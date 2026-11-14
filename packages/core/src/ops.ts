@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { mkdirSync, readdirSync, statSync, unlinkSync, statfsSync, existsSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { desc, eq, sql } from "drizzle-orm";
-import { getDb, env, backupLog, integrityIssues, numberSeries, notificationOutbox, schoolSettings } from "@sb/db";
+import { getDb, env, appRoot, backupLog, integrityIssues, numberSeries, notificationOutbox, schoolSettings } from "@sb/db";
 import { getSettings, audit, clearSettingsCache, type Actor } from "./common";
 
 // ---------------------------------------------------------------- integrity
@@ -70,6 +70,38 @@ function run(cmd: string, args: string[], envVars: Record<string, string>): Prom
   });
 }
 
+/**
+ * Locate a PostgreSQL client tool (pg_dump / pg_restore):
+ *  1. PG_DUMP_PATH in .env (its folder is used for pg_restore too)
+ *  2. tools/pgsql/bin inside the project (portable copy)
+ *  3. C:/Program Files/PostgreSQL/<newest>/bin (normal PostgreSQL install)
+ *  4. whatever is on PATH
+ */
+export function findPgTool(tool: "pg_dump" | "pg_restore"): string | null {
+  const exe = process.platform === "win32" ? `${tool}.exe` : tool;
+  const configured = env().PG_DUMP_PATH;
+  const candidates: string[] = [];
+  if (configured && configured !== "pg_dump") candidates.push(tool === "pg_dump" ? configured : join(dirname(configured), exe));
+  candidates.push(join(appRoot(), "tools", "pgsql", "bin", exe));
+  if (process.platform === "win32") {
+    for (const base of [process.env["ProgramFiles"], process.env["ProgramFiles(x86)"]].filter(Boolean) as string[]) {
+      const root = join(base, "PostgreSQL");
+      if (!existsSync(root)) continue;
+      const versions = readdirSync(root).filter((v) => /^\d+/.test(v)).sort((a, b) => parseFloat(b) - parseFloat(a));
+      for (const v of versions) candidates.push(join(root, v, "bin", exe));
+    }
+  }
+  for (const c of candidates) if (existsSync(c)) return c;
+  for (const dir of (process.env["PATH"] ?? "").split(process.platform === "win32" ? ";" : ":")) {
+    if (dir && existsSync(join(dir, exe))) return join(dir, exe);
+  }
+  return null;
+}
+
+const MISSING_TOOL = "PostgreSQL backup tools (pg_dump) are not installed on this PC. "
+  + "Install PostgreSQL 18 (or copy its bin folder to tools\\pgsql\\bin in the program folder), "
+  + "or set PG_DUMP_PATH in .env to the full path of pg_dump.exe.";
+
 const pgEnv = () => {
   const u = new URL(env().DATABASE_URL);
   return { PGHOST: u.hostname, PGPORT: u.port || "5432", PGUSER: decodeURIComponent(u.username), PGPASSWORD: decodeURIComponent(u.password), PGDATABASE: u.pathname.slice(1) };
@@ -82,7 +114,9 @@ export async function runBackup(kind: "nightly" | "manual" | "pre_update" | "pre
   const stamp = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 16);
   const file = join(dir, `school_billing_${stamp}_${kind}.dump`);
   try {
-    await run(env().PG_DUMP_PATH, ["-Fc", "-f", file], pgEnv());
+    const pgDump = findPgTool("pg_dump");
+    if (!pgDump) throw new Error(MISSING_TOOL);
+    await run(pgDump, ["-Fc", "-f", file], pgEnv());
     const size = statSync(file).size;
     await db.insert(backupLog).values({ kind, filePath: file, sizeBytes: size, ok: true });
     pruneBackups(dir);
@@ -118,7 +152,8 @@ export async function restoreBackup(actor: Actor, file: string) {
   if (!existsSync(file)) throw new Error("Backup file not found");
   const safety = await runBackup("manual");
   if (!safety.ok) throw new Error(`Safety backup failed, restore aborted: ${safety.error}`);
-  const restoreBin = env().PG_DUMP_PATH.replace(/pg_dump(\.exe)?$/i, (_m, ext) => `pg_restore${ext ?? ""}`);
+  const restoreBin = findPgTool("pg_restore");
+  if (!restoreBin) throw new Error(MISSING_TOOL.replace("pg_dump", "pg_restore"));
   await run(restoreBin, ["--clean", "--if-exists", "--no-owner", "-d", pgEnv().PGDATABASE, file], pgEnv());
   await audit(getDb(), actor, "restore", "backup", null, null, { file, safety: safety.file });
 }

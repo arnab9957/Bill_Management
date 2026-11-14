@@ -18,6 +18,7 @@ export { openLines, recalcWallet, applyWalletToInvoice } from "./wallet";
 
 async function assertDayOpen(tx: Executor, actor: Actor, date: ISODate) {
   if (actor.id == null) return;
+  if (!(await getSettings(tx)).dayCloseEnabled) return; // counter closing is optional and off by default
   const closed = await tx.select({ id: dayCloses.id }).from(dayCloses).where(and(eq(dayCloses.date, date), eq(dayCloses.userId, actor.id)));
   if (closed.length) throw new AppError(`Your counter is already closed for ${formatDate(date)}. Ask an accountant to record this entry.`);
 }
@@ -101,7 +102,7 @@ export async function cancelReceipt(actor: Actor, input: unknown) {
   return getDb().transaction(async (tx) => {
     const [p] = await tx.select().from(payments).where(eq(payments.id, d.paymentId));
     if (!p) throw new AppError("Receipt not found");
-    if (actor.role !== "ADMIN") {
+    if (actor.role !== "ADMIN" && (await getSettings(tx)).dayCloseEnabled) {
       const closed = await tx.select({ id: dayCloses.id }).from(dayCloses).where(and(eq(dayCloses.date, p.date), eq(dayCloses.userId, p.receivedBy)));
       if (closed.length) throw new AppError("That day has been closed. Only an Admin can cancel this receipt.");
     }
@@ -192,6 +193,7 @@ export async function dayBook(date: ISODate, userId?: number) {
 export async function closeDay(actor: Actor, input: unknown) {
   const d = dayCloseSchema.parse(input);
   return getDb().transaction(async (tx) => {
+    if (!(await getSettings(tx)).dayCloseEnabled) throw new AppError("Counter closing is turned off. An Admin can turn it on in Settings.");
     const exists = await tx.select().from(dayCloses).where(and(eq(dayCloses.date, d.date), eq(dayCloses.userId, actor.id!)));
     if (exists.length) throw new AppError("This day is already closed for your counter");
     const rows = await tx.select({ mode: payments.mode, total: sql<string>`sum(${payments.amount})` }).from(payments)

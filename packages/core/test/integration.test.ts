@@ -139,7 +139,10 @@ describe.skipIf(!run)("integration", () => {
     expect(again.sent).toBe(0);
   });
 
-  it("day close locks the cashier's day", async () => {
+  it("counter closing is off by default; when switched on it locks the cashier's day", async () => {
+    await expect(core.payments.closeDay(cashier, { date: "2026-05-02", counts: { "500": 1 } })).rejects.toThrow(/turned off/);
+    await db.getDb().update(db.schoolSettings).set({ dayCloseEnabled: true });
+    core.clearSettingsCache();
     await core.payments.closeDay(cashier, { date: "2026-05-02", counts: { "500": 1 } });
     await expect(core.payments.collectPayment({ studentId: studentB, amount: 100, mode: "cash", date: "2026-05-02" }, cashier)).rejects.toThrow(/closed/);
   });

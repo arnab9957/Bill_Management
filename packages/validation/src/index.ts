@@ -259,6 +259,7 @@ export const schoolSettingsSchema = z.object({
     s.split(",").map((x) => Number(x.trim())).filter((n) => Number.isInteger(n) && n > 0),
   ),
   backupPath: z.string().trim().optional(),
+  dayCloseEnabled: checkbox,
 });
 export const providerConfigSchema = z.object({
   emailMode: z.enum(["off", "smtp", "console"]).default("console"),

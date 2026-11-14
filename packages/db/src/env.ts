@@ -26,6 +26,8 @@ const envSchema = z.object({
 });
 
 export type Env = z.infer<typeof envSchema>;
+/** Folder holding the monorepo (where .env / pnpm-workspace.yaml live). */
+export const appRoot = () => baseDir;
 let cached: Env | undefined;
 
 /** Validated environment; the app refuses to start with bad config. */

@@ -46,6 +46,8 @@ export const schoolSettings = pgTable("school_settings", {
   /** AES-GCM encrypted JSON of provider credentials (SMTP, WhatsApp, SMS). */
   providerConfigEnc: text("provider_config_enc"),
   defaultLanguage: varchar("default_language", { length: 8 }).notNull().default("en"),
+  /** Optional cash-counter closing (denomination count + day lock). Off for most schools. */
+  dayCloseEnabled: boolean("day_close_enabled").notNull().default(false),
 }, (t) => [check("single_row", sql`${t.id} = 1`)]);
 
 export const users = pgTable("app_user", {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, formatINR, payments, today } from "@sb/core";
+import { can, formatINR, getSettings, payments, today } from "@sb/core";
 import { closeDayAction } from "./actions";
 import { denominations } from "@sb/validation";
 import { requireRole } from "@/lib/auth";
@@ -13,12 +13,13 @@ export default async function DayBook({ searchParams }: { searchParams: Promise<
   // Cashiers only see their own counter; accountants/admins see everyone unless they filter.
   const onlyMine = user.role === "CASHIER" || sp.mine === "1";
   const book = await payments.dayBook(date, onlyMine ? user.id : undefined);
+  const closing = (await getSettings()).dayCloseEnabled; // optional cash-counter closing
   const myClose = book.closes.find((c) => c.c.userId === user.id);
   const myCash = book.rows.filter((r) => r.p.receivedBy === user.id && r.p.status === "valid" && r.p.mode === "cash").reduce((a, r) => a + r.p.amount, 0);
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Day book" subtitle={date} actions={<>
+      <PageHeader title="Day book" subtitle={`${date} · everything collected that day`} actions={<>
         <form className="flex gap-2"><input type="date" name="date" defaultValue={date} />{user.role !== "CASHIER" && <label className="flex items-center gap-1"><input type="checkbox" name="mine" value="1" defaultChecked={sp.mine === "1"} />Mine only</label>}<button className="rounded-md border border-gray-300 bg-white px-3 text-sm">Show</button></form>
         {can(user.role, "reports") && <LinkButton href={`/api/export/daybook?date=${date}`}>Export</LinkButton>}
       </>} />
@@ -37,6 +38,7 @@ export default async function DayBook({ searchParams }: { searchParams: Promise<
           ))}</tbody>
         </table>
       </Card>
+      {closing && (
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Close my counter">
           {myClose ? (
@@ -59,6 +61,7 @@ export default async function DayBook({ searchParams }: { searchParams: Promise<
           )}
         </Card>
       </div>
+      )}
     </div>
   );
 }
