@@ -6,6 +6,9 @@ import { requireRole } from "@/lib/auth";
 import { formObject, run, type ActionState } from "@/lib/action";
 import { ActionForm, FieldError, Submit } from "@/components/action-form";
 import { Badge, Card, LinkButton, Money, Notice, PageHeader } from "@/components/ui";
+import { StudentPhoto } from "@/components/student-photo";
+import { ReminderButtons } from "@/components/reminder-buttons";
+import { removePhotoAction, uploadPhotoAction } from "./photo-actions";
 
 const path = (id: number) => `/students/${id}`;
 
@@ -43,13 +46,6 @@ async function doRefund(id: number, _: ActionState, fd: FormData): Promise<Actio
   revalidatePath(path(id));
   return r;
 }
-async function remind(id: number) {
-  "use server";
-  const u = await requireRole("notifications");
-  await notifications.sendReminderNow(u, [id]);
-  revalidatePath(path(id));
-}
-
 export default async function StudentProfile({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
   const user = await requireRole("students");
   const id = Number((await params).id);
@@ -62,20 +58,30 @@ export default async function StudentProfile({ params, searchParams }: { params:
 
   return (
     <div className="space-y-5">
+      <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+        <StudentPhoto studentId={id} name={p.s.name} photoPath={p.s.photoPath} canEdit={edit} upload={uploadPhotoAction} remove={removePhotoAction} />
+        <div className="w-full min-w-0 flex-1">
       <PageHeader title={p.s.name} subtitle={<>{p.s.admissionNo} · Class {p.className}{p.sectionName ? "-" + p.sectionName : ""} · <Badge>{p.s.status}</Badge></>}
         actions={<>
           {can(user.role, "collect") && <LinkButton variant="primary" href={`/collect?student=${id}`}>Collect fee</LinkButton>}
           <LinkButton href={`/students/${id}/statement`}>Statement</LinkButton>
           {edit && <LinkButton href={`/students/${id}/edit`}>Edit</LinkButton>}
           {edit && <LinkButton href={`/students/new?sibling=${id}`}>Add sibling</LinkButton>}
-          {can(user.role, "notifications") && outstanding > 0 && <form action={remind.bind(null, id)}><button className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm">Send reminder now</button></form>}
         </>} />
+        </div>
+      </div>
       {created && <Notice tone="ok">Admission saved.</Notice>}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Balance">
           <div className="text-3xl font-semibold"><Money p={outstanding} className={outstanding ? "text-red-700" : "text-green-700"} /></div>
           <div className="mt-1 text-sm text-gray-500">Advance (wallet): <Money p={ledger.wallet} /></div>
+          {can(user.role, "notifications") && outstanding > 0 && (
+            <div className="mt-4 border-t border-gray-100 pt-3">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Send fee reminder to parent</div>
+              <ReminderButtons studentIds={[id]} availability={notifications.channelAvailability(p.guardians.find((x) => x.isPrimary)?.g ?? p.guardians[0]?.g)} />
+            </div>
+          )}
           <div className="mt-3 text-sm text-gray-600">Admitted {formatDate(p.s.admissionDate)}{p.s.leavingDate ? ` · Left ${formatDate(p.s.leavingDate)}` : ""}{p.route ? ` · ${p.route}` : ""}</div>
         </Card>
         <Card title="Guardian">

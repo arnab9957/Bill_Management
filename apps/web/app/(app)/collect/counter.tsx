@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { formatINR, formatDate } from "@sb/core/src/money-dates-client";
 import { collectAction, loadStudentAction, searchAction } from "./actions";
+import { Avatar } from "@/components/student-photo";
 
 type Found = Awaited<ReturnType<typeof searchAction>>[number];
 type Loaded = NonNullable<Awaited<ReturnType<typeof loadStudentAction>>>;
@@ -114,9 +115,7 @@ export function Counter({ today, initialStudentId }: { today: string; initialStu
         {student && (
           <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             <div className="flex gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-100 text-lg font-semibold text-brand-700">
-                {student.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
-              </div>
+              <Avatar studentId={student.id} name={student.name} photoPath={student.photoPath} size={72} />
               <div className="min-w-0">
                 <a href={`/students/${student.id}`} className="font-semibold hover:underline">{student.name}</a>
                 <div className="text-sm text-gray-600">{student.admissionNo} · Class {student.className}{student.sectionName ? "-" + student.sectionName : ""}</div>

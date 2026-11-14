@@ -9,7 +9,7 @@ const config: NextConfig = {
   output: process.env.NEXT_STANDALONE === "1" ? "standalone" : undefined,
   outputFileTracingRoot: resolve(import.meta.dirname, "../.."),
   transpilePackages: ["@sb/core", "@sb/db", "@sb/validation"],
-  serverExternalPackages: ["@node-rs/argon2", "pg", "exceljs"],
+  serverExternalPackages: ["@node-rs/argon2", "pg", "exceljs", "pg-boss", "nodemailer"],
   poweredByHeader: false,
   // Never let the browser or a proxy cache financial pages.
   async headers() {

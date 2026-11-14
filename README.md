@@ -83,6 +83,8 @@ scripts/            install-services.ps1 (NSSM + LAN firewall), backup.ps1, rest
 | Excel export; Tally receipt vouchers as CSV | Done |
 | UPI QR with the amount filled in on bills; no-dues certificate; student statement | Done |
 | Nightly `pg_dump` with 30 daily + 12 monthly retention, USB reminder, restore screen, integrity check, health page | Done |
+| Student photos (profile banner and Collect fee screen; camera on phones; JPG, PNG or WebP up to 3 MB) | Done. Photos are files in `storage/photos/` and are **not** in the database backup, so copy that folder to the USB drive with the backups |
+| Print buttons on every bill, plus **Print all shown** on the Bills page (one A5 page per bill, using the current filters) | Done |
 | Year-end promotion wizard with an automatic backup first and dues carried forward | Done |
 | NSSM services, LAN-only firewall rule, backup, restore and update scripts | Done |
 

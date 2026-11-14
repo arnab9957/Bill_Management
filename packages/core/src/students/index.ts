@@ -1,8 +1,10 @@
 import ExcelJS from "exceljs";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { basename, join } from "node:path";
 import { and, asc, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import {
   getDb, academicYears, classes, guardians, invoices, sections, studentConcessions, concessionTypes, studentGuardians, students,
-  transportRoutes, notificationOutbox, payments, type Executor,
+  transportRoutes, notificationOutbox, payments, env, type Executor,
 } from "@sb/db";
 import { admissionSchema, guardianSchema, importRowSchema, studentSchema, fieldErrors, type ImportRow } from "@sb/validation";
 import { AppError, audit, getCurrentYear, type Actor } from "../common";
@@ -301,4 +303,57 @@ export async function linkGuardian(actor: Actor, studentId: number, guardianId: 
   const db = getDb();
   await db.insert(studentGuardians).values({ studentId, guardianId, isPrimary: false }).onConflictDoNothing();
   await audit(db, actor, "link_guardian", "student", studentId, null, { guardianId });
+}
+
+// ---------------------------------------------------------------- photos
+const PHOTO_MAX_BYTES = 3 * 1024 * 1024;
+const photoDir = () => join(env().STORAGE_DIR, "photos");
+
+/** Detect the real image type from the file's first bytes (never trust the browser's label). */
+function imageType(b: Uint8Array): { ext: string; mime: string } | null {
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { ext: "jpg", mime: "image/jpeg" };
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return { ext: "png", mime: "image/png" };
+  if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return { ext: "webp", mime: "image/webp" };
+  return null;
+}
+const MIME: Record<string, string> = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
+
+export async function setStudentPhoto(actor: Actor, studentId: number, data: Uint8Array) {
+  if (data.byteLength === 0) throw new AppError("Choose a photo first");
+  if (data.byteLength > PHOTO_MAX_BYTES) throw new AppError("Photo is larger than 3 MB. Use a smaller picture.");
+  const type = imageType(data);
+  if (!type) throw new AppError("Only JPG, PNG or WebP photos are allowed");
+  const db = getDb();
+  const [s] = await db.select({ photoPath: students.photoPath }).from(students).where(eq(students.id, studentId));
+  if (!s) throw new AppError("Student not found");
+  await mkdir(photoDir(), { recursive: true });
+  // New name every time, so browsers never show a cached old photo.
+  const file = `student-${studentId}-${Date.now()}.${type.ext}`;
+  await writeFile(join(photoDir(), file), data);
+  await db.update(students).set({ photoPath: file }).where(eq(students.id, studentId));
+  if (s.photoPath && s.photoPath !== file) await rm(join(photoDir(), basename(s.photoPath)), { force: true });
+  await audit(db, actor, "photo", "student", studentId, { photo: s.photoPath }, { photo: file });
+  return file;
+}
+
+export async function removeStudentPhoto(actor: Actor, studentId: number) {
+  const db = getDb();
+  const [s] = await db.select({ photoPath: students.photoPath }).from(students).where(eq(students.id, studentId));
+  if (!s?.photoPath) return;
+  await db.update(students).set({ photoPath: null }).where(eq(students.id, studentId));
+  await rm(join(photoDir(), basename(s.photoPath)), { force: true });
+  await audit(db, actor, "photo_remove", "student", studentId, { photo: s.photoPath }, null);
+}
+
+/** Photo bytes for display, or null. */
+export async function readStudentPhoto(studentId: number): Promise<{ data: Buffer; mime: string } | null> {
+  const [s] = await getDb().select({ photoPath: students.photoPath }).from(students).where(eq(students.id, studentId));
+  if (!s?.photoPath) return null;
+  const name = basename(s.photoPath); // stored name only; no path tricks
+  try {
+    const data = await readFile(join(photoDir(), name));
+    return { data, mime: MIME[name.split(".").pop() ?? ""] ?? "application/octet-stream" };
+  } catch {
+    return null;
+  }
 }

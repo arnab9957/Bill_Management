@@ -4,7 +4,7 @@ import {
   type Channel, type Executor, type NotifyEvent, type OutboxRow,
 } from "@sb/db";
 import { getSettings, audit, type Actor, SYSTEM } from "../common";
-import { addDays, formatDate, today, type ISODate } from "../dates";
+import { addDays, daysBetween, formatDate, today, type ISODate } from "../dates";
 import { formatINR } from "../money";
 
 export const CHANNELS: Channel[] = ["whatsapp", "email", "sms"];
@@ -46,6 +46,8 @@ interface EnqueueArgs {
   vars: Record<string, string>;
   expiresAt?: Date;
   attachmentPath?: string;
+  /** Limit to these channels (manual "send by WhatsApp" etc.). Default: all enabled. */
+  channels?: Channel[];
 }
 
 /**
@@ -68,7 +70,7 @@ export async function enqueue(tx: Executor, a: EnqueueArgs): Promise<number> {
 
   const vars = { guardian_name: guardian.name, school_name: settings.name, school_phone: settings.phone, ...a.vars };
   let count = 0;
-  for (const channel of CHANNELS) {
+  for (const channel of a.channels ?? CHANNELS) {
     const recipient = channel === "sms" ? (guardian.notifySms ? guardian.mobile : null)
       : channel === "whatsapp" ? (guardian.notifyWhatsapp ? guardian.whatsappNo ?? guardian.mobile : null)
       : guardian.notifyEmail ? guardian.email : null;
@@ -106,65 +108,103 @@ export async function studentVars(tx: Executor, studentId: number): Promise<Reco
 }
 
 // ---------------------------------------------------------------- reminder triggers
+export interface ReminderPlan { event: NotifyEvent; step: number; expires: ISODate }
+
 /**
- * Daily scan: queue "due in N days", "due today" and overdue (+3/+7/+15) reminders.
- * Siblings with the same primary guardian get ONE combined message.
+ * Which reminder (if any) an unpaid bill should get on `onDate`. Pure; unit tested.
+ * Each reminder has a window rather than one exact day, so a morning when the
+ * school PC was switched off doesn't lose it. The idempotency key (event + step)
+ * still guarantees each reminder is sent at most once.
+ *  - due soon:  any day in the `daysBefore` days before the due date
+ *  - due today: the due date itself
+ *  - overdue:   the latest step reached (e.g. 3, 7, 15 days late), until the next step;
+ *               the last step stays open for 3 days
+ */
+export function reminderFor(dueDate: ISODate, onDate: ISODate, daysBefore: number, overdueSteps: readonly number[]): ReminderPlan | null {
+  const d = daysBetween(dueDate, onDate); // >0 = days late, <0 = days early
+  if (d < 0) return daysBefore > 0 && -d <= daysBefore ? { event: "DUE_UPCOMING", step: 0, expires: addDays(dueDate, -1) } : null;
+  if (d === 0) return { event: "DUE_TODAY", step: 0, expires: onDate };
+  const steps = [...new Set(overdueSteps)].filter((n) => n > 0).sort((a, b) => a - b);
+  let i = -1;
+  for (let k = 0; k < steps.length; k++) if (steps[k]! <= d) i = k;
+  if (i < 0) return null;
+  const step = steps[i]!;
+  const next = steps[i + 1];
+  const windowEnd = next !== undefined ? next - 1 : step + 2;
+  if (d > windowEnd) return null;
+  return { event: "OVERDUE", step, expires: addDays(dueDate, windowEnd) };
+}
+
+/**
+ * Daily scan: queue "due soon", "due today" and overdue reminders.
+ * Siblings with the same primary guardian get ONE combined message per reminder.
  */
 export async function queueDueReminders(onDate: ISODate = today()): Promise<number> {
   const db = getDb();
   const settings = await getSettings(db);
-  const plans: { event: NotifyEvent; dueDate: ISODate; step: number; expires: ISODate }[] = [
-    { event: "DUE_UPCOMING", dueDate: addDays(onDate, settings.reminderDaysBefore), step: 0, expires: addDays(onDate, settings.reminderDaysBefore) },
-    { event: "DUE_TODAY", dueDate: onDate, step: 0, expires: onDate },
-    ...settings.overdueSteps.map((n, i, arr) => ({
-      event: "OVERDUE" as const, dueDate: addDays(onDate, -n), step: n,
-      // stale until the next step would take over
-      expires: addDays(onDate, Math.max(1, ((arr[i + 1] ?? n + 3) - n) - 1)),
-    })),
-  ];
-  if (settings.reminderDaysBefore === 0) plans.shift();
+  const rows = await db.select({
+    invoiceId: invoices.id, invoiceNo: invoices.invoiceNo, balance: invoices.balance, dueDate: invoices.dueDate,
+    studentId: students.id, studentName: students.name, cls: classes.name, guardianId: studentGuardians.guardianId,
+  }).from(invoices)
+    .innerJoin(students, eq(students.id, invoices.studentId))
+    .innerJoin(classes, eq(classes.id, students.classId))
+    .innerJoin(studentGuardians, and(eq(studentGuardians.studentId, students.id), eq(studentGuardians.isPrimary, true)))
+    .where(and(lte(invoices.dueDate, addDays(onDate, settings.reminderDaysBefore)), gt(invoices.balance, 0),
+      ne(invoices.status, "cancelled"), eq(students.status, "active")));
+
+  // Group: one message per guardian per (reminder, due date, step).
+  type Row = (typeof rows)[number];
+  const groups = new Map<string, { plan: ReminderPlan; guardianId: number; dueDate: ISODate; list: Row[] }>();
+  for (const r of rows) {
+    const plan = reminderFor(r.dueDate, onDate, settings.reminderDaysBefore, settings.overdueSteps);
+    if (!plan) continue;
+    const key = `${plan.event}:g${r.guardianId}:${r.dueDate}:${plan.step}`;
+    const g = groups.get(key) ?? { plan, guardianId: r.guardianId, dueDate: r.dueDate, list: [] };
+    g.list.push(r);
+    groups.set(key, g);
+  }
 
   let queued = 0;
-  for (const p of plans) {
-    const rows = await db.select({
-      invoiceId: invoices.id, invoiceNo: invoices.invoiceNo, balance: invoices.balance, dueDate: invoices.dueDate,
-      studentId: students.id, studentName: students.name, cls: classes.name, guardianId: studentGuardians.guardianId,
-    }).from(invoices)
-      .innerJoin(students, eq(students.id, invoices.studentId))
-      .innerJoin(classes, eq(classes.id, students.classId))
-      .innerJoin(studentGuardians, and(eq(studentGuardians.studentId, students.id), eq(studentGuardians.isPrimary, true)))
-      .where(and(eq(invoices.dueDate, p.dueDate), gt(invoices.balance, 0), ne(invoices.status, "cancelled"), eq(students.status, "active")));
-
-    const byGuardian = new Map<number, typeof rows>();
-    for (const r of rows) byGuardian.set(r.guardianId, [...(byGuardian.get(r.guardianId) ?? []), r]);
-
-    for (const [guardianId, list] of byGuardian) {
-      const total = list.reduce((a, r) => a + r.balance, 0);
-      const names = [...new Set(list.map((r) => r.studentName))];
-      const detail = list.map((r) => `${r.studentName} (${r.cls}): ${formatINR(r.balance)} – ${r.invoiceNo}`).join("\n");
-      const expiresAt = new Date(`${p.expires}T23:59:59`);
-      queued += await db.transaction((tx) => enqueue(tx, {
-        event: p.event,
-        keyBase: `${p.event}:g${guardianId}:${p.dueDate}:${p.step}`,
-        studentIds: [...new Set(list.map((r) => r.studentId))],
-        invoiceIds: list.map((r) => r.invoiceId),
-        vars: {
-          student_name: names.join(", "),
-          class: [...new Set(list.map((r) => r.cls))].join(", "),
-          amount_due: formatINR(total, { symbol: false }),
-          due_date: formatDate(p.dueDate),
-          invoice_no: list.map((r) => r.invoiceNo).join(", "),
-          dues_detail: detail,
-        },
-        expiresAt,
-      }));
-    }
+  for (const [keyBase, { plan, dueDate, list }] of groups) {
+    const total = list.reduce((a, r) => a + r.balance, 0);
+    queued += await db.transaction((tx) => enqueue(tx, {
+      event: plan.event,
+      keyBase,
+      studentIds: [...new Set(list.map((r) => r.studentId))],
+      invoiceIds: list.map((r) => r.invoiceId),
+      vars: {
+        student_name: [...new Set(list.map((r) => r.studentName))].join(", "),
+        class: [...new Set(list.map((r) => r.cls))].join(", "),
+        amount_due: formatINR(total, { symbol: false }),
+        due_date: formatDate(dueDate),
+        invoice_no: list.map((r) => r.invoiceNo).join(", "),
+        dues_detail: list.map((r) => `${r.studentName} (${r.cls}): ${formatINR(r.balance)} – ${r.invoiceNo}`).join("\n"),
+      },
+      expiresAt: new Date(`${plan.expires}T23:59:59`),
+    }));
   }
   return queued;
 }
 
-/** "Send reminder now" from the defaulters list: one message per guardian, keyed per day. */
-export async function sendReminderNow(actor: Actor, studentIds: number[]): Promise<number> {
+/** Why a guardian can or can't be reached on each channel (for the manual buttons). */
+export type ChannelAvailability = Record<Channel, { ok: boolean; to?: string; reason?: string }>;
+export function channelAvailability(g: { messagingConsent: boolean; mobile: string; whatsappNo: string | null; email: string | null; notifySms: boolean; notifyWhatsapp: boolean; notifyEmail: boolean } | null | undefined): ChannelAvailability {
+  const no = (reason: string) => ({ ok: false, reason });
+  if (!g) return { whatsapp: no("No guardian"), email: no("No guardian"), sms: no("No guardian") };
+  if (!g.messagingConsent) { const r = no("Parent hasn't consented to messages (edit student)"); return { whatsapp: r, email: r, sms: r }; }
+  return {
+    whatsapp: g.notifyWhatsapp ? { ok: true, to: g.whatsappNo ?? g.mobile } : no("WhatsApp turned off for this parent"),
+    email: !g.email ? no("No email address on file") : g.notifyEmail ? { ok: true, to: g.email } : no("Email turned off for this parent"),
+    sms: g.notifySms ? { ok: true, to: g.mobile } : no("SMS turned off for this parent"),
+  };
+}
+
+/**
+ * Manual reminder ("Send reminder now", or the WhatsApp / Email / SMS buttons).
+ * One combined message per guardian covering all their children's unpaid bills.
+ * Keyed to the minute, so a double-click doesn't send twice but staff can resend later.
+ */
+export async function sendReminderNow(actor: Actor, studentIds: number[], channels: Channel[] = CHANNELS): Promise<number> {
   const db = getDb();
   if (!studentIds.length) return 0;
   const rows = await db.select({
@@ -179,12 +219,14 @@ export async function sendReminderNow(actor: Actor, studentIds: number[]): Promi
   for (const r of rows) byGuardian.set(r.guardianId, [...(byGuardian.get(r.guardianId) ?? []), r]);
   let n = 0;
   const d = today();
+  const minute = new Date().toISOString().slice(0, 16);
   for (const [guardianId, list] of byGuardian) {
     const oldest = list.map((r) => r.dueDate).sort()[0]!;
     n += await db.transaction(async (tx) => {
       const c = await enqueue(tx, {
         event: oldest < d ? "OVERDUE" : "DUE_UPCOMING",
-        keyBase: `MANUAL:g${guardianId}:${d}`,
+        keyBase: `MANUAL:g${guardianId}:${minute}`,
+        channels,
         studentIds: [...new Set(list.map((r) => r.studentId))],
         invoiceIds: list.map((r) => r.invoiceId),
         vars: {
@@ -197,7 +239,7 @@ export async function sendReminderNow(actor: Actor, studentIds: number[]): Promi
         },
         expiresAt: new Date(`${addDays(d, 1)}T23:59:59`),
       });
-      if (c) await audit(tx, actor, "send_reminder", "guardian", guardianId);
+      if (c) await audit(tx, actor, "send_reminder", "guardian", guardianId, null, { channels, studentIds });
       return c;
     });
   }
@@ -361,3 +403,15 @@ export const SAMPLE_VARS: Record<string, string> = {
   dues_detail: "Anita Kumar (V): ₹ 2,200.00 – INV/2026-27/000123", amount_paid: "2,200.00", receipt_no: "RCT/2026-27/000045",
   balance: "0.00", cheque_no: "123456", bounce_charge: "300.00", late_fee: "50.00",
 };
+
+/** Channel availability for many students at once (primary guardian of each). */
+export async function availabilityForStudents(studentIds: number[]): Promise<Map<number, ChannelAvailability>> {
+  const out = new Map<number, ChannelAvailability>();
+  if (!studentIds.length) return out;
+  const rows = await getDb().select({ sid: studentGuardians.studentId, g: guardians }).from(studentGuardians)
+    .innerJoin(guardians, eq(guardians.id, studentGuardians.guardianId))
+    .where(inArray(studentGuardians.studentId, studentIds)).orderBy(desc(studentGuardians.isPrimary));
+  for (const r of rows) if (!out.has(r.sid)) out.set(r.sid, channelAvailability(r.g));
+  for (const id of studentIds) if (!out.has(id)) out.set(id, channelAvailability(null));
+  return out;
+}

@@ -31,7 +31,7 @@ export default async function InvoiceDetail({ params }: { params: Promise<{ id: 
   return (
     <div className="space-y-4">
       <PageHeader title={`Bill ${inv.invoiceNo}`} subtitle={<><Link className="text-brand-700 hover:underline" href={`/students/${inv.studentId}`}>{d.student.name}</Link> · {d.className} · {periodLabel(inv.period)} · <Badge>{inv.status}</Badge></>}
-        actions={<LinkButton href={`/invoices/${id}/print`} target="_blank">Print</LinkButton>} />
+        actions={<LinkButton variant="primary" href={`/invoices/${id}/print?auto=1`} target="_blank">🖨 Print bill</LinkButton>} />
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Lines" className="lg:col-span-2">
           <table className="data">

@@ -9,6 +9,6 @@ export * as payments from "./payments";
 export * as students from "./students";
 export * as fees from "./fees";
 export * as notifications from "./notifications";
-export type { NotificationAdapter, OutboundMessage, SendResult } from "./notifications";
+export type { NotificationAdapter, OutboundMessage, SendResult, ChannelAvailability } from "./notifications";
 export * as reports from "./reports";
 export * as ops from "./ops";
