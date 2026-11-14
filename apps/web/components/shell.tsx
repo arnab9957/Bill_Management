@@ -4,10 +4,27 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
 export interface NavItem { href: string; label: string; key?: string }
+export interface YearInfo { id: number; name: string; isCurrent: boolean; currentName: string; options: { id: number; name: string; isCurrent: boolean }[] }
+
+/** Academic-year switcher: everything year-based (students, bills, bill run) follows it. */
+function YearPicker({ year, switchYear }: { year: YearInfo; switchYear: (fd: FormData) => Promise<void> }) {
+  return (
+    <form action={switchYear} className="mt-2">
+      <label className="flex flex-col gap-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+        Academic year
+        <select name="yearId" defaultValue={year.id} onChange={(e) => e.currentTarget.form?.requestSubmit()}
+          className={`w-full py-1 text-sm font-semibold normal-case tracking-normal ${year.isCurrent ? "text-gray-900" : "border-amber-400 bg-amber-50 text-amber-900"}`}>
+          {year.options.map((o) => <option key={o.id} value={o.id}>{o.name}{o.isCurrent ? " (current)" : ""}</option>)}
+        </select>
+      </label>
+    </form>
+  );
+}
 
 /** Sidebar + global keyboard shortcuts (Alt+key). */
-export function Shell({ nav, user, school, children, logout }: {
+export function Shell({ nav, user, school, children, logout, year, switchYear }: {
   nav: NavItem[]; user: { fullName: string; role: string }; school: string; children: ReactNode; logout: () => Promise<void>;
+  year: YearInfo; switchYear: (fd: FormData) => Promise<void>;
 }) {
   const path = usePathname();
   const router = useRouter();
@@ -37,15 +54,16 @@ export function Shell({ nav, user, school, children, logout }: {
         </button>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-brand-900">{school}</div>
-          <div className="truncate text-xs text-gray-500">{nav.find((n) => (n.href === "/" ? path === "/" : path.startsWith(n.href)))?.label ?? "Fee Billing"}</div>
+          <div className="truncate text-xs text-gray-500">{nav.find((n) => (n.href === "/" ? path === "/" : path.startsWith(n.href)))?.label ?? "Fee Billing"} · {year.name}</div>
         </div>
       </header>
       {menuOpen && <div className="no-print fixed inset-0 z-40 bg-black/30 lg:hidden" onClick={() => setMenuOpen(false)} aria-hidden />}
       <aside className={`no-print fixed inset-y-0 left-0 z-50 flex h-screen w-64 shrink-0 flex-col border-r border-gray-200 bg-white shadow-xl transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:w-56 lg:translate-x-0 lg:shadow-none ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-          <div className="min-w-0">
+        <div className="flex items-start justify-between border-b border-gray-100 px-4 py-3">
+          <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold text-brand-900">{school}</div>
             <div className="text-xs text-gray-500">Fee Billing</div>
+            <YearPicker year={year} switchYear={switchYear} />
           </div>
           <button type="button" aria-label="Close menu" onClick={() => setMenuOpen(false)} className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 lg:hidden">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
@@ -74,7 +92,14 @@ export function Shell({ nav, user, school, children, logout }: {
         </div>
       </aside>
       {pendingHref && <div className="no-print fixed inset-x-0 top-0 z-50 h-1 overflow-hidden bg-brand-100"><div className="h-full w-1/3 animate-[navbar_1s_ease-in-out_infinite] bg-brand-600" /></div>}
-      <main className={`min-w-0 flex-1 p-3 transition-opacity sm:p-6 ${pendingHref ? "pointer-events-none opacity-50" : ""}`} aria-busy={!!pendingHref}>{children}</main>
+      <main className={`min-w-0 flex-1 p-3 transition-opacity sm:p-6 ${pendingHref ? "pointer-events-none opacity-50" : ""}`} aria-busy={!!pendingHref}>
+        {!year.isCurrent && (
+          <div className="no-print mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            You are viewing academic year <b>{year.name}</b>. The current year is {year.currentName}. Change it in the sidebar.
+          </div>
+        )}
+        {children}
+      </main>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { billing, fees, periodOf, today } from "@sb/core";
 import { requireRole } from "@/lib/auth";
+import { getWorkingYear } from "@/lib/year";
 import { run, type ActionState } from "@/lib/action";
 import { ActionForm, Submit } from "@/components/action-form";
 import { Card, Notice, PageHeader } from "@/components/ui";
@@ -20,14 +21,17 @@ async function runBilling(_: ActionState, fd: FormData): Promise<ActionState> {
 export default async function BillingPage() {
   await requireRole("billing");
   const { classes } = await fees.masters();
+  const { year } = await getWorkingYear();
+  const now = periodOf(today());
+  const defaultPeriod = now >= periodOf(year.startDate) && now <= periodOf(year.endDate) ? now : periodOf(year.startDate);
   return (
     <div className="space-y-4">
       <PageHeader title="Bill run" subtitle="Bills are generated automatically on the 1st of each month. Use this to run now for a class or month." />
-      <Notice>Always <b>Preview</b> first. Re-running a month never creates duplicates — students already billed are skipped.</Notice>
+      <Notice>Academic year <b>{year.name}</b>: only students enrolled in {year.name} are billed, using their {year.name} class and fee structure. Always <b>Preview</b> first. Re-running a month never creates duplicates — students already billed are skipped.</Notice>
       <Card>
         <ActionForm action={runBilling}>
           <div className="flex flex-wrap items-end gap-4">
-            <label className="flex flex-col gap-1">Month<input type="month" name="period" defaultValue={periodOf(today())} required /></label>
+            <label className="flex flex-col gap-1">Month<input type="month" name="period" defaultValue={defaultPeriod} min={periodOf(year.startDate)} max={periodOf(year.endDate)} required /></label>
             <div className="flex flex-col gap-1">
               <span className="text-sm text-gray-700">Classes (none selected = all)</span>
               <div className="flex max-w-3xl flex-wrap gap-x-3 gap-y-1">

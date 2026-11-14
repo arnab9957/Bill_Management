@@ -147,6 +147,27 @@ export const guardians = pgTable("guardian", {
   messagingConsent: boolean("messaging_consent").notNull().default(false),
 }, (t) => [index("guardian_mobile_idx").on(t.mobile)]);
 
+/**
+ * One row per student per academic year: the class/section/roll for that year.
+ * Promotion adds a row for the new year; earlier years stay as history.
+ * student.classId/sectionId/rollNo mirror the student's latest enrolment.
+ */
+export const enrollmentStatusEnum = pgEnum("enrollment_status", ["studying", "promoted", "left", "passed_out"]);
+export const studentEnrollments = pgTable("student_enrollment", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  academicYearId: integer("academic_year_id").notNull().references(() => academicYears.id),
+  classId: integer("class_id").notNull().references(() => classes.id),
+  sectionId: integer("section_id").references(() => sections.id),
+  rollNo: varchar("roll_no", { length: 16 }),
+  status: enrollmentStatusEnum("status").notNull().default("studying"),
+  note: text("note"),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("enrollment_student_year").on(t.studentId, t.academicYearId),
+  index("enrollment_year_class").on(t.academicYearId, t.classId),
+]);
+
 export const studentGuardians = pgTable("student_guardian", {
   studentId: integer("student_id").notNull().references(() => students.id),
   guardianId: integer("guardian_id").notNull().references(() => guardians.id),
@@ -275,6 +296,8 @@ export const payments = pgTable("payment", {
   referenceNo: text("reference_no"),
   bank: text("bank"),
   receivedBy: integer("received_by").notNull().references(() => users.id),
+  /** Academic year the payment belongs to (from its date). */
+  academicYearId: integer("academic_year_id").references(() => academicYears.id),
   status: paymentStatusEnum("status").notNull().default("valid"),
   cancelReason: text("cancel_reason"),
   cancelledBy: integer("cancelled_by").references(() => users.id),
@@ -283,6 +306,7 @@ export const payments = pgTable("payment", {
 }, (t) => [
   index("payment_student_idx").on(t.studentId),
   index("payment_date_idx").on(t.date),
+  index("payment_year_idx").on(t.academicYearId),
   check("payment_amount_pos", sql`${t.amount} > 0`),
   check("payment_unalloc_ok", sql`${t.unallocated} >= 0 and ${t.unallocated} <= ${t.amount}`),
 ]);
@@ -405,6 +429,7 @@ export const backupLog = pgTable("backup_log", {
 
 export type User = typeof users.$inferSelect;
 export type Student = typeof students.$inferSelect;
+export type StudentEnrollment = typeof studentEnrollments.$inferSelect;
 export type Guardian = typeof guardians.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type InvoiceLine = typeof invoiceLines.$inferSelect;

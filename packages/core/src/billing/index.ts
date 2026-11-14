@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, inArray, lte, ne, sql, like } from "drizzle-orm";
 import {
   getDb, academicYears, classes, concessionTypes, creditNotes, feeHeads, feeStructureItems, feeStructures, invoiceLines,
-  invoices, lateFeeRules, sections, students, studentConcessions, transportRoutes, payments, paymentAllocations,
+  invoices, lateFeeRules, sections, students, studentConcessions, transportRoutes, payments, paymentAllocations, studentEnrollments,
   type Executor, type Invoice,
 } from "@sb/db";
 import { billRunSchema, cancelInvoiceSchema, creditNoteSchema, miscChargeSchema, type BillRunInput } from "@sb/validation";
@@ -65,13 +65,17 @@ export async function generateInvoices(input: BillRunInput, actor: Actor = SYSTE
   const year = await yearForDate(db, periodStart);
   const periodEnd = dateInPeriod(period, 28); // admissions up to the 28th are billed for the month
 
-  const conds = [eq(students.status, "active"), lte(students.admissionDate, periodEnd)];
+  // Only students enrolled in THIS academic year are billed, with the class they have in this year.
+  const conds = [eq(students.status, "active"), lte(students.admissionDate, periodEnd),
+    eq(studentEnrollments.academicYearId, year.id), eq(studentEnrollments.status, "studying")];
   if (studentId) conds.push(eq(students.id, studentId));
-  else if (classIds.length) conds.push(inArray(students.classId, classIds));
-  const studs = await db.select({ s: students, className: classes.name, route: transportRoutes })
-    .from(students).innerJoin(classes, eq(classes.id, students.classId))
+  else if (classIds.length) conds.push(inArray(studentEnrollments.classId, classIds));
+  const enrolled = await db.select({ s: students, classId: studentEnrollments.classId, className: classes.name, route: transportRoutes })
+    .from(studentEnrollments).innerJoin(students, eq(students.id, studentEnrollments.studentId))
+    .innerJoin(classes, eq(classes.id, studentEnrollments.classId))
     .leftJoin(transportRoutes, eq(transportRoutes.id, students.transportRouteId))
     .where(and(...conds)).orderBy(asc(classes.sortOrder), asc(students.name));
+  const studs = enrolled.map((x) => ({ ...x, s: { ...x.s, classId: x.classId } }));
 
   const result: BillRunResult = { period, yearName: year.name, dryRun, planned: [], skipped: [], totalNet: 0, created: [] };
   if (!studs.length) return result;
@@ -308,9 +312,10 @@ export async function getInvoice(id: number) {
   return { ...row, lines, allocations: allocs, creditNotes: cns };
 }
 
-export async function listInvoices(f: { period?: string; classId?: number; status?: string; q?: string; limit?: number }) {
+export async function listInvoices(f: { period?: string; classId?: number; status?: string; q?: string; limit?: number; yearId?: number }) {
   const db = getDb();
   const conds = [];
+  if (f.yearId) conds.push(eq(invoices.academicYearId, f.yearId));
   if (f.period) conds.push(eq(invoices.period, f.period));
   if (f.classId) conds.push(eq(students.classId, f.classId));
   if (f.status) conds.push(eq(invoices.status, f.status as Invoice["status"]));

@@ -132,6 +132,7 @@ if (demo) {
         admissionNo: `A100${i + 1}`, name: nm, classId: cls.id, admissionDate: "2026-04-01", rollNo: String(i + 1),
       }).returning();
       await db.insert(s.studentGuardians).values({ studentId: stu!.id, guardianId: g!.id, isPrimary: true });
+      await db.insert(s.studentEnrollments).values({ studentId: stu!.id, academicYearId: currentYear.id, classId: cls.id, rollNo: String(i + 1) });
     }
     console.log("Demo students A1001, A1002 created (siblings).");
   }

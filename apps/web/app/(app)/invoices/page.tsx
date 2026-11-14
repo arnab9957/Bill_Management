@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { billing, can, fees, formatDate, notifications, periodLabel } from "@sb/core";
 import { requireRole } from "@/lib/auth";
+import { getWorkingYear } from "@/lib/year";
 import { Badge, Card, Empty, LinkButton, Money, PageHeader } from "@/components/ui";
 import { ReminderButtons } from "@/components/reminder-buttons";
 
@@ -8,7 +9,8 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
   const user = await requireRole("billing");
   const sp = await searchParams;
   const { classes } = await fees.masters();
-  const rows = await billing.listInvoices({ q: sp.q, period: sp.period, classId: sp.classId ? Number(sp.classId) : undefined, status: sp.status });
+  const { year } = await getWorkingYear();
+  const rows = await billing.listInvoices({ q: sp.q, period: sp.period, classId: sp.classId ? Number(sp.classId) : undefined, status: sp.status, yearId: year.id });
   const total = rows.reduce((a, r) => a + r.inv.balance, 0);
   const canSend = can(user.role, "notifications");
   const unpaid = rows.filter((r) => r.inv.balance > 0 && r.inv.status !== "cancelled").map((r) => r.inv.studentId);
@@ -16,7 +18,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
   const qs = new URLSearchParams(Object.entries(sp).filter(([, v]) => v) as [string, string][]).toString();
   return (
     <div>
-      <PageHeader title="Bills" subtitle={<>{rows.length} shown · balance <Money p={total} /></>} actions={<>
+      <PageHeader title="Bills" subtitle={<>{year.name} · {rows.length} shown · balance <Money p={total} /></>} actions={<>
         {rows.length > 0 && <LinkButton href={`/invoices/print-all?${qs}`} target="_blank">🖨 Print all shown ({rows.length})</LinkButton>}
         <LinkButton variant="primary" href="/billing">Run billing</LinkButton>
       </>} />

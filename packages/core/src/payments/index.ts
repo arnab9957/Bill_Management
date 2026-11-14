@@ -49,7 +49,7 @@ export async function collectPayment(input: CollectPaymentInput, actor: Actor) {
     const settings = await getSettings(tx);
     const receiptNo = formatDocNo(settings.receiptPrefix, year.name, await nextNumber(tx, `RECEIPT:${year.name}`));
     const [p] = await tx.insert(payments).values({
-      receiptNo, studentId: d.studentId, date: d.date, amount: d.amount, unallocated: plan.remainder, mode: d.mode,
+      receiptNo, studentId: d.studentId, date: d.date, academicYearId: year.id, amount: d.amount, unallocated: plan.remainder, mode: d.mode,
       referenceNo: d.referenceNo || d.chequeNo || null, bank: d.bank || null, receivedBy: actor.id!,
     }).returning();
     if ((d.mode === "cheque" || d.mode === "dd") && d.chequeNo && d.bank) {

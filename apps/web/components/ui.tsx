@@ -76,7 +76,7 @@ export function Stat({ label, value, sub, tone }: { label: string; value: ReactN
   return (
     <div className="min-w-0 rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:p-4">
       <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</div>
-      <div className={cx("mt-1 break-words text-xl font-semibold tabular-nums sm:text-2xl", tone === "red" && "text-red-700", tone === "green" && "text-green-700")}>{value}</div>
+      <div className={cx("mt-1 wrap-break-word text-xl font-semibold tabular-nums sm:text-2xl", tone === "red" && "text-red-700", tone === "green" && "text-green-700")}>{value}</div>
       {sub && <div className="mt-0.5 text-xs text-gray-500">{sub}</div>}
     </div>
   );

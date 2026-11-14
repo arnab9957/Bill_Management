@@ -2,6 +2,7 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { fees, toRupeeString } from "@sb/core";
 import { requireRole } from "@/lib/auth";
+import { getWorkingYear } from "@/lib/year";
 import { formObject, run, type ActionState } from "@/lib/action";
 import { ActionForm, FieldError, Submit } from "@/components/action-form";
 import { Card, Money, PageHeader } from "@/components/ui";
@@ -38,7 +39,7 @@ async function copy(_: ActionState, fd: FormData): Promise<ActionState> {
 export default async function FeesPage({ searchParams }: { searchParams: Promise<{ year?: string }> }) {
   await requireRole("fees");
   const m = await fees.masters();
-  const current = m.years.find((y) => y.isCurrent) ?? m.years.at(-1);
+  const current = (await getWorkingYear()).year;
   const yearId = Number((await searchParams).year ?? current?.id);
   const year = m.years.find((y) => y.id === yearId);
   const [structs, conc, late] = await Promise.all([fees.listStructures(yearId), fees.listConcessionTypes(), fees.getLateFeeRule(yearId)]);

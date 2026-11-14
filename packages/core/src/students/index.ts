@@ -4,13 +4,16 @@ import { basename, join } from "node:path";
 import { and, asc, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import {
   getDb, academicYears, classes, guardians, invoices, sections, studentConcessions, concessionTypes, studentGuardians, students,
-  transportRoutes, notificationOutbox, payments, env, type Executor,
+  transportRoutes, notificationOutbox, payments, env, studentEnrollments, type Executor,
 } from "@sb/db";
-import { admissionSchema, guardianSchema, importRowSchema, studentSchema, fieldErrors, type ImportRow } from "@sb/validation";
+import { admissionSchema, guardianSchema, importRowSchema, studentEditSchema, fieldErrors, type ImportRow } from "@sb/validation";
 import { AppError, audit, getCurrentYear, type Actor } from "../common";
 import { today, type ISODate } from "../dates";
 import { createOpeningBalance } from "../billing";
 import { recalcWallet } from "../payments/wallet";
+import { carryForwardDues, promoteStudent, upsertEnrollment } from "./enrollment";
+
+export * from "./enrollment";
 
 export async function admitStudent(actor: Actor, input: unknown) {
   const d = admissionSchema.parse(input);
@@ -22,6 +25,8 @@ export async function admitStudent(actor: Actor, input: unknown) {
       admissionNo: d.admissionNo, name: d.name, dob: d.dob ?? null, gender: d.gender ?? null, classId: d.classId,
       sectionId: d.sectionId ?? null, rollNo: d.rollNo || null, admissionDate: d.admissionDate, transportRouteId: d.transportRouteId ?? null,
     }).returning();
+    const yearId = d.academicYearId ?? (await getCurrentYear(tx)).id;
+    await upsertEnrollment(tx, { studentId: s!.id, academicYearId: yearId, classId: d.classId, sectionId: d.sectionId, rollNo: d.rollNo });
     let guardianId = d.existingGuardianId;
     if (!guardianId && d.guardian) {
       const [g] = await tx.insert(guardians).values({ ...d.guardian, whatsappNo: d.guardian.whatsappNo ?? null, email: d.guardian.email ?? null }).returning();
@@ -34,8 +39,12 @@ export async function admitStudent(actor: Actor, input: unknown) {
   });
 }
 
+/**
+ * Edit personal details (shared by all years) and the class/section/roll of one academic year
+ * (default: the student's latest year). Other years' records are not touched.
+ */
 export async function updateStudent(actor: Actor, studentId: number, input: unknown) {
-  const d = studentSchema.parse(input);
+  const d = studentEditSchema.parse(input);
   const db = getDb();
   return db.transaction(async (tx) => {
     const [old] = await tx.select().from(students).where(eq(students.id, studentId)).for("update");
@@ -44,11 +53,21 @@ export async function updateStudent(actor: Actor, studentId: number, input: unkn
       const dup = await tx.select({ id: students.id }).from(students).where(eq(students.admissionNo, d.admissionNo));
       if (dup.length) throw new AppError("Admission number already exists", { admissionNo: "Already used" });
     }
-    const [s] = await tx.update(students).set({
-      admissionNo: d.admissionNo, name: d.name, dob: d.dob ?? null, gender: d.gender ?? null, classId: d.classId,
-      sectionId: d.sectionId ?? null, rollNo: d.rollNo || null, admissionDate: d.admissionDate, transportRouteId: d.transportRouteId ?? null,
-    }).where(eq(students.id, studentId)).returning();
-    await audit(tx, actor, "update", "student", studentId, old, s);
+    await tx.update(students).set({
+      admissionNo: d.admissionNo, name: d.name, dob: d.dob ?? null, gender: d.gender ?? null,
+      admissionDate: d.admissionDate, transportRouteId: d.transportRouteId ?? null,
+    }).where(eq(students.id, studentId));
+    let yearId = d.academicYearId;
+    if (!yearId) {
+      const [latest] = await tx.select({ y: studentEnrollments.academicYearId }).from(studentEnrollments)
+        .innerJoin(academicYears, eq(academicYears.id, studentEnrollments.academicYearId))
+        .where(eq(studentEnrollments.studentId, studentId)).orderBy(desc(academicYears.startDate)).limit(1);
+      yearId = latest?.y ?? (await getCurrentYear(tx)).id;
+    }
+    const [prev] = await tx.select().from(studentEnrollments).where(and(eq(studentEnrollments.studentId, studentId), eq(studentEnrollments.academicYearId, yearId)));
+    await upsertEnrollment(tx, { studentId, academicYearId: yearId, classId: d.classId, sectionId: d.sectionId, rollNo: d.rollNo, status: prev?.status ?? "studying" });
+    const [s] = await tx.select().from(students).where(eq(students.id, studentId));
+    await audit(tx, actor, "update", "student", studentId, old, { ...s, academicYearId: yearId });
     return s!;
   });
 }
@@ -69,10 +88,19 @@ export async function setStudentStatus(actor: Actor, studentId: number, status: 
   const [old] = await db.select().from(students).where(eq(students.id, studentId));
   if (!old) throw new AppError("Student not found");
   await db.update(students).set({ status, leavingDate: status === "active" ? null : leavingDate ?? today() }).where(eq(students.id, studentId));
+  const [latest] = await db.select({ id: studentEnrollments.id }).from(studentEnrollments)
+    .innerJoin(academicYears, eq(academicYears.id, studentEnrollments.academicYearId))
+    .where(eq(studentEnrollments.studentId, studentId)).orderBy(desc(academicYears.startDate)).limit(1);
+  if (latest) await db.update(studentEnrollments).set({ status: status === "active" ? "studying" : status === "left" ? "left" : "passed_out" }).where(eq(studentEnrollments.id, latest.id));
   await audit(db, actor, "status", "student", studentId, { status: old.status }, { status, leavingDate });
 }
 
-export async function searchStudents(q: string, opts: { classId?: number; status?: string; limit?: number } = {}) {
+/**
+ * Search students. With `yearId`, only students enrolled in that academic year are returned,
+ * with the class/section/roll of that year.
+ */
+export async function searchStudents(q: string, opts: { classId?: number; status?: string; limit?: number; yearId?: number } = {}) {
+  if (opts.yearId) return searchInYear(q, { ...opts, yearId: opts.yearId });
   const db = getDb();
   const conds = [];
   const term = q.trim();
@@ -91,6 +119,30 @@ export async function searchStudents(q: string, opts: { classId?: number; status
     outstanding: sql<number>`(select coalesce(sum(balance),0) from ${invoices} i where i.student_id = ${students.id} and i.status <> 'cancelled')`.mapWith(Number),
   }).from(students).innerJoin(classes, eq(classes.id, students.classId)).leftJoin(sections, eq(sections.id, students.sectionId))
     .where(conds.length ? and(...conds) : undefined).orderBy(asc(classes.sortOrder), asc(sections.name), asc(students.name)).limit(opts.limit ?? 300);
+}
+
+function termCond(term: string) {
+  return or(
+    ilike(students.name, `%${term}%`),
+    ilike(students.admissionNo, `${term}%`),
+    sql`exists (select 1 from ${studentGuardians} sg join ${guardians} g on g.id = sg.guardian_id where sg.student_id = ${students.id} and (g.mobile like ${term + "%"} or g.name ilike ${"%" + term + "%"}))`,
+  );
+}
+
+async function searchInYear(q: string, opts: { classId?: number; status?: string; limit?: number; yearId: number }) {
+  const conds = [eq(studentEnrollments.academicYearId, opts.yearId)];
+  const term = q.trim();
+  if (term) conds.push(termCond(term)!);
+  if (opts.classId) conds.push(eq(studentEnrollments.classId, opts.classId));
+  if (opts.status) conds.push(eq(students.status, opts.status as "active"));
+  return getDb().select({
+    id: students.id, admissionNo: students.admissionNo, name: students.name, status: students.status, rollNo: studentEnrollments.rollNo,
+    className: classes.name, sectionName: sections.name, yearStatus: studentEnrollments.status,
+    outstanding: sql<number>`(select coalesce(sum(balance),0) from ${invoices} i where i.student_id = ${students.id} and i.status <> 'cancelled')`.mapWith(Number),
+  }).from(studentEnrollments)
+    .innerJoin(students, eq(students.id, studentEnrollments.studentId))
+    .innerJoin(classes, eq(classes.id, studentEnrollments.classId)).leftJoin(sections, eq(sections.id, studentEnrollments.sectionId))
+    .where(and(...conds)).orderBy(asc(classes.sortOrder), asc(sections.name), asc(students.name)).limit(opts.limit ?? 300);
 }
 
 export async function getStudentProfile(studentId: number) {
@@ -248,6 +300,7 @@ export async function commitImport(actor: Actor, file: ArrayBuffer) {
         guardianByMobile.set(d.guardianMobile, gid);
       }
       await tx.insert(studentGuardians).values({ studentId: s!.id, guardianId: gid, isPrimary: true }).onConflictDoNothing();
+      await upsertEnrollment(tx, { studentId: s!.id, academicYearId: year.id, classId: c.id, sectionId: sec?.id ?? null, rollNo: d.rollNo ?? null });
       if (d.openingBalance > 0) await createOpeningBalance(tx, actor, s!.id, d.openingBalance, year.id, year.name, today());
       count++;
     }
@@ -258,45 +311,38 @@ export async function commitImport(actor: Actor, file: ArrayBuffer) {
 
 // ---------------------------------------------------------------- promotion
 /**
- * Year-end promotion: move every active student of `fromClassId` to `toClassId`
- * (or mark alumni) and carry their unpaid dues into the new year as an opening balance.
- * The caller must take a backup first.
+ * Year-end promotion of a whole class: every student studying in `fromClassId` in `fromYearId`
+ * gets a record for `newYearId` in `toClassId` (or is marked passed out). Unpaid dues are carried
+ * into the new year. Students already enrolled in the new year are skipped. Take a backup first.
  */
-export async function promoteClass(actor: Actor, args: { fromClassId: number; toClassId: number | "alumni"; newYearId: number }) {
+export async function promoteClass(actor: Actor, args: { fromYearId: number; fromClassId: number; toClassId: number | "alumni"; newYearId: number }) {
+  if (args.fromYearId === args.newYearId) throw new AppError("Choose a different academic year to promote into");
   const db = getDb();
   return db.transaction(async (tx) => {
     const [ny] = await tx.select().from(academicYears).where(eq(academicYears.id, args.newYearId));
     if (!ny) throw new AppError("Target academic year not found");
-    const list = await tx.select().from(students).where(and(eq(students.classId, args.fromClassId), eq(students.status, "active"))).for("update");
-    let moved = 0, carried = 0;
-    for (const s of list) {
-      const due = await outstandingBefore(tx, s.id, ny.id);
-      if (due > 0) {
-        const exists = await tx.select({ id: invoices.id }).from(invoices).where(and(eq(invoices.studentId, s.id), eq(invoices.academicYearId, ny.id), eq(invoices.period, "OPENING")));
-        if (!exists.length) {
-          // Close old invoices by credit and re-bill the total in the new year so the ledger stays continuous.
-          const old = await tx.select().from(invoices).where(and(eq(invoices.studentId, s.id), ne(invoices.academicYearId, ny.id), sql`${invoices.balance} > 0`, ne(invoices.status, "cancelled")));
-          for (const i of old) {
-            await tx.execute(sql`update invoice_line set credited = credited + (net - paid), net = paid where invoice_id = ${i.id} and net > paid`);
-            await tx.update(invoices).set({ credited: i.credited + i.balance, net: i.paid, balance: 0, status: "paid", cancelReason: `Carried forward to ${ny.name}` }).where(eq(invoices.id, i.id));
-          }
-          await createOpeningBalance(tx, actor, s.id, due, ny.id, ny.name, ny.startDate, `Dues carried forward from previous year`);
-          carried++;
-        }
+    const list = await tx.select({ e: studentEnrollments, s: students }).from(studentEnrollments)
+      .innerJoin(students, eq(students.id, studentEnrollments.studentId))
+      .where(and(eq(studentEnrollments.academicYearId, args.fromYearId), eq(studentEnrollments.classId, args.fromClassId),
+        eq(studentEnrollments.status, "studying"), eq(students.status, "active")));
+    let moved = 0, carried = 0, skipped = 0;
+    for (const { e, s: st } of list) {
+      if (args.toClassId === "alumni") {
+        await tx.update(studentEnrollments).set({ status: "passed_out" }).where(eq(studentEnrollments.id, e.id));
+        await tx.update(students).set({ status: "alumni", leavingDate: today() }).where(eq(students.id, st.id));
+        moved++;
+        continue;
       }
-      if (args.toClassId === "alumni") await tx.update(students).set({ status: "alumni", leavingDate: today() }).where(eq(students.id, s.id));
-      else await tx.update(students).set({ classId: args.toClassId, sectionId: null }).where(eq(students.id, s.id));
+      const already = await tx.select({ id: studentEnrollments.id }).from(studentEnrollments)
+        .where(and(eq(studentEnrollments.studentId, st.id), eq(studentEnrollments.academicYearId, ny.id)));
+      if (already.length) { skipped++; continue; }
+      const r = await promoteStudent(actor, { studentId: st.id, toYearId: ny.id, classId: args.toClassId, rollNo: e.rollNo ?? "", carryDues: true }, tx);
+      if (r.carried) carried++;
       moved++;
     }
-    await audit(tx, actor, "promote", "class", args.fromClassId, null, { to: args.toClassId, year: ny.name, moved, carried });
-    return { moved, carried };
+    await audit(tx, actor, "promote", "class", args.fromClassId, null, { fromYearId: args.fromYearId, to: args.toClassId, year: ny.name, moved, carried, skipped });
+    return { moved, carried, skipped };
   });
-}
-
-async function outstandingBefore(tx: Executor, studentId: number, newYearId: number) {
-  const [r] = await tx.select({ v: sql<string>`coalesce(sum(${invoices.balance}),0)` }).from(invoices)
-    .where(and(eq(invoices.studentId, studentId), ne(invoices.academicYearId, newYearId), ne(invoices.status, "cancelled")));
-  return Number(r?.v ?? 0);
 }
 
 export async function linkGuardian(actor: Actor, studentId: number, guardianId: number) {

@@ -2,33 +2,61 @@ import ExcelJS from "exceljs";
 import { and, asc, desc, eq, gte, lte, ne, sql, gt } from "drizzle-orm";
 import {
   getDb, classes, feeHeads, invoiceLines, invoices, notificationOutbox, paymentAllocations, payments, students, users,
-  studentGuardians, guardians, auditLog, refunds,
+  studentGuardians, guardians, auditLog, refunds, studentEnrollments,
 } from "@sb/db";
 import { today, addDays, periodOf, type ISODate } from "../dates";
 
 const num = (v: unknown) => Number(v ?? 0);
 
-export async function dashboard(onDate: ISODate = today()) {
+export interface DashboardRange { yearId: number; yearStart: ISODate; yearEnd: ISODate; from: ISODate; to: ISODate; onDate?: ISODate }
+
+/**
+ * Dashboard for one academic session and a date range inside it (today, a month, the whole session…).
+ * Period figures use `from`..`to`; session figures cover the whole academic year.
+ */
+export async function dashboard(r: DashboardRange) {
   const db = getDb();
-  const monthStart = `${periodOf(onDate)}-01`;
-  const [todayCol] = await db.select({ v: sql`coalesce(sum(${payments.amount}),0)`, n: sql`count(*)` }).from(payments).where(and(eq(payments.date, onDate), eq(payments.status, "valid")));
-  const [mtdCol] = await db.select({ v: sql`coalesce(sum(${payments.amount}),0)` }).from(payments).where(and(gte(payments.date, monthStart), lte(payments.date, onDate), eq(payments.status, "valid")));
-  const [mtdBilled] = await db.select({ v: sql`coalesce(sum(${invoices.net}),0)` }).from(invoices).where(and(gte(invoices.issueDate, monthStart), lte(invoices.issueDate, onDate), ne(invoices.status, "cancelled")));
-  const [outstanding] = await db.select({ v: sql`coalesce(sum(${invoices.balance}),0)`, overdue: sql`coalesce(sum(case when ${invoices.dueDate} < ${onDate} then ${invoices.balance} end),0)` }).from(invoices).where(ne(invoices.status, "cancelled"));
-  const topClasses = await db.select({ className: classes.name, v: sql`sum(${invoices.balance})`.mapWith(Number), students: sql`count(distinct ${students.id})`.mapWith(Number) })
-    .from(invoices).innerJoin(students, eq(students.id, invoices.studentId)).innerJoin(classes, eq(classes.id, students.classId))
-    .where(and(gt(invoices.balance, 0), ne(invoices.status, "cancelled"), sql`${invoices.dueDate} < ${onDate}`))
-    .groupBy(classes.name, classes.sortOrder).orderBy(desc(sql`sum(${invoices.balance})`)).limit(5);
-  const trend = await db.select({ month: sql<string>`to_char(${payments.date}, 'YYYY-MM')`, v: sql`sum(${payments.amount})`.mapWith(Number) })
-    .from(payments).where(and(eq(payments.status, "valid"), gte(payments.date, addDays(monthStart, -170))))
-    .groupBy(sql`to_char(${payments.date}, 'YYYY-MM')`).orderBy(sql`to_char(${payments.date}, 'YYYY-MM')`);
-  const [failed] = await db.select({ n: sql`count(*)` }).from(notificationOutbox).where(eq(notificationOutbox.status, "failed"));
-  const [queued] = await db.select({ n: sql`count(*)` }).from(notificationOutbox).where(eq(notificationOutbox.status, "queued"));
-  const byMode = await db.select({ mode: payments.mode, v: sql`sum(${payments.amount})`.mapWith(Number) }).from(payments)
-    .where(and(eq(payments.date, onDate), eq(payments.status, "valid"))).groupBy(payments.mode);
+  const onDate = r.onDate ?? today();
+  const paid = and(eq(payments.status, "valid"), eq(payments.academicYearId, r.yearId));
+  const inRange = and(paid, gte(payments.date, r.from), lte(payments.date, r.to));
+  const live = and(eq(invoices.academicYearId, r.yearId), ne(invoices.status, "cancelled"));
+
+  const [[col], [billed], byMode, daily, recent, [session], [sessionPaid], topClasses, monthlyPaid, monthlyBilled, [failed], [queued]] = await Promise.all([
+    db.select({ v: sql`coalesce(sum(${payments.amount}),0)`, n: sql`count(*)` }).from(payments).where(inRange),
+    db.select({ v: sql`coalesce(sum(${invoices.net}),0)`, n: sql`count(*)` }).from(invoices).where(and(live, gte(invoices.issueDate, r.from), lte(invoices.issueDate, r.to))),
+    db.select({ mode: payments.mode, v: sql`sum(${payments.amount})`.mapWith(Number), n: sql`count(*)`.mapWith(Number) }).from(payments).where(inRange).groupBy(payments.mode).orderBy(desc(sql`sum(${payments.amount})`)),
+    db.select({ day: sql<string>`${payments.date}::text`, v: sql`sum(${payments.amount})`.mapWith(Number) }).from(payments).where(inRange).groupBy(payments.date).orderBy(asc(payments.date)),
+    db.select({ id: payments.id, receiptNo: payments.receiptNo, date: payments.date, amount: payments.amount, mode: payments.mode, studentId: students.id, studentName: students.name })
+      .from(payments).innerJoin(students, eq(students.id, payments.studentId)).where(inRange).orderBy(desc(payments.id)).limit(8),
+    db.select({ billed: sql`coalesce(sum(${invoices.net}),0)`, balance: sql`coalesce(sum(${invoices.balance}),0)`,
+      overdue: sql`coalesce(sum(case when ${invoices.dueDate} < ${onDate} then ${invoices.balance} end),0)` }).from(invoices).where(live),
+    db.select({ v: sql`coalesce(sum(${payments.amount}),0)` }).from(payments).where(paid),
+    db.select({ className: classes.name, v: sql`sum(${invoices.balance})`.mapWith(Number), students: sql`count(distinct ${invoices.studentId})`.mapWith(Number) })
+      .from(invoices)
+      .innerJoin(studentEnrollments, and(eq(studentEnrollments.studentId, invoices.studentId), eq(studentEnrollments.academicYearId, r.yearId)))
+      .innerJoin(classes, eq(classes.id, studentEnrollments.classId))
+      .where(and(live, gt(invoices.balance, 0), sql`${invoices.dueDate} < ${onDate}`))
+      .groupBy(classes.name, classes.sortOrder).orderBy(desc(sql`sum(${invoices.balance})`)).limit(6),
+    db.select({ month: sql<string>`to_char(${payments.date}, 'YYYY-MM')`, v: sql`sum(${payments.amount})`.mapWith(Number) })
+      .from(payments).where(paid).groupBy(sql`to_char(${payments.date}, 'YYYY-MM')`),
+    db.select({ month: sql<string>`to_char(${invoices.issueDate}, 'YYYY-MM')`, v: sql`sum(${invoices.net})`.mapWith(Number) })
+      .from(invoices).where(live).groupBy(sql`to_char(${invoices.issueDate}, 'YYYY-MM')`),
+    db.select({ n: sql`count(*)` }).from(notificationOutbox).where(eq(notificationOutbox.status, "failed")),
+    db.select({ n: sql`count(*)` }).from(notificationOutbox).where(eq(notificationOutbox.status, "queued")),
+  ]);
+
+  // Every month of the session, including empty ones, so the chart always shows 12 bars.
+  const months: { month: string; collected: number; billed: number }[] = [];
+  for (let m = periodOf(r.yearStart); m <= periodOf(r.yearEnd); ) {
+    months.push({ month: m, collected: monthlyPaid.find((x) => x.month === m)?.v ?? 0, billed: monthlyBilled.find((x) => x.month === m)?.v ?? 0 });
+    const [y, mo] = m.split("-").map(Number);
+    m = mo === 12 ? `${y! + 1}-01` : `${y}-${String(mo! + 1).padStart(2, "0")}`;
+  }
+
   return {
-    todayCollection: num(todayCol?.v), todayReceipts: num(todayCol?.n), mtdCollected: num(mtdCol?.v), mtdBilled: num(mtdBilled?.v),
-    outstanding: num(outstanding?.v), overdue: num(outstanding?.overdue), topClasses, trend, failedMessages: num(failed?.n), queuedMessages: num(queued?.n), byMode,
+    period: { collected: num(col?.v), receipts: num(col?.n), billed: num(billed?.v), bills: num(billed?.n), byMode, daily, recent },
+    session: { billed: num(session?.billed), collected: num(sessionPaid?.v), outstanding: num(session?.balance), overdue: num(session?.overdue) },
+    months, topClasses, failedMessages: num(failed?.n), queuedMessages: num(queued?.n),
   };
 }
 

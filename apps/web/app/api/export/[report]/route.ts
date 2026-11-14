@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { payments, reports, students, today } from "@sb/core";
 import { rupeesToPaise } from "@sb/validation";
 import { apiUser } from "@/lib/auth";
+import { getWorkingYear } from "@/lib/year";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ repo
 
   if (report === "students") {
     const u = await apiUser("students"); if (u instanceof Response) return u;
-    const rows = await students.searchStudents(sp.get("q") ?? "", { classId: sp.get("classId") ? Number(sp.get("classId")) : undefined, status: sp.get("status") ?? "active", limit: 100000 });
+    const { year } = await getWorkingYear();
+    const rows = await students.searchStudents(sp.get("q") ?? "", { classId: sp.get("classId") ? Number(sp.get("classId")) : undefined, status: sp.get("status") ?? "active", limit: 100000, yearId: year.id });
     return xlsx(await reports.toXlsx("Students", [
       { header: "Admission No", key: "admissionNo" }, { header: "Name", key: "name", width: 28 }, { header: "Class", key: "className" },
       { header: "Section", key: "sectionName" }, { header: "Roll", key: "rollNo" }, { header: "Status", key: "status" }, { header: "Outstanding", key: "outstanding", money: true },

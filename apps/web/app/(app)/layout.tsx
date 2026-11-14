@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { accounts, can, getSettings, type Permission } from "@sb/core";
 import { getUser, SESSION_COOKIE } from "@/lib/auth";
 import { Shell, type NavItem } from "@/components/shell";
+import { getWorkingYear, YEAR_COOKIE } from "@/lib/year";
+import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +24,14 @@ const NAV: (NavItem & { perm: Permission })[] = [
   { href: "/audit", label: "Audit log", perm: "audit" },
 ];
 
+async function switchYear(fd: FormData) {
+  "use server";
+  if (!(await getUser())) redirect("/login");
+  const id = Number(fd.get("yearId"));
+  if (Number.isInteger(id) && id > 0) (await cookies()).set(YEAR_COOKIE, String(id), { httpOnly: true, sameSite: "strict", path: "/", maxAge: 60 * 60 * 24 * 365 });
+  revalidatePath("/", "layout");
+}
+
 async function logout() {
   "use server";
   const jar = await cookies();
@@ -35,8 +45,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   if (!user) redirect("/login");
   const settings = await getSettings();
   const nav = NAV.filter((n) => can(user.role, n.perm)).map(({ perm: _p, ...n }) => n);
+  const wy = await getWorkingYear();
   return (
-    <Shell nav={nav} user={{ fullName: user.fullName, role: user.role }} school={settings.name} logout={logout}>
+    <Shell nav={nav} user={{ fullName: user.fullName, role: user.role }} school={settings.name} logout={logout}
+      year={{ id: wy.year.id, name: wy.year.name, isCurrent: wy.isCurrent, currentName: wy.current.name, options: wy.years.map((y) => ({ id: y.id, name: y.name, isCurrent: y.isCurrent })) }}
+      switchYear={switchYear}>
       {children}
     </Shell>
   );

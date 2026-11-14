@@ -144,6 +144,40 @@ describe.skipIf(!run)("integration", () => {
     await expect(core.payments.collectPayment({ studentId: studentB, amount: 100, mode: "cash", date: "2026-05-02" }, cashier)).rejects.toThrow(/closed/);
   });
 
+  it("academic years stay separate: promotion creates a new year record and only enrolled students are billed", async () => {
+    const y2 = await core.fees.createYear(admin, { name: "2027-28", startDate: "2027-04-01", endDate: "2028-03-31" });
+    const { classes } = await core.fees.masters();
+    const vi = classes.find((c) => c.name === "VI")!;
+    const y1 = (await core.fees.masters()).years.find((y) => y.name === "2026-27")!;
+    await core.fees.copyStructures(admin, y1.id, y2.id, 10);
+    const dueBefore = (await core.payments.counterView(studentB)).total;
+    expect(dueBefore).toBeGreaterThan(0);
+
+    const r = await core.students.promoteStudent(admin, { studentId: studentB, toYearId: y2.id, classId: vi.id, rollNo: "7", carryDues: "on" });
+    expect(r.carried).toBe(dueBefore);
+    await expect(core.students.promoteStudent(admin, { studentId: studentB, toYearId: y2.id, classId: vi.id, carryDues: "on" })).rejects.toThrow(/already has a record/);
+
+    const hist = await core.students.listEnrollments(studentB);
+    expect(hist.map((h) => `${h.yearName}:${h.className}:${h.e.status}`)).toEqual(["2026-27:V:promoted", "2027-28:VI:studying"]);
+    // Total owed is unchanged — it just moved into the new year's opening bill.
+    expect((await core.payments.counterView(studentB)).total).toBe(dueBefore);
+
+    // Year lists: B appears in both years, with that year's class.
+    const old = await core.students.searchStudents("", { yearId: y1.id, status: "" });
+    const neu = await core.students.searchStudents("", { yearId: y2.id, status: "" });
+    expect(old.find((x) => x.id === studentB)?.className).toBe("V");
+    expect(neu.map((x) => [x.id, x.className])).toEqual([[studentB, "VI"]]);
+
+    // Bill run for April 2027 bills only B (A was not promoted into 2027-28), at Class VI fees + 10%.
+    const run = await core.billing.generateInvoices({ period: "2027-04", dryRun: true });
+    expect(run.planned.map((p) => [p.studentId, p.className])).toEqual([[studentB, "VI"]]);
+    const tuition = run.planned[0]!.lines.find((l) => l.description.startsWith("Tuition"))!;
+    expect(tuition.amount).toBe(Math.round(((150000 + 8 * 10000) * 1.1) / 100) * 100);
+    // Old-year bill lists are untouched; new-year list has only the opening balance so far.
+    expect((await core.billing.listInvoices({ yearId: y2.id })).map((i) => i.inv.period)).toEqual(["OPENING"]);
+    expect((await core.billing.listInvoices({ yearId: y1.id })).length).toBeGreaterThan(0);
+  });
+
   it("integrity check is clean", async () => {
     const r = await core.ops.integrityCheck();
     expect(r.problems).toEqual([]);

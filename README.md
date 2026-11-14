@@ -68,6 +68,7 @@ scripts/            install-services.ps1 (NSSM + LAN firewall), backup.ps1, rest
 |---|---|
 | Login, Argon2, roles (Admin/Accountant/Cashier/Principal), lockout after 5 failures, idle timeout, forced password change | Done |
 | Academic years, classes, sections, transport routes, students, guardians, siblings | Done |
+| Academic-year separation: a year switcher in the sidebar; one record per student per year (class, section, roll); admission into a chosen year; promotion from the profile or for a whole class, carrying dues forward; bill run, Students and Bills scoped to the selected year; profile shows the year-by-year history and fee records per year | Done |
 | Excel import with template, row-level validation, preview, all-or-nothing import, opening balances | Done |
 | Fee heads; structures per class and year with frequency, due day and months; copy from another year with a % hike | Done |
 | Concessions (percent or flat, per head) with approval; late-fee rules (flat, per day, percent, with a cap) | Done |

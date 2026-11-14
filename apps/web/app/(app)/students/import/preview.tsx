@@ -10,7 +10,7 @@ export function ImportPreview() {
   const bad = d.rows.filter((r) => Object.keys(r.errors).length);
   const shown = bad.length ? bad : d.rows.slice(0, 50);
   return (
-    <div className="mt-4 max-h-[28rem] overflow-auto">
+    <div className="mt-4 max-h-112 overflow-auto">
       <p className="mb-2 text-sm">{bad.length ? "Rows with errors:" : `All rows valid. First ${shown.length} shown:`}</p>
       <table className="data">
         <thead><tr><th>Row</th><th>Adm. no.</th><th>Name</th><th>Class</th><th>Guardian</th><th>Mobile</th><th>Problems</th></tr></thead>

@@ -62,12 +62,27 @@ export const studentSchema = z.object({
   admissionDate: isoDate,
   transportRouteId: optionalId,
 });
+/** Personal details + the class for one academic year (edit page). */
+export const studentEditSchema = studentSchema.extend({ academicYearId: optionalId });
 export const admissionSchema = studentSchema.extend({
+  /** Academic year the student joins in. Defaults to the current year. */
+  academicYearId: optionalId,
   guardian: guardianSchema.optional(),
   /** link to an existing guardian (siblings) instead of creating one */
   existingGuardianId: optionalId,
 }).refine((d) => d.guardian || d.existingGuardianId, { message: "Guardian details required", path: ["guardian.name"] });
 export type AdmissionInput = z.infer<typeof admissionSchema>;
+
+/** Promote one student into another academic year. */
+export const promoteStudentSchema = z.object({
+  studentId: id,
+  toYearId: id,
+  classId: id,
+  sectionId: optionalId,
+  rollNo: z.preprocess(blank, z.string().trim().max(16).optional()),
+  /** Move unpaid dues from earlier years into the new year as an opening-balance bill. */
+  carryDues: checkbox,
+});
 
 const str = (v: unknown) => (v == null || v === "" ? undefined : String(v).trim());
 export const importRowSchema = z.object({

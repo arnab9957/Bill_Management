@@ -1,5 +1,6 @@
 import { billing, getSettings } from "@sb/core";
 import { requireRole } from "@/lib/auth";
+import { getWorkingYear } from "@/lib/year";
 import { PrintControls } from "@/components/print-controls";
 import { InvoiceSheet } from "@/components/invoice-sheet";
 
@@ -10,7 +11,8 @@ const MAX = 300;
 export default async function PrintAll({ searchParams }: { searchParams: Promise<{ q?: string; period?: string; classId?: string; status?: string }> }) {
   await requireRole("billing");
   const sp = await searchParams;
-  const rows = await billing.listInvoices({ q: sp.q, period: sp.period, classId: sp.classId ? Number(sp.classId) : undefined, status: sp.status, limit: MAX });
+  const { year } = await getWorkingYear();
+  const rows = await billing.listInvoices({ q: sp.q, period: sp.period, classId: sp.classId ? Number(sp.classId) : undefined, status: sp.status, limit: MAX, yearId: year.id });
   const [s, bills] = await Promise.all([
     getSettings(),
     Promise.all(rows.slice().reverse().map((r) => billing.getInvoice(r.inv.id))),
