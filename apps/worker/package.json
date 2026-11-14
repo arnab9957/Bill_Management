@@ -1,0 +1,35 @@
+{
+  "name": "@sb/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsup",
+    "run-job": "tsx src/runOnce.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sb/core": "workspace:*",
+    "@sb/db": "workspace:*",
+    "@sb/notifications": "workspace:*",
+    "@sb/validation": "workspace:*",
+    "pg-boss": "^10.1.6",
+    "pino": "^9.6.0",
+    "pino-roll": "^3.1.0",
+    "drizzle-orm": "^0.44.0",
+    "pg": "^8.16.0",
+    "exceljs": "^4.4.0",
+    "nodemailer": "^6.10.0",
+    "@node-rs/argon2": "^2.0.2",
+    "zod": "^3.25.0",
+    "dotenv": "^16.5.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3",
+    "@types/node": "^22.15.0"
+  }
+}
