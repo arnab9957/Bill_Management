@@ -17,6 +17,14 @@ pnpm dev                        # web on http://localhost:3000 and the worker
 
 Sign in as **admin / admin12345**. You must change the password the first time.
 
+**Speed:** `pnpm dev` compiles each page the first time you open it (about 1 s per page), and it's quick after that.
+For daily use, or to judge speed, run the production server, where every page loads in under 0.1 s:
+
+```powershell
+pnpm --filter @sb/web build
+pnpm --filter @sb/web start      # http://localhost:3000
+```
+
 `pnpm db:start` runs a real PostgreSQL via `embedded-postgres`, so you don't have to install it. Data is kept in `.pgdata/`.
 It doesn't include `pg_dump`. For backups, point `PG_DUMP_PATH` in `.env` at a full PostgreSQL install, for example
 `C:\Program Files\PostgreSQL\16\bin\pg_dump.exe`.
@@ -97,7 +105,7 @@ scripts/            install-services.ps1 (NSSM + LAN firewall), backup.ps1, rest
 ## Production on the school server
 
 1. Install PostgreSQL 16 or later as a Windows service and create the database and user. Set `DATABASE_URL`, `APP_SECRET` and `PG_DUMP_PATH` in `.env`.
-2. Build: `pnpm build`. This produces `apps/web/.next/standalone` and the bundled worker in `apps/worker/dist`.
+2. Build: `pnpm build`. This builds the web app (`apps/web/.next`) and bundles the worker into `apps/worker/dist`. The web app runs with `next start`. Next's "standalone" output is off by default because on Windows it needs symlink rights (Developer Mode); set `NEXT_STANDALONE=1` to build it anyway.
 3. Run migrations with `node apps/worker/dist/migrate.js` (set `MIGRATIONS_DIR=packages/db/migrations`). Then run `pnpm db:seed` once.
 4. Run `scripts/install-services.ps1` as Administrator. It installs both services with auto-start and restart, and allows the port from the LAN subnet only. Never expose the port to the internet.
 5. Under *Settings*, set:

@@ -58,7 +58,19 @@ export async function nextNumber(tx: Executor, series: string): Promise<number> 
 export const formatDocNo = (prefix: string, yearName: string, n: number) => `${prefix}/${yearName}/${String(n).padStart(6, "0")}`;
 
 // ---------------------------------------------------------------- settings
-export async function getSettings(db: Executor = getDb()) {
+// Settings are read on every page; cache them briefly in-process. Writes clear the cache.
+let settingsCache: { at: number; row: typeof schoolSettings.$inferSelect } | undefined;
+const SETTINGS_TTL_MS = 30_000;
+export const clearSettingsCache = () => { settingsCache = undefined; };
+
+export async function getSettings(db?: Executor) {
+  if (!db && settingsCache && Date.now() - settingsCache.at < SETTINGS_TTL_MS) return settingsCache.row;
+  const row = await loadSettings(db ?? getDb());
+  if (!db) settingsCache = { at: Date.now(), row };
+  return row;
+}
+
+async function loadSettings(db: Executor) {
   const [row] = await db.select().from(schoolSettings).where(eq(schoolSettings.id, 1));
   if (row) return row;
   const [created] = await db.insert(schoolSettings).values({ id: 1 }).onConflictDoNothing().returning();
@@ -108,6 +120,7 @@ export async function getProviderConfig(db: Executor = getDb()): Promise<Provide
 export async function saveProviderConfig(db: Executor, actor: Actor, cfg: ProviderConfig) {
   await getSettings(db);
   await db.update(schoolSettings).set({ providerConfigEnc: encryptSecret(JSON.stringify(cfg)) }).where(eq(schoolSettings.id, 1));
+  clearSettingsCache();
   await audit(db, actor, "update", "provider_config", 1, null, { modes: [cfg.emailMode, cfg.whatsappMode, cfg.smsMode] });
 }
 
@@ -117,5 +130,6 @@ export async function updateSchoolSettings(actor: Actor, input: unknown) {
   const db = getDb();
   const old = await getSettings(db);
   await db.update(schoolSettings).set({ ...d, upiId: d.upiId || null, backupPath: d.backupPath || null }).where(eq(schoolSettings.id, 1));
+  clearSettingsCache();
   await audit(db, actor, "update", "school_settings", 1, { ...old, providerConfigEnc: undefined }, d);
 }

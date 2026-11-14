@@ -29,9 +29,9 @@ function Install-Svc($name, $script, $cwd, $extraEnv) {
   & $Nssm set $name DependOnService postgresql-x64-16
 }
 
-# .env is read from the app root by both processes.
-Install-Svc "SchoolBillingWeb" "apps\web\server.js" "$AppDir\web" @("PORT=$Port", "HOSTNAME=0.0.0.0")
-Install-Svc "SchoolBillingWorker" "dist\index.js" "$AppDir\worker" @()
+# Run from the built monorepo; .env sits in the app root.
+Install-Svc "SchoolBillingWeb" "node_modules\next\dist\bin\next start -H 0.0.0.0 -p $Port" "$AppDir\apps\web" @()
+Install-Svc "SchoolBillingWorker" "dist\index.js" "$AppDir\apps\worker" @()
 
 # LAN-only firewall rule. Never port-forward this to the internet.
 Remove-NetFirewallRule -DisplayName "School Billing (LAN)" -ErrorAction SilentlyContinue

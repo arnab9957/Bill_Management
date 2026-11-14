@@ -2,7 +2,8 @@ import type { NextConfig } from "next";
 import { resolve } from "node:path";
 
 const config: NextConfig = {
-  output: "standalone",
+  // Standalone bundles need symlink rights on Windows (pnpm); default to `next start` instead.
+  output: process.env.NEXT_STANDALONE === "1" ? "standalone" : undefined,
   outputFileTracingRoot: resolve(import.meta.dirname, "../.."),
   transpilePackages: ["@sb/core", "@sb/db", "@sb/validation"],
   serverExternalPackages: ["@node-rs/argon2", "pg", "exceljs"],

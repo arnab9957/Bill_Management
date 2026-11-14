@@ -4,7 +4,7 @@ import { mkdirSync, readdirSync, statSync, unlinkSync, statfsSync, existsSync } 
 import { join, resolve, dirname } from "node:path";
 import { desc, eq, sql } from "drizzle-orm";
 import { getDb, env, backupLog, integrityIssues, numberSeries, notificationOutbox, schoolSettings } from "@sb/db";
-import { getSettings, audit, type Actor } from "./common";
+import { getSettings, audit, clearSettingsCache, type Actor } from "./common";
 
 // ---------------------------------------------------------------- integrity
 export async function integrityCheck(): Promise<{ checks: number; problems: string[] }> {
@@ -126,6 +126,7 @@ export async function restoreBackup(actor: Actor, file: string) {
 export async function markUsbBackupDone(actor: Actor) {
   const db = getDb();
   await db.update(schoolSettings).set({ usbBackupLastAt: new Date() }).where(eq(schoolSettings.id, 1));
+  clearSettingsCache();
   await audit(db, actor, "usb_backup", "school_settings", 1);
 }
 
