@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
-import { fees, toRupeeString } from "@sb/core";
+import { fees, getSettings, toRupeeString } from "@sb/core";
 import { requireRole } from "@/lib/auth";
 import { getWorkingYear } from "@/lib/year";
 import { formObject, run, type ActionState } from "@/lib/action";
@@ -42,6 +42,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const current = (await getWorkingYear()).year;
   const yearId = Number((await searchParams).year ?? current?.id);
   const year = m.years.find((y) => y.id === yearId);
+  const concessionsOn = (await getSettings()).concessionsEnabled;
   const [structs, conc, late] = await Promise.all([fees.listStructures(yearId), fees.listConcessionTypes(), fees.getLateFeeRule(yearId)]);
   return (
     <div className="space-y-5">
@@ -78,6 +79,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           </ActionForm>
         </Card>
 
+        {concessionsOn && (
         <Card title="Concession types">
           <table className="data"><thead><tr><th>Name</th><th>Value</th><th>Applies to</th></tr></thead>
             <tbody>{conc.map(({ t, headName }) => <tr key={t.id}><td>{t.name}</td><td>{t.kind === "percent" ? `${t.value / 100}%` : <Money p={t.value} />}</td><td>{headName ?? "All heads"}</td></tr>)}</tbody></table>
@@ -90,6 +92,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           </ActionForm>
           <p className="mt-2 text-xs text-gray-500">Attach a concession to a student from their profile; it needs Accountant/Admin approval.</p>
         </Card>
+        )}
 
         <Card title={`Late fee rule ${year?.name ?? ""}`}>
           <ActionForm action={saveLate} className="grid grid-cols-2 gap-3">

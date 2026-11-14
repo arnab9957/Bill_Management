@@ -48,6 +48,8 @@ export const schoolSettings = pgTable("school_settings", {
   defaultLanguage: varchar("default_language", { length: 8 }).notNull().default("en"),
   /** Optional cash-counter closing (denomination count + day lock). Off for most schools. */
   dayCloseEnabled: boolean("day_close_enabled").notNull().default(false),
+  /** Optional fee concessions (sibling, staff ward, merit…). Off unless the school uses them. */
+  concessionsEnabled: boolean("concessions_enabled").notNull().default(false),
 }, (t) => [check("single_row", sql`${t.id} = 1`)]);
 
 export const users = pgTable("app_user", {

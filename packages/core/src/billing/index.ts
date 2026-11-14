@@ -104,7 +104,8 @@ export async function generateInvoices(input: BillRunInput, actor: Actor = SYSTE
       lte(studentConcessions.validFrom, periodEnd), sql`(${studentConcessions.validTo} is null or ${studentConcessions.validTo} >= ${periodStart})`,
       sql`${studentConcessions.approvedBy} is not null`));
   const concBy = new Map<number, ConcessionRule[]>();
-  for (const c of conc) concBy.set(c.sid, [...(concBy.get(c.sid) ?? []), { name: c.t.name, kind: c.t.kind, value: c.t.value, feeHeadId: c.t.feeHeadId }]);
+  const concessionsOn = (await getSettings(db)).concessionsEnabled;
+  if (concessionsOn) for (const c of conc) concBy.set(c.sid, [...(concBy.get(c.sid) ?? []), { name: c.t.name, kind: c.t.kind, value: c.t.value, feeHeadId: c.t.feeHeadId }]);
 
   const [transportHead] = await db.select().from(feeHeads).where(eq(feeHeads.code, "TRANSPORT"));
 

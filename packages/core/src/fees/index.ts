@@ -6,7 +6,7 @@ import {
 import {
   concessionTypeSchema, feeHeadSchema, lateFeeRuleSchema, structureItemSchema, studentConcessionSchema, isoDate, z,
 } from "@sb/validation";
-import { AppError, audit, type Actor } from "../common";
+import { AppError, audit, getSettings, type Actor } from "../common";
 import { percentOf } from "../money";
 
 // ---------------------------------------------------------------- masters
@@ -171,6 +171,7 @@ export async function listConcessionTypes() {
 export async function grantConcession(actor: Actor, input: unknown) {
   const d = studentConcessionSchema.parse(input);
   if (actor.role !== "ADMIN" && actor.role !== "ACCOUNTANT") throw new AppError("Only an Accountant or Admin can approve concessions");
+  if (!(await getSettings()).concessionsEnabled) throw new AppError("Concessions are turned off. An Admin can turn them on in Settings.");
   const db = getDb();
   const [st] = await db.select({ id: students.id }).from(students).where(eq(students.id, d.studentId));
   if (!st) throw new AppError("Student not found");

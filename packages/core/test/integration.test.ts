@@ -40,8 +40,13 @@ describe.skipIf(!run)("integration", () => {
     const all = await core.students.searchStudents("Kumar");
     studentA = all.find((s) => s.admissionNo === "A1001")!.id;
     studentB = all.find((s) => s.admissionNo === "A1002")!.id;
-    // Sibling concession for B
+    // Concessions are off by default: granting is refused until the school turns them on.
     const types = await core.fees.listConcessionTypes();
+    const sibling = types.find((t) => t.t.name === "Sibling")!.t.id;
+    await expect(core.fees.grantConcession(admin, { studentId: studentB, concessionTypeId: sibling, validFrom: "2026-04-01" })).rejects.toThrow(/turned off/);
+    await db.getDb().update(db.schoolSettings).set({ concessionsEnabled: true });
+    core.clearSettingsCache();
+    // Sibling concession for B
     await core.fees.grantConcession(admin, { studentId: studentB, concessionTypeId: types.find((t) => t.t.name === "Sibling")!.t.id, validFrom: "2026-04-01" });
   }, 120_000);
 
@@ -65,6 +70,15 @@ describe.skipIf(!run)("integration", () => {
     const may = await core.billing.generateInvoices({ period: "2026-05", dryRun: false });
     const mayA = may.planned.find((p) => p.studentId === studentA)!;
     expect(mayA.lines.map((l) => l.amount)).toEqual([220000]); // only tuition
+  });
+
+  it("concessions are ignored by the bill run while switched off", async () => {
+    await db.getDb().update(db.schoolSettings).set({ concessionsEnabled: false });
+    core.clearSettingsCache();
+    const dry = await core.billing.generateInvoices({ period: "2026-07", studentId: studentB, dryRun: true });
+    expect(dry.planned[0]!.lines.every((l) => l.discount === 0)).toBe(true);
+    await db.getDb().update(db.schoolSettings).set({ concessionsEnabled: true });
+    core.clearSettingsCache();
   });
 
   it("BILL_GENERATED queued once per channel, deduplicated", async () => {

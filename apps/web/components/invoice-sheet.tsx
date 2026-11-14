@@ -7,6 +7,8 @@ type Settings = Awaited<ReturnType<typeof getSettings>>;
 /** One printable A5 fee bill. Used by the single-bill and bulk print pages. */
 export async function InvoiceSheet({ d, s }: { d: InvoiceData; s: Settings }) {
   const { inv } = d;
+  const hasConc = d.lines.some((l) => l.discount + l.credited > 0);
+  const cols = hasConc ? 3 : 2;
   // UPI QR with the exact amount pre-filled, generated offline from the school's UPI ID.
   const upi = s.upiId && inv.balance > 0
     ? await QRCode.toDataURL(`upi://pay?pa=${encodeURIComponent(s.upiId)}&pn=${encodeURIComponent(s.name)}&am=${(inv.balance / 100).toFixed(2)}&cu=INR&tn=${encodeURIComponent(inv.invoiceNo)}`, { margin: 0, width: 120 })
@@ -31,17 +33,17 @@ export async function InvoiceSheet({ d, s }: { d: InvoiceData; s: Settings }) {
         <div className="text-right font-semibold"><span className="text-gray-500">Due by</span> {formatDate(inv.dueDate)}</div>
       </div>
       <table className="mt-3 w-full border-t border-gray-800 text-xs">
-        <thead><tr className="border-b border-gray-300"><th className="py-1 text-left">Particulars</th><th className="text-right">Amount</th><th className="text-right">Concession</th><th className="text-right">Net</th></tr></thead>
+        <thead><tr className="border-b border-gray-300"><th className="py-1 text-left">Particulars</th><th className="text-right">Amount</th>{hasConc && <th className="text-right">Concession</th>}<th className="text-right">Net</th></tr></thead>
         <tbody>
           {d.lines.map((l) => (
             <tr key={l.id}><td className="py-0.5">{l.description}</td><td className="text-right tabular-nums">{formatINR(l.amount, { symbol: false })}</td>
-              <td className="text-right tabular-nums">{l.discount + l.credited ? formatINR(l.discount + l.credited, { symbol: false }) : ""}</td><td className="text-right tabular-nums">{formatINR(l.net, { symbol: false })}</td></tr>
+              {hasConc && <td className="text-right tabular-nums">{l.discount + l.credited ? formatINR(l.discount + l.credited, { symbol: false }) : ""}</td>}<td className="text-right tabular-nums">{formatINR(l.net, { symbol: false })}</td></tr>
           ))}
         </tbody>
         <tfoot className="border-t border-gray-800">
-          <tr><td className="pt-1" colSpan={3}>Total</td><td className="pt-1 text-right font-semibold tabular-nums">{formatINR(inv.net)}</td></tr>
-          {inv.paid > 0 && <tr><td colSpan={3}>Paid / adjusted</td><td className="text-right tabular-nums">{formatINR(inv.paid)}</td></tr>}
-          <tr className="text-sm"><td colSpan={3} className="font-semibold">Amount payable</td><td className="text-right font-bold tabular-nums">{formatINR(inv.balance)}</td></tr>
+          <tr><td className="pt-1" colSpan={cols}>Total</td><td className="pt-1 text-right font-semibold tabular-nums">{formatINR(inv.net)}</td></tr>
+          {inv.paid > 0 && <tr><td colSpan={cols}>Paid / adjusted</td><td className="text-right tabular-nums">{formatINR(inv.paid)}</td></tr>}
+          <tr className="text-sm"><td colSpan={cols} className="font-semibold">Amount payable</td><td className="text-right font-bold tabular-nums">{formatINR(inv.balance)}</td></tr>
         </tfoot>
       </table>
       <p className="mt-1 text-xs italic">{amountInWords(inv.balance)}</p>

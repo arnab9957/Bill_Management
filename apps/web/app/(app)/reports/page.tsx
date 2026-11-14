@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { addDays, formatDate, reports, today } from "@sb/core";
+import { addDays, formatDate, reports, today, getSettings } from "@sb/core";
 import { requireRole } from "@/lib/auth";
 import { Card, LinkButton, Money, PageHeader, Stat } from "@/components/ui";
 
@@ -23,6 +23,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
     reports.collectionReport(from, to), reports.outstandingByClass(), reports.concessionReport(from, to), reports.lateFeeReport(from, to), reports.cancelledReceipts(from, to),
   ]);
   const q = `from=${from}&to=${to}`;
+  const concessionsOn = (await getSettings()).concessionsEnabled;
   return (
     <div className="space-y-5">
       <PageHeader title="Reports" subtitle={`${formatDate(from)} – ${formatDate(to)}`} actions={<>
@@ -47,9 +48,11 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
         <Breakdown title="By fee head" rows={col.byHead} />
         <Breakdown title="By class" rows={col.byClass} />
         <Breakdown title="By date" rows={col.byDate.map((d) => ({ ...d, key: formatDate(d.key) }))} />
+        {concessionsOn && (
         <Card title="Concessions given">
           <table className="data"><tbody>{conc.length === 0 && <tr><td className="text-gray-500">None</td></tr>}{conc.map((c) => <tr key={c.head}><td>{c.head}</td><td className="num text-gray-500">{c.lines}</td><td className="num"><Money p={c.discount} /></td></tr>)}</tbody></table>
         </Card>
+        )}
       </div>
       <Card title="Outstanding by class (all time)">
         <table className="data">

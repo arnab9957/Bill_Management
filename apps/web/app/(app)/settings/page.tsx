@@ -76,6 +76,8 @@ export default async function SettingsPage() {
           <label className="flex flex-col gap-1">Reminder days before due<input name="reminderDaysBefore" type="number" defaultValue={s.reminderDaysBefore} /></label>
           <label className="flex flex-col gap-1">Overdue reminders after (days)<input name="overdueSteps" defaultValue={s.overdueSteps.join(", ")} /></label>
           <label className="flex flex-col gap-1 sm:col-span-2">Backup folder (second disk recommended)<input name="backupPath" defaultValue={s.backupPath ?? ""} placeholder="D:\SchoolBackups" /></label>
+          <label className="flex items-start gap-2 sm:col-span-3"><input type="checkbox" name="concessionsEnabled" defaultChecked={s.concessionsEnabled} className="mt-0.5" />
+            <span>Fee concessions <span className="text-gray-500">— discounts such as sibling, staff ward or merit, approved per student and applied automatically to new bills. Leave off if your school doesn&apos;t give concessions.</span></span></label>
           <label className="flex items-start gap-2 sm:col-span-3"><input type="checkbox" name="dayCloseEnabled" defaultChecked={s.dayCloseEnabled} className="mt-0.5" />
             <span>Cash counter closing <span className="text-gray-500">— each cashier counts the cash drawer by notes at the end of the day and the day is then locked for them. Most schools leave this off.</span></span></label>
           <div className="sm:col-span-3"><Submit>Save</Submit></div>

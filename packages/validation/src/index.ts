@@ -260,6 +260,7 @@ export const schoolSettingsSchema = z.object({
   ),
   backupPath: z.string().trim().optional(),
   dayCloseEnabled: checkbox,
+  concessionsEnabled: checkbox,
 });
 export const providerConfigSchema = z.object({
   emailMode: z.enum(["off", "smtp", "console"]).default("console"),

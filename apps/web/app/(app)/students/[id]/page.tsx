@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { billing, can, fees, formatDate, notifications, payments, periodLabel, students, today } from "@sb/core";
+import { billing, can, fees, formatDate, notifications, payments, periodLabel, students, today, getSettings } from "@sb/core";
 import { requireRole } from "@/lib/auth";
 import { getWorkingYear, nextYear } from "@/lib/year";
 import { formObject, run, type ActionState } from "@/lib/action";
@@ -64,6 +64,7 @@ export default async function StudentProfile({ params, searchParams }: { params:
   const p = await students.getStudentProfile(id);
   if (!p) notFound();
   const [ledger, conc, m, history, wy] = await Promise.all([students.studentLedger(id), fees.listConcessionTypes(), fees.masters(), students.listEnrollments(id), getWorkingYear()]);
+  const concessionsOn = (await getSettings()).concessionsEnabled;
   const inYear = history.find((h) => h.e.academicYearId === wy.year.id);
   const latest = history.at(-1);
   const promoteYear = latest ? nextYear(m.years, latest.e.academicYearId) : undefined;
@@ -100,7 +101,7 @@ export default async function StudentProfile({ params, searchParams }: { params:
       {saved && <Notice tone="ok">Changes saved.</Notice>}
       {promoted && <Notice tone="ok">Promoted to <b>{promoted}</b>. The previous year&apos;s record, bills and payments are kept below as history.{Number(carried) > 0 && <> Unpaid dues of <Money p={Number(carried)} /> were moved into {promoted} as an opening-balance bill.</>}</Notice>}
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className={`grid gap-4 ${concessionsOn ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
         <Card title="Balance">
           <div className="text-3xl font-semibold"><Money p={outstanding} className={outstanding ? "text-red-700" : "text-green-700"} /></div>
           <div className="mt-1 text-sm text-gray-500">Advance (wallet): <Money p={ledger.wallet} /></div>
@@ -126,6 +127,7 @@ export default async function StudentProfile({ params, searchParams }: { params:
           ))}
           {p.siblings.length > 0 && <div className="mt-3 text-sm">Siblings: {p.siblings.map((s) => <Link key={s.id} className="mr-2 text-brand-700 hover:underline" href={`/students/${s.id}`}>{s.name} ({s.className})</Link>)}</div>}
         </Card>
+        {concessionsOn && (
         <Card title="Concessions">
           <ul className="space-y-1 text-sm">
             {p.concessions.length === 0 && <li className="text-gray-500">None</li>}
@@ -145,6 +147,7 @@ export default async function StudentProfile({ params, searchParams }: { params:
             </ActionForm>
           )}
         </Card>
+        )}
       </div>
 
       <Card title="Academic history">

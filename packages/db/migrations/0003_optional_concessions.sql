@@ -1,0 +1,1 @@
+ALTER TABLE "school_settings" ADD COLUMN "concessions_enabled" boolean DEFAULT false NOT NULL;
