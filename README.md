@@ -4,7 +4,17 @@ Offline-first fee billing for a school, built from *School Billing Management Sy
 Everything (admissions, bills, fee collection, receipts, reports) works with the internet switched off.
 SMS, WhatsApp and email reminders wait in a local outbox and are sent when a connection is available.
 
-## Quick start (development, Windows)
+## Easiest way: double-click `start.cmd`
+
+It does everything below automatically:
+- installs packages and creates `.env` on the first run
+- starts the database in its own minimised window
+- applies database updates and loads the starting data on the first run
+- starts the website and the reminder worker, then opens http://localhost:3000
+
+Code changes appear on a normal browser refresh. To stop, close its window and the "Database" window.
+
+## Quick start by hand (development, Windows)
 
 ```powershell
 pnpm install
