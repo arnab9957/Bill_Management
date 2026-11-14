@@ -148,7 +148,7 @@ export default async function StudentProfile({ params, searchParams }: { params:
               {p.messages.length === 0 && <tr><td colSpan={4} className="text-gray-500">No messages yet.</td></tr>}
               {p.messages.map((x) => (
                 <tr key={x.id} title={x.body}><td className="whitespace-nowrap text-xs">{x.createdAt.toLocaleString("en-IN")}</td><td className="text-xs">{x.event.replace(/_/g, " ").toLowerCase()}</td>
-                  <td className="capitalize">{x.channel}</td><td><Badge>{x.status}</Badge>{x.lastError && <div className="text-xs text-gray-500">{x.lastError}</div>}</td></tr>
+                  <td className="capitalize">{x.channel}</td><td className="wrap"><Badge>{x.status}</Badge>{x.lastError && <div className="text-xs text-gray-500">{x.lastError}</div>}</td></tr>
               ))}
             </tbody>
           </table>

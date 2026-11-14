@@ -22,7 +22,7 @@ export default async function Statement({ params }: { params: Promise<{ id: stri
           <thead><tr><th>Date</th><th>Ref</th><th>Particulars</th><th className="num">Debit</th><th className="num">Credit</th><th className="num">Balance</th></tr></thead>
           <tbody>
             {l.entries.map((e, i) => (
-              <tr key={i}><td className="whitespace-nowrap">{formatDate(e.date)}</td><td className="text-xs">{e.ref}</td><td>{e.description}</td>
+              <tr key={i}><td className="whitespace-nowrap">{formatDate(e.date)}</td><td className="text-xs">{e.ref}</td><td className="wrap">{e.description}</td>
                 <td className="num">{e.debit ? formatINR(e.debit, { symbol: false }) : ""}</td><td className="num">{e.credit ? formatINR(e.credit, { symbol: false }) : ""}</td>
                 <td className="num">{formatINR(e.balance, { symbol: false })}</td></tr>
             ))}

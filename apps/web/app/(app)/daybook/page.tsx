@@ -1,20 +1,10 @@
 import Link from "next/link";
-import { revalidatePath } from "next/cache";
 import { can, formatINR, payments, today } from "@sb/core";
+import { closeDayAction } from "./actions";
 import { denominations } from "@sb/validation";
 import { requireRole } from "@/lib/auth";
-import { run, type ActionState } from "@/lib/action";
 import { ActionForm, Submit } from "@/components/action-form";
 import { Badge, Card, LinkButton, Money, PageHeader, Stat } from "@/components/ui";
-
-async function closeDay(date: string, _: ActionState, fd: FormData): Promise<ActionState> {
-  "use server";
-  const u = await requireRole("dayClose");
-  const counts = Object.fromEntries(denominations.map((d) => [d, Number(fd.get(`d${d}`) || 0)]));
-  const r = await run(() => payments.closeDay(u, { date, counts }), (x) => `Day closed. Difference ${formatINR(x.difference)}`);
-  revalidatePath("/daybook");
-  return r;
-}
 
 export default async function DayBook({ searchParams }: { searchParams: Promise<{ date?: string; mine?: string }> }) {
   const user = await requireRole("dayClose");
@@ -52,9 +42,10 @@ export default async function DayBook({ searchParams }: { searchParams: Promise<
           {myClose ? (
             <p className="text-sm">Closed at {myClose.c.closedAt.toLocaleTimeString("en-IN")}. System cash <Money p={myClose.c.systemCash} />, counted <Money p={myClose.c.countedCash} />, difference <b><Money p={myClose.c.difference} /></b>. Entries for this day are locked.</p>
           ) : (
-            <ActionForm action={closeDay.bind(null, date)}>
+            <ActionForm action={closeDayAction}>
+              <input type="hidden" name="date" value={date} />
               <p className="mb-3 text-sm text-gray-600">Count the cash drawer. Expected cash: <b><Money p={myCash} /></b></p>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                 {denominations.map((d) => <label key={d} className="flex flex-col gap-1 text-xs">₹{d} ×<input name={`d${d}`} type="number" min={0} defaultValue={0} className="w-full" /></label>)}
               </div>
               <div className="mt-3"><Submit confirm="Close the day? You won't be able to collect more for this date.">Close day</Submit></div>

@@ -86,7 +86,7 @@ export function Counter({ today, initialStudentId }: { today: string; initialStu
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[22rem_1fr]">
+    <div className="grid gap-4 lg:grid-cols-[22rem_1fr] lg:gap-5">
       <div className="space-y-3">
         <div className="relative">
           <input ref={searchRef} autoFocus value={q} onChange={(e) => setQ(e.target.value)} className="w-full text-base"
@@ -199,7 +199,7 @@ export function Counter({ today, initialStudentId }: { today: string; initialStu
                 <label className="flex flex-col gap-1">Date on cheque<input type="date" value={ref.chequeDate} onChange={(e) => setRef({ ...ref, chequeDate: e.target.value })} /></label>
               </>)}
               <div className="flex items-end sm:col-span-2">
-                <button disabled={pending || !paise} className="rounded-md bg-green-600 px-5 py-2 text-base font-semibold text-white hover:bg-green-700 disabled:opacity-50">
+                <button disabled={pending || !paise} className="w-full rounded-md bg-green-600 px-5 py-3 text-base font-semibold text-white hover:bg-green-700 disabled:opacity-50 sm:w-auto sm:py-2">
                   {pending ? "Saving…" : `Save & print receipt${paise ? " · " + formatINR(paise) : ""}`}
                 </button>
               </div>

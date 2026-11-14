@@ -18,7 +18,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
       </>} />
       <Card>
         <form className="mb-4 flex flex-wrap gap-2">
-          <input name="q" defaultValue={sp.q} placeholder="Name, admission no., guardian mobile" className="w-72" autoFocus />
+          <input name="q" defaultValue={sp.q} placeholder="Name, admission no., guardian mobile" className="w-full sm:w-72" autoFocus />
           <select name="classId" defaultValue={sp.classId}><option value="">All classes</option>{classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
           <select name="status" defaultValue={sp.status ?? "active"}><option value="active">Active</option><option value="left">Left</option><option value="alumni">Alumni</option><option value="">All</option></select>
           <button className="rounded-md border border-gray-300 bg-white px-3 text-sm">Search</button>

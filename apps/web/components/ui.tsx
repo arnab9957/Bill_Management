@@ -10,7 +10,7 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
+        <h1 className="text-lg font-semibold text-gray-900 sm:text-xl">{title}</h1>
         {subtitle && <div className="mt-0.5 text-sm text-gray-500">{subtitle}</div>}
       </div>
       {actions && <div className="flex flex-wrap gap-2 no-print">{actions}</div>}
@@ -20,14 +20,14 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
 
 export function Card({ title, children, className, actions }: { title?: ReactNode; children: ReactNode; className?: string; actions?: ReactNode }) {
   return (
-    <section className={cx("rounded-lg border border-gray-200 bg-white shadow-sm", className)}>
+    <section className={cx("min-w-0 rounded-lg border border-gray-200 bg-white shadow-sm", className)}>
       {title && (
         <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
           <h2 className="text-sm font-semibold text-gray-800">{title}</h2>
           {actions}
         </div>
       )}
-      <div className="p-4">{children}</div>
+      <div className="overflow-x-auto p-3 sm:p-4">{children}</div>
     </section>
   );
 }
@@ -74,9 +74,9 @@ export function Badge({ children }: { children: string }) {
 
 export function Stat({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: "red" | "green" }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="min-w-0 rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:p-4">
       <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</div>
-      <div className={cx("mt-1 text-2xl font-semibold tabular-nums", tone === "red" && "text-red-700", tone === "green" && "text-green-700")}>{value}</div>
+      <div className={cx("mt-1 break-words text-xl font-semibold tabular-nums sm:text-2xl", tone === "red" && "text-red-700", tone === "green" && "text-green-700")}>{value}</div>
       {sub && <div className="mt-0.5 text-xs text-gray-500">{sub}</div>}
     </div>
   );

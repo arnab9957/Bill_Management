@@ -26,7 +26,7 @@ export function RunResult() {
             <thead><tr><th>Adm. no.</th><th>Student</th><th>Class</th><th>Heads</th><th>Due</th><th className="num">Net</th></tr></thead>
             <tbody>{r.planned.map((p) => (
               <tr key={p.studentId}><td>{p.admissionNo}</td><td>{p.name}</td><td>{p.className}</td>
-                <td className="text-xs">{p.lines.map((l) => l.description.replace(/ – .*$/, "")).join(", ")}</td>
+                <td className="wrap text-xs">{p.lines.map((l) => l.description.replace(/ – .*$/, "")).join(", ")}</td>
                 <td>{formatDate(p.dueDate)}</td><td className="num">{formatINR(p.net)}</td></tr>
             ))}</tbody>
           </table>

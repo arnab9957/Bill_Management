@@ -43,3 +43,4 @@ desktop.ini
 
 # The plan PDF (optional — remove this line to commit it)
 *.pdf
+.next-dev/

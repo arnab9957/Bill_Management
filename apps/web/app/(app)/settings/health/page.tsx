@@ -71,7 +71,7 @@ export default async function Health() {
       <Card title="Restore from backup (danger)">
         <Notice tone="error">Restoring replaces ALL current data with the backup. A safety backup is taken first. Stop all counters before restoring.</Notice>
         <ActionForm action={restore} className="mt-3 flex flex-wrap gap-2">
-          <select name="file" className="max-w-xl">{backups.filter((b) => b.ok).map((b) => <option key={b.id} value={b.filePath}>{b.at.toLocaleString("en-IN")} — {b.kind}</option>)}</select>
+          <select name="file" className="w-full sm:max-w-xl">{backups.filter((b) => b.ok).map((b) => <option key={b.id} value={b.filePath}>{b.at.toLocaleString("en-IN")} — {b.kind}</option>)}</select>
           <input name="confirm" placeholder="Type RESTORE" className="w-36" />
           <Submit variant="danger" confirm="Really replace all data with this backup?">Restore</Submit>
         </ActionForm>

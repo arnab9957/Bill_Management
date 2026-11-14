@@ -21,10 +21,10 @@ export default async function Audit({ searchParams }: { searchParams: Promise<{ 
               <td className="whitespace-nowrap text-xs">{a.at.toLocaleString("en-IN")}</td>
               <td>{username ?? "system"}{a.ip ? <div className="text-xs text-gray-400">{a.ip}</div> : null}</td>
               <td>{a.action}</td><td className="text-xs">{a.tableName} #{a.recordId}</td>
-              <td className="max-w-xl">
+              <td className="wrap max-w-xl">
                 <details><summary className="cursor-pointer text-xs text-brand-700">details</summary>
-                  {a.oldValues != null && <pre className="mt-1 overflow-auto bg-red-50 p-1 text-[10px]">{JSON.stringify(a.oldValues, null, 1)}</pre>}
-                  {a.newValues != null && <pre className="mt-1 overflow-auto bg-green-50 p-1 text-[10px]">{JSON.stringify(a.newValues, null, 1)}</pre>}
+                  {a.oldValues != null && <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-all bg-red-50 p-1 text-[10px]">{JSON.stringify(a.oldValues, null, 1)}</pre>}
+                  {a.newValues != null && <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-all bg-green-50 p-1 text-[10px]">{JSON.stringify(a.newValues, null, 1)}</pre>}
                 </details>
               </td>
             </tr>

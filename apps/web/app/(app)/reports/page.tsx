@@ -60,7 +60,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
       {cancelled.length > 0 && (
         <Card title="Cancelled receipts">
           <table className="data"><thead><tr><th>Receipt</th><th>Date</th><th>Student</th><th>Cashier</th><th>Reason</th><th className="num">Amount</th></tr></thead>
-            <tbody>{cancelled.map((c) => <tr key={c.p.id}><td><Link className="text-brand-700 hover:underline" href={`/receipts/${c.p.id}`}>{c.p.receiptNo}</Link></td><td>{formatDate(c.p.date)}</td><td>{c.studentName}</td><td>{c.cashier}</td><td>{c.p.cancelReason}</td><td className="num"><Money p={c.p.amount} /></td></tr>)}</tbody></table>
+            <tbody>{cancelled.map((c) => <tr key={c.p.id}><td><Link className="text-brand-700 hover:underline" href={`/receipts/${c.p.id}`}>{c.p.receiptNo}</Link></td><td>{formatDate(c.p.date)}</td><td>{c.studentName}</td><td>{c.cashier}</td><td className="wrap">{c.p.cancelReason}</td><td className="num"><Money p={c.p.amount} /></td></tr>)}</tbody></table>
         </Card>
       )}
     </div>

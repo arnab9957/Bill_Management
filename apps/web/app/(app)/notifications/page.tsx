@@ -46,8 +46,8 @@ export default async function Messages({ searchParams }: { searchParams: Promise
                 <td className="text-xs">{m.event.replace(/_/g, " ").toLowerCase()}</td>
                 <td className="capitalize">{m.channel}</td>
                 <td className="text-xs">{m.recipient}</td>
-                <td className="max-w-md text-xs"><div className="line-clamp-2 whitespace-pre-line" title={m.body}>{m.body}</div></td>
-                <td><Badge>{m.status}</Badge>
+                <td className="wrap max-w-md text-xs"><div className="line-clamp-2 whitespace-pre-line" title={m.body}>{m.body}</div></td>
+                <td className="wrap"><Badge>{m.status}</Badge>
                   <div className="text-xs text-gray-500">{m.attempts ? `${m.attempts} attempt(s)` : ""}{m.lastError ? ` · ${m.lastError}` : ""}</div>
                   {m.sentAt && <div className="text-xs text-gray-500">sent {m.sentAt.toLocaleString("en-IN")}</div>}</td>
                 <td className="whitespace-nowrap">

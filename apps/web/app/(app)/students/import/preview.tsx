@@ -19,7 +19,7 @@ export function ImportPreview() {
             <tr key={r.row} className={Object.keys(r.errors).length ? "bg-red-50" : ""}>
               <td>{r.row}</td><td>{String(r.data?.admissionNo ?? "")}</td><td>{String(r.data?.name ?? "")}</td><td>{String(r.data?.className ?? "")}</td>
               <td>{String(r.data?.guardianName ?? "")}</td><td>{String(r.data?.guardianMobile ?? "")}</td>
-              <td className="text-xs text-red-700">{Object.entries(r.errors).map(([k, v]) => `${k}: ${v}`).join("; ")}</td>
+              <td className="wrap text-xs text-red-700">{Object.entries(r.errors).map(([k, v]) => `${k}: ${v}`).join("; ")}</td>
             </tr>
           ))}
         </tbody>

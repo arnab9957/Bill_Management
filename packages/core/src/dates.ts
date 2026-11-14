@@ -31,6 +31,9 @@ export const dateInPeriod = (period: string, day: number): ISODate => {
   return `${year}-${pad(month)}-${pad(day)}`;
 };
 export function periodLabel(period: string): string {
+  if (period === "OPENING") return "Opening balance";
+  if (period.startsWith("MISC-")) return "Misc. charge";
+  if (period.startsWith("CHQ-")) return "Cheque bounce";
   if (!/^\d{4}-\d{2}$/.test(period)) return period;
   const { year, month } = parsePeriod(period);
   return new Date(year, month - 1, 1).toLocaleString("en-IN", { month: "short", year: "numeric" });

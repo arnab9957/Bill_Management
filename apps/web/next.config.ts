@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 import { resolve } from "node:path";
 
 const config: NextConfig = {
+  // Dev and production builds live in separate folders. Otherwise running `next dev`
+  // overwrites the files a running `next start` server needs, and form submissions hang.
+  distDir: process.env.NODE_ENV === "development" ? ".next-dev" : ".next",
   // Standalone bundles need symlink rights on Windows (pnpm); default to `next start` instead.
   output: process.env.NEXT_STANDALONE === "1" ? "standalone" : undefined,
   outputFileTracingRoot: resolve(import.meta.dirname, "../.."),
