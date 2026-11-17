@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
-import { fees, getSettings, toRupeeString, updateSchoolSettings } from "@sb/core";
-import { rupeesToPaise } from "@sb/validation";
+import { fees, getSettings, receiptNumberPreview, setNextReceiptNumber, toRupeeString, updateSchoolSettings } from "@sb/core";
+import { rupeesToPaise, setNextReceiptNumberSchema } from "@sb/validation";
 import { requireRole } from "@/lib/auth";
 import { formObject, run, type ActionState } from "@/lib/action";
 import { ActionForm, FieldError, Submit } from "@/components/action-form";
@@ -12,6 +12,15 @@ async function saveSchool(_: ActionState, fd: FormData): Promise<ActionState> {
   const r = await run(() => updateSchoolSettings(u, formObject(fd)), "Settings saved");
   revalidatePath("/", "layout");
   return r;
+}
+async function setNextNumber(_: ActionState, fd: FormData): Promise<ActionState> {
+  "use server";
+  const u = await requireRole("settings");
+  const parsed = setNextReceiptNumberSchema.safeParse({ next: fd.get("next") });
+  if (!parsed.success) return { ok: false, message: "Enter a whole number, 1 or more", errors: { next: "Invalid number" } };
+  const r = await run(() => setNextReceiptNumber(u, parsed.data.next), (n) => `Done. The next receipt will be ${n}`);
+  revalidatePath("/settings");
+  return r ? { ok: r.ok, message: r.message, errors: r.errors } : r;
 }
 async function addYear(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
@@ -53,7 +62,7 @@ async function saveRoute(_: ActionState, fd: FormData): Promise<ActionState> {
 
 export default async function SettingsPage() {
   await requireRole("settings");
-  const [s, m] = await Promise.all([getSettings(), fees.masters()]);
+  const [s, m, num] = await Promise.all([getSettings(), fees.masters(), receiptNumberPreview()]);
   return (
     <div className="space-y-5">
       <PageHeader title="Settings" actions={<>
@@ -64,13 +73,23 @@ export default async function SettingsPage() {
       </>} />
       <Card title="School profile">
         <ActionForm action={saveSchool} className="grid gap-3 sm:grid-cols-3">
-          <label className="flex flex-col gap-1 sm:col-span-2">School name<input name="name" defaultValue={s.name} required /></label>
+          <label className="flex flex-col gap-1 sm:col-span-2">School name <span className="text-xs text-gray-500">(printed in capitals on the black banner of bills and receipts)</span><input name="name" defaultValue={s.name} required /></label>
           <label className="flex flex-col gap-1">Phone<input name="phone" defaultValue={s.phone} /></label>
-          <label className="flex flex-col gap-1 sm:col-span-2">Address<input name="address" defaultValue={s.address} /></label>
+          <label className="flex flex-col gap-1 sm:col-span-3">Line under the name <span className="text-xs text-gray-500">(e.g. managing society)</span><input name="headerSubtitle" defaultValue={s.headerSubtitle} placeholder="(Managed by … Parishad)" /></label>
+          <label className="flex flex-col gap-1">U-DISE code<input name="udiseCode" defaultValue={s.udiseCode} inputMode="numeric" /></label>
+          <label className="flex flex-col gap-1 sm:col-span-2">Registration lines <span className="text-xs text-gray-500">(one per line: society registration, 12A …)</span>
+            <textarea name="registrationNote" defaultValue={s.registrationNote} rows={2} /></label>
+          <label className="flex flex-col gap-1 sm:col-span-2">Address / location line <span className="text-xs text-gray-500">(printed last in the header, in bold)</span><input name="address" defaultValue={s.address} placeholder="Village * Post * District" /></label>
           <label className="flex flex-col gap-1">Email<input name="email" defaultValue={s.email} /><FieldError name="email" /></label>
           <label className="flex flex-col gap-1">UPI ID (for QR on bills)<input name="upiId" defaultValue={s.upiId ?? ""} placeholder="school@bank" /></label>
           <label className="flex flex-col gap-1">Bill prefix<input name="invoicePrefix" defaultValue={s.invoicePrefix} /></label>
-          <label className="flex flex-col gap-1">Receipt prefix<input name="receiptPrefix" defaultValue={s.receiptPrefix} /></label>
+          <label className="flex flex-col gap-1">Receipt prefix<input name="receiptPrefix" defaultValue={s.receiptPrefix} /><FieldError name="receiptPrefix" /></label>
+          <label className="flex flex-col gap-1">Receipt numbering
+            <select name="receiptNumbering" defaultValue={s.receiptIncludeYear ? "per_year" : "continuous"}>
+              <option value="continuous">One running series ({s.receiptPrefix}/6434)</option>
+              <option value="per_year">Restarts every academic year ({s.receiptPrefix}/2026-27/1)</option>
+            </select></label>
+          <label className="flex flex-col gap-1">Number digits <span className="text-xs text-gray-500">(1 = no leading zeros)</span><input name="receiptDigits" type="number" min={1} max={10} defaultValue={s.receiptDigits} /><FieldError name="receiptDigits" /></label>
           <label className="flex flex-col gap-1">Send messages from<input name="quietStart" defaultValue={s.quietStart} /><FieldError name="quietStart" /></label>
           <label className="flex flex-col gap-1">…until<input name="quietEnd" defaultValue={s.quietEnd} /><FieldError name="quietEnd" /></label>
           <label className="flex flex-col gap-1">Reminder days before due<input name="reminderDaysBefore" type="number" defaultValue={s.reminderDaysBefore} /></label>
@@ -82,6 +101,23 @@ export default async function SettingsPage() {
             <span>Cash counter closing <span className="text-gray-500">— each cashier counts the cash drawer by notes at the end of the day and the day is then locked for them. Most schools leave this off.</span></span></label>
           <div className="sm:col-span-3"><Submit>Save</Submit></div>
         </ActionForm>
+      </Card>
+
+      <Card title="Receipt numbers">
+        {num ? (<>
+          <p className="text-sm">The next receipt will be numbered <b className="font-mono text-base">{num.text}</b>
+            <span className="ml-2 text-gray-500">(series {num.series}, {num.issued} issued so far)</span></p>
+          {num.canSetStart ? (
+            <ActionForm action={setNextNumber} className="mt-3 flex flex-wrap items-end gap-2">
+              <label className="flex flex-col gap-1">Continue the paper receipt book from number
+                <input name="next" type="number" min={1} defaultValue={num.next} className="w-44" /><FieldError name="next" /></label>
+              <Submit variant="secondary">Set number</Submit>
+            </ActionForm>
+          ) : (
+            <p className="mt-2 text-sm text-gray-500">Numbers in this series are already in use, so they can&apos;t be changed. To continue from another number, change the receipt prefix above, save, and set the number here.</p>
+          )}
+          <p className="mt-2 text-xs text-gray-500">Do this before the first receipt is printed, so the app carries on from the last receipt of your paper book (for example, if the book is at 6434, type 6435).</p>
+        </>) : <p className="text-sm text-gray-500">Set a current academic year first.</p>}
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">

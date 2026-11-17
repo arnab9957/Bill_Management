@@ -37,17 +37,32 @@ export async function integrityCheck(): Promise<{ checks: number; problems: stri
     select w.student_id, w.balance, coalesce((select sum(unallocated) from payment p where p.student_id = w.student_id and p.status='valid'),0) as real
     from student_wallet w where w.balance <> coalesce((select sum(unallocated) from payment p where p.student_id = w.student_id and p.status='valid'),0)`,
     (r) => `student ${r.student_id}: wallet ${r.balance} ≠ ${r.real}`);
-  // Gap-free numbering: every value 1..last must exist for receipts and invoices.
+  // Gap-free numbering. Invoices and credit notes: every value 1..last must exist.
   const series = await db.select().from(numberSeries);
   for (const s of series) {
     const [kind, year] = s.key.split(":");
-    const table = kind === "RECEIPT" ? "payment" : kind === "INVOICE" ? "invoice" : kind === "CREDIT_NOTE" ? "credit_note" : null;
-    const col = kind === "RECEIPT" ? "receipt_no" : kind === "INVOICE" ? "invoice_no" : "credit_note_no";
+    if (kind === "RECEIPT") continue; // receipts are checked below, from the number each one recorded
+    const table = kind === "INVOICE" ? "invoice" : kind === "CREDIT_NOTE" ? "credit_note" : null;
+    const col = kind === "INVOICE" ? "invoice_no" : "credit_note_no";
     if (!table || !year) continue;
     const res = await db.execute(sql`select count(*)::int as n from ${sql.identifier(table)} where ${sql.identifier(col)} like ${"%/" + year + "/%"}`);
     const n = Number((res.rows[0] as { n: number }).n);
     if (n !== s.lastValue) problems.push(`[numbering] ${s.key}: counter at ${s.lastValue} but ${n} documents exist`);
   }
+  // Receipts: each counter ("RECEIPT:C", "RECEIPT:RCT:2026-27") must run without gaps from where the
+  // series started (1, or the number the school's paper book had reached) to the counter's value.
+  const used = await db.execute(sql`
+    select receipt_series as key, count(*)::int as n, min(receipt_seq)::int as lo, max(receipt_seq)::int as hi
+    from payment where receipt_series is not null group by receipt_series`);
+  const usedBy = new Map((used.rows as { key: string; n: number; lo: number; hi: number }[]).map((r) => [r.key, r]));
+  for (const s of series.filter((x) => x.key.startsWith("RECEIPT:"))) {
+    const u = usedBy.get(s.key);
+    const issued = Math.max(0, s.lastValue - s.startValue + 1);
+    if (!u) { if (issued > 0) problems.push(`[numbering] ${s.key}: counter at ${s.lastValue} but no receipts exist`); continue; }
+    if (u.hi !== s.lastValue) problems.push(`[numbering] ${s.key}: highest receipt is ${u.hi} but the counter is at ${s.lastValue}`);
+    if (u.lo !== s.startValue || u.hi - u.lo + 1 !== u.n) problems.push(`[numbering] ${s.key}: gap in receipt numbers (${u.n} receipts between ${u.lo} and ${u.hi})`);
+  }
+  for (const key of usedBy.keys()) if (!series.some((s) => s.key === key)) problems.push(`[numbering] ${key}: receipts exist but their counter is missing`);
   await db.update(integrityIssues).set({ resolved: true }).where(eq(integrityIssues.resolved, false));
   if (problems.length) await db.insert(integrityIssues).values(problems.map((p) => ({ checkName: p.slice(1, p.indexOf("]")), detail: p })));
   return { checks: 5, problems };

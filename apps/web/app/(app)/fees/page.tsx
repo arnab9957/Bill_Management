@@ -21,6 +21,20 @@ async function addConcession(_: ActionState, fd: FormData): Promise<ActionState>
   revalidatePath("/fees");
   return r;
 }
+async function saveRows(_: ActionState, fd: FormData): Promise<ActionState> {
+  "use server";
+  const u = await requireRole("fees");
+  const rows = fd.getAll("ids").map(Number).map((id) => {
+    const n = Number(String(fd.get(`order_${id}`) ?? "").trim());
+    return { id, show: fd.get(`show_${id}`) === "on", order: Number.isInteger(n) && n >= 1 ? n : null, label: String(fd.get(`label_${id}`) ?? "").trim() || null };
+  });
+  // A head that is ticked but has no number goes after the last numbered one.
+  let next = Math.max(0, ...rows.filter((x) => x.show && x.order).map((x) => x.order!)) + 1;
+  for (const x of rows) if (x.show && !x.order) x.order = next++;
+  const r = await run(() => fees.saveReceiptRows(u, rows), "Receipt rows saved");
+  revalidatePath("/fees");
+  return r ? { ok: r.ok, message: r.message, errors: r.errors } : r;
+}
 async function saveLate(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
   const u = await requireRole("fees");
@@ -106,6 +120,27 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           </ActionForm>
         </Card>
       </div>
+
+      <Card title="Rows printed on receipts and bills">
+        <p className="mb-3 text-sm text-gray-600">
+          Receipts and bills list these fee heads as fixed rows, in this order, with 0 for any head not paid — like your paper receipt book.
+          A head that is not ticked is still printed (as an extra row at the end) whenever a payment or bill includes it, so no amount is ever hidden.
+        </p>
+        <ActionForm action={saveRows}>
+          <table className="data">
+            <thead><tr><th>Fee head</th><th>Print a row</th><th>Row no.</th><th>Printed as</th></tr></thead>
+            <tbody>{m.heads.slice().sort((a, b) => (a.receiptOrder ?? 1e6) - (b.receiptOrder ?? 1e6) || a.sortOrder - b.sortOrder).map((h) => (
+              <tr key={h.id}>
+                <td>{h.name} <span className="font-mono text-xs text-gray-400">{h.code}</span><input type="hidden" name="ids" value={h.id} /></td>
+                <td><input type="checkbox" name={`show_${h.id}`} defaultChecked={h.receiptOrder != null} /></td>
+                <td><input name={`order_${h.id}`} type="number" min={1} max={999} defaultValue={h.receiptOrder ?? ""} className="w-20" /></td>
+                <td><input name={`label_${h.id}`} defaultValue={h.receiptLabel ?? ""} placeholder={h.name} className="w-56" /></td>
+              </tr>
+            ))}</tbody>
+          </table>
+          <div className="mt-3"><Submit>Save rows</Submit></div>
+        </ActionForm>
+      </Card>
     </div>
   );
 }

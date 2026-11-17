@@ -44,6 +44,8 @@ export function monthOffset(yearStart: ISODate, period: string): number {
   const p = parsePeriod(period);
   return (p.year - s.year) * 12 + (p.month - s.month);
 }
+/** 13-11-2026 — the day-month-year order used on the school's paper receipts. */
+export const formatDMY = (s: ISODate | null | undefined): string => (s ? s.split("-").reverse().join("-") : "");
 export const formatDate = (s: ISODate | null | undefined): string => {
   if (!s) return "";
   const d = parseISODate(s);

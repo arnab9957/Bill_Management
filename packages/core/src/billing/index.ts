@@ -10,6 +10,7 @@ import { dateInPeriod, formatDate, periodLabel, today, type ISODate } from "../d
 import { formatINR } from "../money";
 import { enqueue, studentVars } from "../notifications";
 import { applyWalletToInvoice } from "../payments/wallet";
+import { buildPrintRows } from "../printing";
 import { concessionFor, deriveStatus, isDueInPeriod, lateFeeTarget, type ConcessionRule } from "./rules";
 
 export * from "./rules";
@@ -310,7 +311,17 @@ export async function getInvoice(id: number) {
     .from(paymentAllocations).innerJoin(payments, eq(payments.id, paymentAllocations.paymentId))
     .where(eq(paymentAllocations.invoiceId, id)).orderBy(asc(paymentAllocations.id));
   const cns = await db.select().from(creditNotes).where(eq(creditNotes.invoiceId, id));
-  return { ...row, lines, allocations: allocs, creditNotes: cns };
+
+  // Class, section and roll the student had in the bill's academic year (not today's class).
+  const [enr] = await db.select({ className: classes.name, sectionName: sections.name, rollNo: studentEnrollments.rollNo })
+    .from(studentEnrollments).innerJoin(classes, eq(classes.id, studentEnrollments.classId)).leftJoin(sections, eq(sections.id, studentEnrollments.sectionId))
+    .where(and(eq(studentEnrollments.studentId, row.inv.studentId), eq(studentEnrollments.academicYearId, row.inv.academicYearId)));
+  const klass = { className: enr?.className ?? row.className, sectionName: enr ? enr.sectionName : row.sectionName, rollNo: enr ? enr.rollNo : row.student.rollNo };
+
+  // The school's grid: what is billed under each fee head (after concession / credit notes).
+  const heads = await db.select().from(feeHeads).orderBy(asc(feeHeads.sortOrder), asc(feeHeads.id));
+  const grid = buildPrintRows(heads, lines.map((l) => ({ feeHeadId: l.feeHeadId, amount: l.net, period: row.inv.period })));
+  return { ...row, lines, allocations: allocs, creditNotes: cns, klass, printRows: grid.rows, printTotal: grid.total };
 }
 
 export async function listInvoices(f: { period?: string; classId?: number; status?: string; q?: string; limit?: number; yearId?: number }) {

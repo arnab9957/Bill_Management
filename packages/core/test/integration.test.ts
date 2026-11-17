@@ -195,6 +195,55 @@ describe.skipIf(!run)("integration", () => {
     expect((await core.billing.listInvoices({ yearId: y1.id })).length).toBeGreaterThan(0);
   });
 
+  it("receipts and bills follow the school's paper format: own number series, fixed fee-head rows, class of that year", async () => {
+    // The paper book is at 6434; numbers are one running series with no year and no leading zeros.
+    const cur = await core.getSettings();
+    await core.updateSchoolSettings(admin, {
+      name: cur.name, address: cur.address, phone: cur.phone, email: cur.email, invoicePrefix: cur.invoicePrefix, receiptPrefix: "C",
+      quietStart: cur.quietStart, quietEnd: cur.quietEnd, reminderDaysBefore: cur.reminderDaysBefore, overdueSteps: cur.overdueSteps.join(","),
+      dayCloseEnabled: cur.dayCloseEnabled, concessionsEnabled: cur.concessionsEnabled, receiptNumbering: "continuous", receiptDigits: 1,
+    });
+    expect((await core.receiptNumberPreview())!.text).toBe("C/1");
+    expect(await core.setNextReceiptNumber(admin, 6435)).toBe("C/6435");
+    expect((await core.receiptNumberPreview())).toMatchObject({ text: "C/6435", canSetStart: true });
+
+    // A bill in 2027-28 for student B (promoted to class VI, roll 7), then pay everything he owes.
+    const y2 = (await core.fees.masters()).years.find((y) => y.name === "2027-28")!;
+    await core.billing.generateInvoices({ period: "2027-04", studentId: studentB, dryRun: false });
+    const bill = (await core.billing.listInvoices({ yearId: y2.id, period: "2027-04" }))[0]!;
+    const sheet = (await core.billing.getInvoice(bill.inv.id))!;
+    expect(sheet.klass).toEqual({ className: "VI", sectionName: null, rollNo: "7" });
+    expect(sheet.printTotal).toBe(sheet.inv.net); // the grid always adds up to the bill
+    expect(sheet.printRows.find((r) => r.label === "Tuition Fees")!.period).toBe("Apr");
+
+    const owed = (await core.payments.counterView(studentB)).total;
+    const pay = await core.payments.collectPayment({ studentId: studentB, amount: owed, mode: "cash", date: "2027-05-02" }, cashier);
+    expect(pay.receiptNo).toBe("C/6435");
+    const rec = (await core.payments.getReceipt(pay.paymentId))!;
+    expect(rec.klass).toEqual({ className: "VI", sectionName: null, rollNo: "7" }); // class in the year of the payment
+    expect(rec.printTotal).toBe(owed);
+    expect(rec.printRows.filter((r) => r.fixed).map((r) => r.label)).toEqual([
+      "Tuition Fees", "Computer fees", "Charges on fine", "Admission fees", "Festival fees", "Development fees", "Examination fees",
+      "Sports fees", "Electric fees", "Badge", "Tie", "Belt", "ID Card", "Book+Khata+Diary", "T.Certificate", "Form", "Miscellaneous",
+    ]);
+    expect(rec.printRows.find((r) => r.label === "Tuition Fees")).toMatchObject({ period: "Apr" });
+    // Heads that are not rows of the school's book are still printed, so nothing is hidden.
+    expect(rec.printRows.filter((r) => !r.fixed).map((r) => r.label).sort()).toEqual(["Annual Charges", "Opening Balance"]);
+
+    // Money paid in advance gets its own row; the next number follows on.
+    const adv = await core.payments.collectPayment({ studentId: studentB, amount: 10000, mode: "cash", date: "2027-05-03" }, cashier);
+    expect(adv.receiptNo).toBe("C/6436");
+    const advRec = (await core.payments.getReceipt(adv.paymentId))!;
+    expect(advRec.printRows.at(-1)).toMatchObject({ label: "Advance", amount: 10000, fixed: false });
+    expect(advRec.printTotal).toBe(10000);
+
+    // Once receipts exist in a series its numbers can no longer be moved.
+    await expect(core.setNextReceiptNumber(admin, 9000)).rejects.toThrow(/already been issued/);
+    expect((await core.receiptNumberPreview())).toMatchObject({ text: "C/6437", canSetStart: false, issued: 2 });
+    // …and the old per-year series (RCT/2026-27/…) and the new one (C/…) both pass the integrity check.
+    expect((await core.ops.integrityCheck()).problems).toEqual([]);
+  });
+
   it("integrity check is clean", async () => {
     const r = await core.ops.integrityCheck();
     expect(r.problems).toEqual([]);

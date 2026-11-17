@@ -4,7 +4,7 @@ import {
   studentConcessions, transportRoutes, students,
 } from "@sb/db";
 import {
-  concessionTypeSchema, feeHeadSchema, lateFeeRuleSchema, structureItemSchema, studentConcessionSchema, isoDate, z,
+  concessionTypeSchema, feeHeadSchema, lateFeeRuleSchema, receiptRowsSchema, structureItemSchema, studentConcessionSchema, isoDate, z,
 } from "@sb/validation";
 import { AppError, audit, getSettings, type Actor } from "../common";
 import { percentOf } from "../money";
@@ -76,6 +76,24 @@ export async function createFeeHead(actor: Actor, input: unknown) {
   if (!h) throw new AppError("A fee head with this code exists", { code: "Already used" });
   await audit(db, actor, "create", "fee_head", h.id, null, d);
   return h;
+}
+
+/**
+ * Choose which fee heads print as fixed rows on receipts and bills, in what order, and under what wording.
+ * Heads left out are still printed (as extra rows) whenever they have an amount.
+ */
+export async function saveReceiptRows(actor: Actor, input: unknown) {
+  const rows = receiptRowsSchema.parse(input);
+  const db = getDb();
+  await db.transaction(async (tx) => {
+    const before = await tx.select({ id: feeHeads.id, order: feeHeads.receiptOrder, label: feeHeads.receiptLabel }).from(feeHeads);
+    const old = new Map(before.map((b) => [b.id, b]));
+    for (const r of rows) {
+      if (!old.has(r.id)) continue;
+      await tx.update(feeHeads).set({ receiptOrder: r.show ? r.order : null, receiptLabel: r.label || null }).where(eq(feeHeads.id, r.id));
+    }
+    await audit(tx, actor, "update", "fee_head", null, before, rows.map((r) => ({ id: r.id, order: r.show ? r.order : null, label: r.label || null })));
+  });
 }
 
 export async function getOrCreateStructure(actor: Actor, academicYearId: number, classId: number) {

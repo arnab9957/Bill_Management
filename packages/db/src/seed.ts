@@ -5,7 +5,7 @@
  * Pass --demo to also create a sample fee structure and a few students.
  */
 import { hash } from "@node-rs/argon2";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDb, getPool } from "./client";
 import * as s from "./schema";
 
@@ -34,21 +34,43 @@ for (const [i, name] of classNames.entries()) {
   if (c) await db.insert(s.sections).values([{ classId: c.id, name: "A" }, { classId: c.id, name: "B" }]).onConflictDoNothing();
 }
 
+// Fee heads. receiptOrder/receiptLabel are the fixed rows of the school's printed receipt, in the order of
+// its paper book: Tuition, Computer, Charges on fine, Admission, Festival, Development, Examination, Sports,
+// Electric, Badge, Tie, Belt, ID Card, Book+Khata+Diary, T.Certificate, Form, Miscellaneous.
 const heads: (typeof s.feeHeads.$inferInsert)[] = [
-  { code: "TUITION", name: "Tuition Fee", type: "recurring", sortOrder: 1 },
-  { code: "ADMISSION", name: "Admission Fee", type: "one_time", sortOrder: 2 },
+  { code: "TUITION", name: "Tuition Fee", type: "recurring", sortOrder: 1, receiptOrder: 1, receiptLabel: "Tuition Fees" },
+  { code: "COMPUTER", name: "Computer Fee", type: "recurring", sortOrder: 5, receiptOrder: 2, receiptLabel: "Computer fees" },
+  { code: "LATE_FEE", name: "Late Fee", type: "optional", sortOrder: 90, receiptOrder: 3, receiptLabel: "Charges on fine" },
+  { code: "ADMISSION", name: "Admission Fee", type: "one_time", sortOrder: 2, receiptOrder: 4, receiptLabel: "Admission fees" },
+  { code: "FESTIVAL", name: "Festival Fee", type: "recurring", sortOrder: 10, receiptOrder: 5, receiptLabel: "Festival fees" },
+  { code: "DEVELOPMENT", name: "Development Fee", type: "recurring", sortOrder: 11, receiptOrder: 6, receiptLabel: "Development fees" },
+  { code: "EXAM", name: "Examination Fee", type: "recurring", sortOrder: 4, receiptOrder: 7, receiptLabel: "Examination fees" },
+  { code: "SPORTS", name: "Sports Fee", type: "recurring", sortOrder: 12, receiptOrder: 8, receiptLabel: "Sports fees" },
+  { code: "ELECTRIC", name: "Electric Fee", type: "recurring", sortOrder: 13, receiptOrder: 9, receiptLabel: "Electric fees" },
+  { code: "BADGE", name: "Badge", type: "optional", sortOrder: 20, receiptOrder: 10 },
+  { code: "TIE", name: "Tie", type: "optional", sortOrder: 21, receiptOrder: 11 },
+  { code: "BELT", name: "Belt", type: "optional", sortOrder: 22, receiptOrder: 12 },
+  { code: "ID_CARD", name: "ID Card", type: "optional", sortOrder: 23, receiptOrder: 13 },
+  { code: "BOOK_KHATA_DIARY", name: "Book+Khata+Diary", type: "optional", sortOrder: 24, receiptOrder: 14 },
+  { code: "T_CERTIFICATE", name: "T.Certificate", type: "optional", sortOrder: 25, receiptOrder: 15 },
+  { code: "FORM", name: "Form", type: "optional", sortOrder: 26, receiptOrder: 16 },
+  { code: "MISC", name: "Miscellaneous", type: "optional", sortOrder: 91, receiptOrder: 17 },
+  // Not on the school's paper receipt: printed as an extra row only when a payment includes them.
   { code: "ANNUAL", name: "Annual Charges", type: "recurring", sortOrder: 3 },
-  { code: "EXAM", name: "Examination Fee", type: "recurring", sortOrder: 4 },
-  { code: "COMPUTER", name: "Computer Fee", type: "recurring", sortOrder: 5 },
   { code: "LAB", name: "Lab Fee", type: "recurring", sortOrder: 6 },
   { code: "TRANSPORT", name: "Transport Fee", type: "optional", sortOrder: 7 },
   { code: "CAUTION", name: "Caution Money", type: "one_time", isRefundable: true, sortOrder: 8 },
-  { code: "LATE_FEE", name: "Late Fee", type: "optional", sortOrder: 90 },
-  { code: "MISC", name: "Miscellaneous", type: "optional", sortOrder: 91 },
   { code: "OPENING", name: "Opening Balance", type: "optional", sortOrder: 92 },
   { code: "BOUNCE", name: "Cheque Bounce Charge", type: "optional", sortOrder: 93 },
 ];
-await db.insert(s.feeHeads).values(heads).onConflictDoNothing();
+await db.insert(s.feeHeads).values(heads).onConflictDoUpdate({
+  target: s.feeHeads.code,
+  // Re-running only fills receipt settings that are still empty; names, types and amounts are never changed.
+  set: {
+    receiptOrder: sql`coalesce(${s.feeHeads.receiptOrder}, excluded.receipt_order)`,
+    receiptLabel: sql`coalesce(${s.feeHeads.receiptLabel}, excluded.receipt_label)`,
+  },
+});
 
 type T = typeof s.notificationTemplates.$inferInsert;
 const sign = "– {school_name}, {school_phone}";

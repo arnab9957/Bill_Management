@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useActionState, useContext, useEffect, useRef, type ReactNode } from "react";
+import { createContext, useActionState, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import type { ActionState } from "@/lib/action";
 
@@ -50,6 +50,11 @@ export function ActionForm({
 }) {
   const [state, formAction] = useActionState(action, null);
   const ref = useRef<HTMLFormElement>(null);
+  // Until the page's JavaScript has loaded, the form is disabled. A submit before that would be a
+  // plain HTML post, which Next.js can't route to these actions (500 "reading 'bind'").
+  // On a slow link (e.g. a shared demo URL) people can otherwise click before the page is ready.
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   useEffect(() => {
     if (state?.ok) {
       if (resetOnSuccess) ref.current?.reset();
@@ -59,8 +64,8 @@ export function ActionForm({
   return (
     <StateCtx.Provider value={state}>
     <ErrCtx.Provider value={state?.errors ?? {}}>
-      <form ref={ref} action={formAction} className={className}>
-        {children}
+      <form ref={ref} action={formAction} className={className} aria-busy={!ready}>
+        <fieldset disabled={!ready} className="contents">{children}</fieldset>
         {state?.message && (
           <div className={`mt-3 rounded-md border px-3 py-2 text-sm ${state.ok ? "border-green-200 bg-green-50 text-green-900" : "border-red-200 bg-red-50 text-red-900"}`} role="status">
             {state.message}

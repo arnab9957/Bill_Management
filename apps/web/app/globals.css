@@ -42,3 +42,46 @@ table.data tr:hover td { @apply bg-brand-50/40; }
 .page-thermal { page: thermal; }
 .watermark { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none;
   font-size: 56px; font-weight: 800; color: rgba(200, 0, 0, 0.12); transform: rotate(-25deg); }
+
+/* ----- the school's own receipt / bill format (components/school-sheet.tsx) ----- */
+@page ss { size: A5; margin: 0; }
+.page-ss { page: ss; }
+.ss { width: 148mm; padding: 6mm 7mm 5mm; position: relative; color: #000; background: #fff;
+  font-family: "Times New Roman", Times, "Liberation Serif", serif; line-height: 1.15; }
+.ss-top { display: flex; justify-content: space-between; font-size: 10pt; margin-bottom: 1mm; }
+.ss-banner { background: #000; color: #fff; text-align: center; font-weight: 700; font-size: 12.5pt; letter-spacing: .02em;
+  text-transform: uppercase; padding: 1.1mm 2mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.ss-lines { text-align: center; font-size: 8.6pt; line-height: 1.3; margin: 1.2mm 0 1.6mm; }
+.ss-grid { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 10.5pt; }
+.ss-grid td { border: 1px solid #000; padding: 0 1.6mm; overflow: hidden; white-space: nowrap; }
+.ss-name td, .ss-class td { height: 5.6mm; font-size: 11pt; }
+.ss-th td { height: 5mm; text-align: center; font-weight: 700; }
+.ss-row td { height: 4.6mm; }
+.ss-row td:first-child { border-top: 0; border-bottom: 0; }
+.ss-row.ss-last td:first-child { border-bottom: 1px solid #000; }
+.ss-row td.ss-n { text-align: right; padding-right: 2mm; font-variant-numeric: tabular-nums; }
+.ss-row td.ss-p { font-size: 9.5pt; }
+.ss-total td { border: 0; height: 5.4mm; font-weight: 700; }
+.ss-total td.ss-box { border: 1px solid #000; text-align: right; padding-right: 2mm; font-size: 11pt; font-variant-numeric: tabular-nums; }
+.ss-total td.ss-tl { text-align: right; font-style: italic; padding-right: 2.5mm; }
+.ss-words { display: grid; grid-template-columns: 38% 62%; margin-top: 2.2mm; font-size: 10pt; font-weight: 700; }
+.ss-words span:last-child { font-size: 9pt; align-self: end; }
+.ss-sign { display: grid; grid-template-columns: 62% 38%; margin-top: 7mm; font-size: 10pt; }
+.ss-sign small { display: block; font-size: 7.5pt; color: #333; }
+.ss-foot { display: flex; justify-content: space-between; align-items: flex-end; gap: 3mm; margin-top: 3mm; font-size: 7.5pt; color: #333; line-height: 1.3; }
+/* 80 mm thermal roll: same layout, smaller, only the rows that have an amount */
+.ss-thermal { width: 76mm; padding: 2mm 2.5mm; }
+.ss-thermal .ss-top { font-size: 8pt; }
+.ss-thermal .ss-banner { font-size: 9.5pt; padding: .8mm 1mm; }
+.ss-thermal .ss-lines { font-size: 6.6pt; }
+.ss-thermal .ss-grid { font-size: 8.5pt; }
+.ss-thermal .ss-name td, .ss-thermal .ss-class td { height: 5mm; font-size: 8.5pt; }
+.ss-thermal .ss-th td { height: 4.6mm; }
+.ss-thermal .ss-row td { height: 4.4mm; }
+.ss-thermal .ss-row td.ss-p { font-size: 7.5pt; }
+.ss-thermal .ss-total td { height: 5mm; }
+.ss-thermal .ss-total td.ss-box { font-size: 9pt; }
+.ss-thermal .ss-words, .ss-thermal .ss-sign { font-size: 8pt; }
+.ss-thermal .ss-words span:last-child { font-size: 7.5pt; }
+.ss-thermal .ss-sign { margin-top: 5mm; }
+.ss-thermal .ss-foot { font-size: 6.5pt; }

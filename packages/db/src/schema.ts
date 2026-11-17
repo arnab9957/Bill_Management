@@ -50,6 +50,18 @@ export const schoolSettings = pgTable("school_settings", {
   dayCloseEnabled: boolean("day_close_enabled").notNull().default(false),
   /** Optional fee concessions (sibling, staff ward, merit…). Off unless the school uses them. */
   concessionsEnabled: boolean("concessions_enabled").notNull().default(false),
+  // ---- printed header of bills and receipts (the school's own paper format)
+  /** Line under the school name, e.g. "(Managed by … Parishad)". */
+  headerSubtitle: text("header_subtitle").notNull().default(""),
+  /** Printed as "U-Dise Code- <code>". */
+  udiseCode: text("udise_code").notNull().default(""),
+  /** Registration / recognition lines, one per line (society regn., 12A …). */
+  registrationNote: text("registration_note").notNull().default(""),
+  // ---- receipt numbering: [prefix]/[year]/[number]
+  /** true: the academic year is part of the number and the series restarts every year. */
+  receiptIncludeYear: boolean("receipt_include_year").notNull().default(true),
+  /** Zero-padding of the number (1 = none, 6 = 000123). */
+  receiptDigits: integer("receipt_digits").notNull().default(6),
 }, (t) => [check("single_row", sql`${t.id} = 1`)]);
 
 export const users = pgTable("app_user", {
@@ -89,6 +101,8 @@ export const auditLog = pgTable("audit_log", {
 export const numberSeries = pgTable("number_series", {
   key: varchar("key", { length: 64 }).primaryKey(),
   lastValue: integer("last_value").notNull().default(0),
+  /** First number of the series (1, or the number the school's paper book had reached). */
+  startValue: integer("start_value").notNull().default(1),
 });
 
 // ---------------------------------------------------------------- masters
@@ -186,6 +200,10 @@ export const feeHeads = pgTable("fee_head", {
   type: feeHeadTypeEnum("type").notNull().default("recurring"),
   isRefundable: boolean("is_refundable").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
+  /** Position of this head's fixed row on printed receipts/bills. Null = printed only when it has an amount. */
+  receiptOrder: integer("receipt_order"),
+  /** Wording on receipts/bills when it differs from `name` (e.g. "Charges on fine"). */
+  receiptLabel: text("receipt_label"),
 });
 
 export const feeStructures = pgTable("fee_structure", {
@@ -291,6 +309,9 @@ export const invoiceLines = pgTable("invoice_line", {
 export const payments = pgTable("payment", {
   id: serial("id").primaryKey(),
   receiptNo: varchar("receipt_no", { length: 40 }).notNull().unique(),
+  /** Counter this receipt number came from (e.g. "RECEIPT:C") and its numeric part — independent of how the number is printed. */
+  receiptSeries: varchar("receipt_series", { length: 64 }),
+  receiptSeq: integer("receipt_seq"),
   studentId: integer("student_id").notNull().references(() => students.id),
   date: date("date").notNull(),
   amount: paise("amount"),
@@ -311,6 +332,7 @@ export const payments = pgTable("payment", {
   index("payment_student_idx").on(t.studentId),
   index("payment_date_idx").on(t.date),
   index("payment_year_idx").on(t.academicYearId),
+  uniqueIndex("payment_series_seq").on(t.receiptSeries, t.receiptSeq),
   check("payment_amount_pos", sql`${t.amount} > 0`),
   check("payment_unalloc_ok", sql`${t.unallocated} >= 0 and ${t.unallocated} <= ${t.amount}`),
 ]);

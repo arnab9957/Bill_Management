@@ -1,12 +1,13 @@
 import { and, asc, desc, eq, isNull, sql, gte, lte } from "drizzle-orm";
 import {
   getDb, cheques, classes, dayCloses, feeHeads, invoiceLines, invoices, paymentAllocations, payments, refunds, sections,
-  studentWallets, students, users, type Executor,
+  studentEnrollments, studentWallets, students, users, type Executor,
 } from "@sb/db";
 import {
   cancelReceiptSchema, chequeBounceSchema, collectPaymentSchema, dayCloseSchema, refundSchema, type CollectPaymentInput,
 } from "@sb/validation";
-import { AppError, audit, formatDocNo, getSettings, nextNumber, yearForDate, type Actor } from "../common";
+import { AppError, audit, formatDocNo, formatReceiptNo, getSettings, nextNumber, receiptSeriesKey, yearForDate, type Actor } from "../common";
+import { buildPrintRows } from "../printing";
 import { formatDate, today, type ISODate } from "../dates";
 import { formatINR } from "../money";
 import { enqueue, studentVars } from "../notifications";
@@ -48,9 +49,12 @@ export async function collectPayment(input: CollectPaymentInput, actor: Actor) {
     }
     const year = await yearForDate(tx, d.date);
     const settings = await getSettings(tx);
-    const receiptNo = formatDocNo(settings.receiptPrefix, year.name, await nextNumber(tx, `RECEIPT:${year.name}`));
+    // Number from the school's own series (e.g. "C/6434"); the counter row is locked until this transaction ends.
+    const receiptSeries = receiptSeriesKey(settings, year.name);
+    const receiptSeq = await nextNumber(tx, receiptSeries);
+    const receiptNo = formatReceiptNo(settings, year.name, receiptSeq);
     const [p] = await tx.insert(payments).values({
-      receiptNo, studentId: d.studentId, date: d.date, academicYearId: year.id, amount: d.amount, unallocated: plan.remainder, mode: d.mode,
+      receiptNo, receiptSeries, receiptSeq, studentId: d.studentId, date: d.date, academicYearId: year.id, amount: d.amount, unallocated: plan.remainder, mode: d.mode,
       referenceNo: d.referenceNo || d.chequeNo || null, bank: d.bank || null, receivedBy: actor.id!,
     }).returning();
     if ((d.mode === "cheque" || d.mode === "dd") && d.chequeNo && d.bank) {
@@ -217,12 +221,26 @@ export async function getReceipt(paymentId: number) {
     .leftJoin(sections, eq(sections.id, students.sectionId)).innerJoin(users, eq(users.id, payments.receivedBy))
     .where(eq(payments.id, paymentId));
   if (!row) return null;
-  const lines = await db.select({ amount: paymentAllocations.amount, description: invoiceLines.description, invoiceNo: invoices.invoiceNo, reversedAt: paymentAllocations.reversedAt })
-    .from(paymentAllocations).innerJoin(invoiceLines, eq(invoiceLines.id, paymentAllocations.invoiceLineId)).innerJoin(invoices, eq(invoices.id, paymentAllocations.invoiceId))
+  const lines = await db.select({
+    amount: paymentAllocations.amount, description: invoiceLines.description, invoiceNo: invoices.invoiceNo, reversedAt: paymentAllocations.reversedAt,
+    feeHeadId: invoiceLines.feeHeadId, period: invoices.period,
+  }).from(paymentAllocations).innerJoin(invoiceLines, eq(invoiceLines.id, paymentAllocations.invoiceLineId)).innerJoin(invoices, eq(invoices.id, paymentAllocations.invoiceId))
     .where(eq(paymentAllocations.paymentId, paymentId)).orderBy(asc(paymentAllocations.id));
   const [cheque] = await db.select().from(cheques).where(eq(cheques.paymentId, paymentId));
   const outstanding = await studentOutstanding(db, row.p.studentId);
-  return { ...row, lines, cheque, outstanding };
+
+  // Class, section and roll the student had in the year of this payment (not today's class).
+  const [enr] = row.p.academicYearId == null ? [] : await db.select({ className: classes.name, sectionName: sections.name, rollNo: studentEnrollments.rollNo })
+    .from(studentEnrollments).innerJoin(classes, eq(classes.id, studentEnrollments.classId)).leftJoin(sections, eq(sections.id, studentEnrollments.sectionId))
+    .where(and(eq(studentEnrollments.studentId, row.p.studentId), eq(studentEnrollments.academicYearId, row.p.academicYearId)));
+  const klass = { className: enr?.className ?? row.className, sectionName: enr ? enr.sectionName : row.sectionName, rollNo: enr ? enr.rollNo : row.student.rollNo };
+
+  // The school's grid: one row per fee head. A cancelled receipt still shows what it originally covered.
+  const covered = row.p.status === "cancelled" ? lines : lines.filter((l) => !l.reversedAt);
+  const heads = await db.select().from(feeHeads).orderBy(asc(feeHeads.sortOrder), asc(feeHeads.id));
+  const grid = buildPrintRows(heads, covered.map((l) => ({ feeHeadId: l.feeHeadId, amount: l.amount, period: l.period })),
+    { advance: row.p.amount - covered.reduce((a, l) => a + l.amount, 0) });
+  return { ...row, lines, cheque, outstanding, klass, printRows: grid.rows, printTotal: grid.total };
 }
 
 /** Increment print count; returns true when this print is a duplicate. */

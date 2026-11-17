@@ -251,7 +251,8 @@ export const schoolSettingsSchema = z.object({
   email: z.union([z.literal(""), z.string().trim().email()]),
   upiId: z.string().trim().optional(),
   invoicePrefix: z.string().trim().min(1).max(8),
-  receiptPrefix: z.string().trim().min(1).max(8),
+  // Letters, digits, dot, dash, underscore: the prefix is part of counter names and receipt numbers.
+  receiptPrefix: z.string().trim().min(1).max(8).regex(/^[A-Za-z0-9._-]+$/, "Letters, digits, . - _ only (no spaces or /)"),
   quietStart: hhmm,
   quietEnd: hhmm,
   reminderDaysBefore: z.coerce.number().int().min(0).max(30),
@@ -261,7 +262,22 @@ export const schoolSettingsSchema = z.object({
   backupPath: z.string().trim().optional(),
   dayCloseEnabled: checkbox,
   concessionsEnabled: checkbox,
+  // Printed header of bills and receipts + receipt numbering. Optional: left out = unchanged.
+  headerSubtitle: z.string().trim().max(200).optional(),
+  udiseCode: z.string().trim().max(40).optional(),
+  registrationNote: z.string().trim().max(500).optional(),
+  receiptNumbering: z.enum(["per_year", "continuous"]).optional(),
+  receiptDigits: z.coerce.number().int().min(1).max(10).optional(),
 });
+export const setNextReceiptNumberSchema = z.object({ next: z.coerce.number().int().min(1, "Enter a number, 1 or more").max(2_000_000_000) });
+
+/** Which fee heads print as fixed rows on receipts/bills, in what order, and under what wording. */
+export const receiptRowsSchema = z.array(z.object({
+  id,
+  show: z.boolean(),
+  order: z.number().int().min(1).max(999).nullable(),
+  label: z.string().trim().max(60).nullable(),
+}));
 export const providerConfigSchema = z.object({
   emailMode: z.enum(["off", "smtp", "console"]).default("console"),
   whatsappMode: z.enum(["off", "cloud", "console"]).default("console"),
