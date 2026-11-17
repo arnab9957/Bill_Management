@@ -1,0 +1,40 @@
+{
+  "profileName": "Blank school (starting point)",
+  "school": {
+    "name": "My School",
+    "headerSubtitle": "",
+    "udiseCode": "",
+    "registrationNote": "",
+    "address": "",
+    "phone": "",
+    "email": "",
+    "upiId": ""
+  },
+  "academicYear": { "name": "2026-27", "startDate": "2026-04-01", "endDate": "2027-03-31" },
+  "classes": [
+    { "name": "I", "sections": ["A"] },
+    { "name": "II", "sections": ["A"] },
+    { "name": "III", "sections": ["A"] },
+    { "name": "IV", "sections": ["A"] },
+    { "name": "V", "sections": ["A"] },
+    { "name": "VI", "sections": ["A"] },
+    { "name": "VII", "sections": ["A"] },
+    { "name": "VIII", "sections": ["A"] },
+    { "name": "IX", "sections": ["A"] },
+    { "name": "X", "sections": ["A"] }
+  ],
+  "feeHeads": [
+    { "code": "TUITION", "name": "Tuition Fee", "type": "recurring", "receiptOrder": 1, "receiptLabel": "Tuition Fees" },
+    { "code": "ADMISSION", "name": "Admission Fee", "type": "one_time", "receiptOrder": 2, "receiptLabel": "Admission fees" },
+    { "code": "EXAM", "name": "Examination Fee", "type": "recurring", "receiptOrder": 3, "receiptLabel": "Examination fees" },
+    { "code": "LATE_FEE", "name": "Late Fee", "type": "optional", "receiptOrder": 4, "receiptLabel": "Charges on fine" },
+    { "code": "MISC", "name": "Miscellaneous", "type": "optional", "receiptOrder": 5 },
+    { "code": "ANNUAL", "name": "Annual Charges", "type": "recurring" },
+    { "code": "CAUTION", "name": "Caution Money", "type": "one_time", "isRefundable": true }
+  ],
+  "receipts": { "prefix": "RCT", "numbering": "per_year", "digits": 6, "nextNumber": 1 },
+  "bills": { "prefix": "INV" },
+  "lateFee": { "graceDays": 5, "kind": "per_day", "amount": 10, "maxCap": 500 },
+  "reminders": { "daysBefore": 3, "overdueSteps": [3, 7, 15], "quietStart": "09:00", "quietEnd": "20:00" },
+  "features": { "concessions": false, "counterClosing": false }
+}

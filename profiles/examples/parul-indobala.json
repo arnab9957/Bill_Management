@@ -1,0 +1,41 @@
+{
+  "profileName": "Parul Indobala Sishu Shiksha Sadan (example school)",
+  "school": {
+    "name": "Parul Indobala Sishu Shiksha Sadan",
+    "headerSubtitle": "(Managed by Parul Shiksha-O-Samaj Unnayan Parishad)",
+    "udiseCode": "19122200107",
+    "registrationNote": "(A Regd. Society Regn. No.- S/5468 of 1962-63 Act. XXI of 1860)\nRegistered under section 12A of the Income Tax Act, 1961",
+    "address": "Parul * Arambagh * Hooghly",
+    "phone": "",
+    "email": "",
+    "upiId": ""
+  },
+  "academicYear": { "name": "2026-27", "startDate": "2026-04-01", "endDate": "2027-03-31" },
+  "classes": [
+    { "name": "S-I", "sections": ["A"] }
+  ],
+  "feeHeads": [
+    { "code": "TUITION", "name": "Tuition Fee", "type": "recurring", "receiptOrder": 1, "receiptLabel": "Tuition Fees" },
+    { "code": "COMPUTER", "name": "Computer Fee", "type": "recurring", "receiptOrder": 2, "receiptLabel": "Computer fees" },
+    { "code": "LATE_FEE", "name": "Late Fee", "type": "optional", "receiptOrder": 3, "receiptLabel": "Charges on fine" },
+    { "code": "ADMISSION", "name": "Admission Fee", "type": "one_time", "receiptOrder": 4, "receiptLabel": "Admission fees" },
+    { "code": "FESTIVAL", "name": "Festival Fee", "type": "recurring", "receiptOrder": 5, "receiptLabel": "Festival fees" },
+    { "code": "DEVELOPMENT", "name": "Development Fee", "type": "recurring", "receiptOrder": 6, "receiptLabel": "Development fees" },
+    { "code": "EXAM", "name": "Examination Fee", "type": "recurring", "receiptOrder": 7, "receiptLabel": "Examination fees" },
+    { "code": "SPORTS", "name": "Sports Fee", "type": "recurring", "receiptOrder": 8, "receiptLabel": "Sports fees" },
+    { "code": "ELECTRIC", "name": "Electric Fee", "type": "recurring", "receiptOrder": 9, "receiptLabel": "Electric fees" },
+    { "code": "BADGE", "name": "Badge", "type": "optional", "receiptOrder": 10 },
+    { "code": "TIE", "name": "Tie", "type": "optional", "receiptOrder": 11 },
+    { "code": "BELT", "name": "Belt", "type": "optional", "receiptOrder": 12 },
+    { "code": "ID_CARD", "name": "ID Card", "type": "optional", "receiptOrder": 13 },
+    { "code": "BOOK_KHATA_DIARY", "name": "Book+Khata+Diary", "type": "optional", "receiptOrder": 14 },
+    { "code": "T_CERTIFICATE", "name": "T.Certificate", "type": "optional", "receiptOrder": 15 },
+    { "code": "FORM", "name": "Form", "type": "optional", "receiptOrder": 16 },
+    { "code": "MISC", "name": "Miscellaneous", "type": "optional", "receiptOrder": 17 }
+  ],
+  "receipts": { "prefix": "C", "numbering": "continuous", "digits": 1, "nextNumber": 6435 },
+  "bills": { "prefix": "INV" },
+  "lateFee": null,
+  "reminders": { "daysBefore": 3, "overdueSteps": [3, 7, 15], "quietStart": "09:00", "quietEnd": "20:00" },
+  "features": { "concessions": false, "counterClosing": false }
+}

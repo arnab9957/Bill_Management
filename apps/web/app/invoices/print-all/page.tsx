@@ -1,4 +1,4 @@
-import { billing, getSettings } from "@sb/core";
+import { billing, getSettings, schoolLogoDataUri } from "@sb/core";
 import { requireRole } from "@/lib/auth";
 import { getWorkingYear } from "@/lib/year";
 import { PrintControls } from "@/components/print-controls";
@@ -18,6 +18,7 @@ export default async function PrintAll({ searchParams }: { searchParams: Promise
     Promise.all(rows.slice().reverse().map((r) => billing.getInvoice(r.inv.id))),
   ]);
   const list = bills.filter((b) => b !== null);
+  const logoSrc = (await schoolLogoDataUri()) ?? undefined;
   return (
     <div className="bg-gray-100 p-4 print:bg-white print:p-0 page-ss">
       <div className="mx-auto max-w-[148mm]">
@@ -27,7 +28,7 @@ export default async function PrintAll({ searchParams }: { searchParams: Promise
         </p>
       </div>
       <div className="space-y-4 print:space-y-0">
-        {list.length === 0 ? <p className="text-center text-sm text-gray-500">No bills match these filters.</p> : list.map((d, i) => <InvoiceSheet key={d.inv.id} d={d} s={s} breakAfter={i < list.length - 1} />)}
+        {list.length === 0 ? <p className="text-center text-sm text-gray-500">No bills match these filters.</p> : list.map((d, i) => <InvoiceSheet key={d.inv.id} d={d} s={s} breakAfter={i < list.length - 1} logoSrc={logoSrc} />)}
       </div>
     </div>
   );

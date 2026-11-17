@@ -3,6 +3,8 @@ import { fees, getSettings, receiptNumberPreview, setNextReceiptNumber, toRupeeS
 import { rupeesToPaise, setNextReceiptNumberSchema } from "@sb/validation";
 import { requireRole } from "@/lib/auth";
 import { formObject, run, type ActionState } from "@/lib/action";
+import { LogoCard } from "@/components/logo-card";
+import { removeLogoAction, uploadLogoAction } from "./logo-actions";
 import { ActionForm, FieldError, Submit } from "@/components/action-form";
 import { Card, LinkButton, Money, PageHeader } from "@/components/ui";
 
@@ -102,6 +104,8 @@ export default async function SettingsPage() {
           <div className="sm:col-span-3"><Submit>Save</Submit></div>
         </ActionForm>
       </Card>
+
+      <LogoCard hasLogo={!!s.logoPath} version={s.logoPath ?? ""} upload={uploadLogoAction} remove={removeLogoAction} />
 
       <Card title="Receipt numbers">
         {num ? (<>

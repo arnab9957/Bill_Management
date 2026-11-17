@@ -45,3 +45,6 @@ desktop.ini
 *.pdf
 .next-dev/
 tools/
+
+# Each real school's profile (private)
+profiles/local/

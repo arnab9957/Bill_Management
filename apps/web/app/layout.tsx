@@ -1,7 +1,7 @@
 import "./globals.css";
 import type { ReactNode } from "react";
 
-export const metadata = { title: "School Billing", description: "Offline-first school fee management" };
+export const metadata = { title: "Fee Billing", description: "Offline fee billing for schools and colleges" };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

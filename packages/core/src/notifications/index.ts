@@ -399,7 +399,7 @@ export async function addTemplateLanguage(actor: Actor, templateId: number, lang
 
 export const SAMPLE_VARS: Record<string, string> = {
   guardian_name: "Ramesh Kumar", student_name: "Anita Kumar", class: "V", amount_due: "2,200.00", due_date: "10 Jul 2026",
-  invoice_no: "INV/2026-27/000123", school_name: "Demo Public School", school_phone: "9876543210",
+  invoice_no: "INV/2026-27/000123", school_name: "Your School", school_phone: "0000000000",
   dues_detail: "Anita Kumar (V): ₹ 2,200.00 – INV/2026-27/000123", amount_paid: "2,200.00", receipt_no: "RCT/2026-27/000045",
   balance: "0.00", cheque_no: "123456", bounce_charge: "300.00", late_fee: "50.00",
 };

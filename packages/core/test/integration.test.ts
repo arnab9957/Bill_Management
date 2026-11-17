@@ -244,6 +244,15 @@ describe.skipIf(!run)("integration", () => {
     expect((await core.ops.integrityCheck()).problems).toEqual([]);
   });
 
+  it("school logo: only real images are accepted, it can be printed, and it can be removed", async () => {
+    await expect(core.setSchoolLogo(admin, new Uint8Array([1, 2, 3, 4]))).rejects.toThrow(/PNG, JPG or WebP/);
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+    await core.setSchoolLogo(admin, png);
+    expect((await core.schoolLogoDataUri())!.startsWith("data:image/png;base64,")).toBe(true);
+    await core.removeSchoolLogo(admin);
+    expect(await core.schoolLogoDataUri()).toBeNull();
+  });
+
   it("integrity check is clean", async () => {
     const r = await core.ops.integrityCheck();
     expect(r.problems).toEqual([]);

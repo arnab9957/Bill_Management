@@ -17,6 +17,9 @@ importers:
       embedded-postgres:
         specifier: 18.6.0-beta.19
         version: 18.6.0-beta.19
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
       turbo:
         specifier: ^2.5.0
         version: 2.11.11
@@ -194,6 +197,9 @@ importers:
       '@node-rs/argon2':
         specifier: ^2.0.2
         version: 2.2.2
+      '@sb/validation':
+        specifier: workspace:*
+        version: link:../validation
       dotenv:
         specifier: ^16.5.0
         version: 16.6.1

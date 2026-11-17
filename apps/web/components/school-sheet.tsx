@@ -31,6 +31,8 @@ export interface SchoolSheetProps {
   notes?: ReactNode;
   images?: { src: string; alt: string; size: number }[];
   breakAfter?: boolean;
+  /** the school's logo as a data address (optional) */
+  logoSrc?: string;
 }
 
 /**
@@ -47,6 +49,7 @@ export function SchoolSheet(p: SchoolSheetProps) {
       {p.watermark && <div className="watermark">{p.watermark}</div>}
 
       <div className="ss-top"><span>{p.title} No: {p.number}</span><span>Date: {formatDMY(p.date)}</span></div>
+      {p.logoSrc && <img src={p.logoSrc} alt="" className="ss-logo" />}
       <div className="ss-banner">{p.school.name}</div>
       <div className="ss-lines">
         {p.school.headerSubtitle && <div>{p.school.headerSubtitle}</div>}

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
-import { amountInWords, formatINR, getSettings, payments } from "@sb/core";
+import { amountInWords, formatINR, getSettings, payments, schoolLogoDataUri } from "@sb/core";
 import { requireRole } from "@/lib/auth";
 import { PrintControls } from "@/components/print-controls";
 import { SchoolSheet } from "@/components/school-sheet";
@@ -26,6 +26,7 @@ export default async function ReceiptPrint({ params, searchParams }: { params: P
   const thermal = format === "thermal";
   const qr = await QRCode.toDataURL(`RCPT|${r.p.receiptNo}|${r.p.amount}|${r.p.date}|${r.student.admissionNo}`, { margin: 0, width: 110 });
   const mode = r.p.mode.replace("_", " ");
+  const logoSrc = (await schoolLogoDataUri()) ?? undefined;
 
   return (
     <div className="flex justify-center overflow-x-auto bg-gray-100 p-4 print:bg-white print:p-0">
@@ -33,7 +34,7 @@ export default async function ReceiptPrint({ params, searchParams }: { params: P
         <PrintControls onPrint={markPrinted.bind(null, r.p.id)} auto={!duplicate} current={format}
           formats={[{ key: "a5", label: "A5" }, { key: "thermal", label: "80mm thermal" }]} />
         <SchoolSheet
-          title="Receipt" school={s} number={r.p.receiptNo} date={r.p.date}
+          title="Receipt" school={s} number={r.p.receiptNo} date={r.p.date} logoSrc={logoSrc}
           student={{ name: r.student.name, className: r.klass.className, sectionName: r.klass.sectionName, rollNo: r.klass.rollNo }}
           rows={r.printRows} total={r.printTotal} words={amountInWords(r.printTotal)}
           signRightName={r.cashier} compact={thermal}

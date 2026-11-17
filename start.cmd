@@ -15,10 +15,7 @@ if not exist node_modules (
   echo Installing packages, first run only...
   call pnpm install || goto :fail
 )
-if not exist .env (
-  echo Creating .env from .env.example
-  copy /y .env.example .env >nul
-)
+node scripts\ensure-env.mjs || goto :fail
 
 rem --- 2. Website already running? Just open it.
 node scripts\wait-port.mjs 3000 0 --check
@@ -52,10 +49,9 @@ goto :migrate
 echo Database is up to date.
 
 if "%FRESH%"=="1" (
-  echo First run: loading starting data...
-  call pnpm db:seed || goto :fail
   echo.
-  echo   Sign in with  admin / admin12345  and choose a new password.
+  echo If this is a brand-new computer or database, run setup.cmd first, once.
+  echo For the development demo school instead, run:  pnpm db:seed -- --demo
   echo.
 )
 

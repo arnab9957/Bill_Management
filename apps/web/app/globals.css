@@ -85,3 +85,7 @@ table.data tr:hover td { @apply bg-brand-50/40; }
 .ss-thermal .ss-words span:last-child { font-size: 7.5pt; }
 .ss-thermal .ss-sign { margin-top: 5mm; }
 .ss-thermal .ss-foot { font-size: 6.5pt; }
+
+/* school logo (optional), printed above the banner */
+.ss-logo { display: block; margin: 0 auto 1mm; height: 11mm; max-width: 60mm; object-fit: contain; }
+.ss-thermal .ss-logo { height: 8mm; }

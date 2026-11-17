@@ -6,7 +6,7 @@ type InvoiceData = NonNullable<Awaited<ReturnType<typeof billing.getInvoice>>>;
 type Settings = Awaited<ReturnType<typeof getSettings>>;
 
 /** One printable fee bill in the school's own paper format. Used by the single-bill and bulk print pages. */
-export async function InvoiceSheet({ d, s, breakAfter }: { d: InvoiceData; s: Settings; breakAfter?: boolean }) {
+export async function InvoiceSheet({ d, s, breakAfter, logoSrc }: { d: InvoiceData; s: Settings; breakAfter?: boolean; logoSrc?: string }) {
   const { inv } = d;
   // UPI QR with the exact amount pre-filled, generated offline from the school's UPI ID.
   const upi = s.upiId && inv.balance > 0
@@ -16,7 +16,7 @@ export async function InvoiceSheet({ d, s, breakAfter }: { d: InvoiceData; s: Se
 
   return (
     <SchoolSheet
-      title="Bill" school={s} number={inv.invoiceNo} date={inv.issueDate} breakAfter={breakAfter}
+      title="Bill" school={s} number={inv.invoiceNo} date={inv.issueDate} breakAfter={breakAfter} logoSrc={logoSrc}
       student={{ name: d.student.name, className: d.klass.className, sectionName: d.klass.sectionName, rollNo: d.klass.rollNo }}
       rows={d.printRows} total={d.printTotal} words={amountInWords(d.printTotal)}
       signRight="Authorised signature"

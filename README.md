@@ -9,7 +9,7 @@ SMS, WhatsApp and email reminders wait in a local outbox and are sent when a con
 It does everything below automatically:
 - installs packages and creates `.env` on the first run
 - starts the database in its own minimised window
-- applies database updates and loads the starting data on the first run
+- applies database updates. On a brand-new, empty database it reminds you to run `setup.cmd` first (see below)
 - starts the website and the reminder worker, then opens http://localhost:3000
 
 Code changes appear on a normal browser refresh. To stop, close its window and the "Database" window.
@@ -119,10 +119,34 @@ scripts/            install-services.ps1 (NSSM + LAN firewall), backup.ps1, rest
 
 1. Install PostgreSQL 16 or later as a Windows service and create the database and user. Set `DATABASE_URL`, `APP_SECRET` and `PG_DUMP_PATH` in `.env`.
 2. Build: `pnpm build`. This builds the web app (`apps/web/.next`) and bundles the worker into `apps/worker/dist`. The web app runs with `next start`. Next's "standalone" output is off by default because on Windows it needs symlink rights (Developer Mode); set `NEXT_STANDALONE=1` to build it anyway.
-3. Run migrations with `node apps/worker/dist/migrate.js` (set `MIGRATIONS_DIR=packages/db/migrations`). Then run `pnpm db:seed` once.
+3. Run migrations with `node apps/worker/dist/migrate.js` (set `MIGRATIONS_DIR=packages/db/migrations`). Then set up the school once with `pnpm new-school --profile profiles/local/<school>.json` (or `setup.cmd`), which also loads the profile and prints the first admin password. Do not run `pnpm db:seed` on a school database: it loads the development demo data.
 4. Run `scripts/install-services.ps1` as Administrator. It installs both services with auto-start and restart, and allows the port from the LAN subnet only. Never expose the port to the internet.
 5. Under *Settings*, set:
-   - the school profile and UPI ID
+   - the school details and UPI ID
    - a backup folder on a second disk
    - the providers (SMTP, WhatsApp, SMS)
    - one user per staff member
+
+## Setting up another school
+
+The same program serves any school or college. Each school gets its own installation and database.
+Everything specific to a school lives in its **profile** file and in its **Settings**; nothing is written into the code.
+
+1. Copy `profiles/school-default.json` to `profiles/local/<school>.json` and fill it in (see `profiles/README.md`).
+2. On the school's computer, double-click **`setup.cmd`**, type the profile file name, and write down the admin password it shows.
+3. Double-click **`start.cmd`**. Sign in as `admin` with the password from step 2 and choose a new one.
+4. Follow `docs/new-school-checklist.md` for the rest: fee amounts, users, students, messages, backups and printing.
+
+| Command | What it does |
+|---|---|
+| `setup.cmd` | Sets up a new school (first time only). Refuses to run on a database that already has school data. |
+| `pnpm new-school --profile profiles/local/<school>.json` | The same setup from the command line. |
+| `start.cmd` | Starts the database, the web app and the reminder worker, then opens the browser. |
+| `pnpm db:seed -- --demo` | Development only: demo school, students and fee structures. |
+
+Notes:
+- Changing a school's details later is done in the app, not by running setup again.
+- A new installation gets its own random `APP_SECRET` in `.env`. An existing `.env` is never changed, because saved provider passwords depend on it.
+- Parts that are specific to India stay as defaults: the U-DISE line, the ₹ sign and Indian number grouping, Indian mobile numbers and DLT SMS templates.
+- For a college, enter each course and year as a class (for example `BCA-1`) and its branches or groups as sections.
+- Not built yet: a web setup wizard, importing fee amounts from Excel, a Windows installer, and translated message templates.
