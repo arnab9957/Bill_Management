@@ -10,7 +10,7 @@
     "db:generate": "pnpm --filter @sb/db generate",
     "db:migrate": "pnpm --filter @sb/db migrate",
     "db:seed": "pnpm --filter @sb/db seed",
-    "dev": "turbo run dev --parallel",
+    "dev": "pnpm --parallel --filter @sb/web --filter @sb/worker run dev",
     "dev:web": "pnpm --filter @sb/web dev",
     "dev:worker": "pnpm --filter @sb/worker dev",
     "build": "turbo run build",
