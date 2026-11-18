@@ -13,7 +13,7 @@
     "instance:list": "node scripts/instance.mjs list",
     "instance:doctor": "node scripts/instance.mjs doctor",
     "new:institute": "node scripts/new-institute.mjs",
-    "dev": "turbo run dev --parallel",
+    "dev": "pnpm --parallel --filter @sb/web --filter @sb/worker run dev",
     "dev:web": "pnpm --filter @sb/web dev",
     "dev:worker": "pnpm --filter @sb/worker dev",
     "build": "turbo run build",
