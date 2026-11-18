@@ -48,3 +48,6 @@ tools/
 
 # Each real school's profile (private)
 profiles/local/
+
+# Per-institute installations: secrets, databases metadata, files and backups
+instances/

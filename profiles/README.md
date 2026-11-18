@@ -1,8 +1,9 @@
 # School profiles
 
 A profile is a JSON file that holds everything specific to one school. Setting up a school means
-creating one profile and running `setup.cmd` (or `pnpm new-school --profile <file>`). After setup,
-everything can also be changed in the app under **Settings**, **Fee setup** and **Messages**.
+creating one profile and running `new-institute.cmd` (or `pnpm new-school --profile <file>` with
+`SB_INSTANCE` set). After setup, everything can also be changed in the app under **Settings**,
+**Fee setup** and **Messages**. The profile is copied into `instances/<code>/profile.json`.
 
 | File | Purpose |
 |---|---|

@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { SESSION_COOKIE } from "./lib/instance";
 
 /**
  * First gate only: no cookie → login page. The real session and role checks
  * happen on the server in requireRole(), which every page/action calls.
  */
 export function middleware(req: NextRequest) {
-  const has = req.cookies.has("sb_session");
+  const has = req.cookies.has(SESSION_COOKIE);
   if (!has) {
     if (req.nextUrl.pathname.startsWith("/api/")) return new NextResponse("Unauthorized", { status: 401 });
     const url = req.nextUrl.clone();

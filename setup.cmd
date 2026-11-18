@@ -8,6 +8,7 @@ rem  It refuses to run on a database that already holds school data.
 rem ============================================================
 title School Billing - Set up a new school
 cd /d "%~dp0"
+set "SB_INSTANCE=default"
 
 where node >nul 2>nul || (echo Node.js is not installed. Install Node.js 22 or newer from nodejs.org & goto :fail)
 where pnpm >nul 2>nul || (echo pnpm is not installed. Run:  npm install -g pnpm & goto :fail)

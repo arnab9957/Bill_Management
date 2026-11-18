@@ -6,6 +6,9 @@ rem  Close this window (or press Ctrl+C) to stop the website and worker.
 rem ============================================================
 title School Billing
 cd /d "%~dp0"
+set "SB_INSTANCE=default"
+set "SB_HOST=127.0.0.1"
+set "SB_PORT=3000"
 
 where node >nul 2>nul || (echo Node.js is not installed. Install Node.js 22 or newer from nodejs.org & goto :fail)
 where pnpm >nul 2>nul || (echo pnpm is not installed. Run:  npm install -g pnpm & goto :fail)
@@ -21,7 +24,7 @@ rem --- 2. Website already running? Just open it.
 node scripts\wait-port.mjs 3000 0 --check
 if not errorlevel 1 (
   echo The website is already running.
-  start "" http://localhost:3000
+  start "" http://127.0.0.1:3000
   timeout /t 3 >nul
   exit /b 0
 )
@@ -56,12 +59,12 @@ if "%FRESH%"=="1" (
 )
 
 rem --- 5. Open the browser as soon as the website answers (in the background)
-start "" /min cmd /c "node scripts\wait-port.mjs 3000 180 && start "" http://localhost:3000"
+start "" /min cmd /c "node scripts\wait-port.mjs 3000 180 && start "" http://127.0.0.1:3000"
 
 rem --- 6. Website + reminder worker (this window). Code changes appear on browser refresh.
 echo.
 echo  Starting the website and reminder worker...
-echo  Website:  http://localhost:3000   (other PCs: http://THIS-PC-IP:3000)
+echo  Website:  http://127.0.0.1:3000
 echo  Keep this window and the Database window open. Close them to stop.
 echo.
 call pnpm dev

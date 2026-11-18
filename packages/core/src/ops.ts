@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { mkdirSync, readdirSync, statSync, unlinkSync, statfsSync, existsSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { desc, eq, sql } from "drizzle-orm";
-import { getDb, env, appRoot, backupLog, integrityIssues, numberSeries, notificationOutbox, schoolSettings } from "@sb/db";
+import { getDb, env, appRoot, instanceCode, backupLog, integrityIssues, numberSeries, notificationOutbox, schoolSettings } from "@sb/db";
 import { getSettings, audit, clearSettingsCache, type Actor } from "./common";
 
 // ---------------------------------------------------------------- integrity
@@ -127,7 +127,7 @@ export async function runBackup(kind: "nightly" | "manual" | "pre_update" | "pre
   const s = await getSettings(db);
   const dir = backupDir(s.backupPath);
   const stamp = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 16);
-  const file = join(dir, `school_billing_${stamp}_${kind}.dump`);
+  const file = join(dir, `${instanceCode()}_${stamp}_${kind}.dump`);
   try {
     const pgDump = findPgTool("pg_dump");
     if (!pgDump) throw new Error(MISSING_TOOL);
