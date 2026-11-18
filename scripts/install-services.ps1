@@ -1,16 +1,29 @@
-# Registers the web app and worker as Windows services with NSSM (auto-start, auto-restart)
-# and opens the web port to the school LAN only. Run as Administrator on the server PC.
-#
-#   .\scripts\install-services.ps1 -AppDir "C:\SchoolBilling" -Nssm "C:\SchoolBilling\tools\nssm.exe" -Subnet "192.168.1.0/24"
 param(
   [Parameter(Mandatory)] [string]$AppDir,
   [Parameter(Mandatory)] [string]$Nssm,
   [string]$Node = "$AppDir\node\node.exe",
   [int]$Port = 3000,
-  [string]$Subnet = "LocalSubnet"
+  [string]$Subnet = "LocalSubnet",
+  [string]$Instance = "default",
+  [string]$BindAddress = "127.0.0.1",
+  [string]$PgService = "postgresql-x64-16",
+  [switch]$AllowLan
 )
 $ErrorActionPreference = "Stop"
-$logs = Join-Path $AppDir "storage\logs"
+$helper = Join-Path $AppDir "scripts\instance.mjs"
+
+function Get-InstanceValue([string]$Key) {
+  $value = & node $helper get $Instance $Key
+  if ($LASTEXITCODE -ne 0) { throw "Cannot read institute '$Instance'." }
+  return ($value | Select-Object -Last 1).Trim()
+}
+
+$webName = Get-InstanceValue "serviceWeb"
+$workerName = Get-InstanceValue "serviceWorker"
+$firewallName = Get-InstanceValue "firewallRule"
+$logs = Join-Path (Get-InstanceValue "storageDir") "logs"
+$webPort = if ($Instance -eq "default") { $Port } else { [int](Get-InstanceValue "webPort") }
+$bind = if ($Instance -eq "default") { $BindAddress } else { Get-InstanceValue "bind" }
 New-Item -ItemType Directory -Force $logs | Out-Null
 
 function Install-Svc($name, $script, $cwd, $extraEnv) {
@@ -18,7 +31,7 @@ function Install-Svc($name, $script, $cwd, $extraEnv) {
   & $Nssm remove $name confirm 2>$null | Out-Null
   & $Nssm install $name $Node $script
   & $Nssm set $name AppDirectory $cwd
-  & $Nssm set $name AppEnvironmentExtra "NODE_ENV=production" "NEXT_TELEMETRY_DISABLED=1" @extraEnv
+  & $Nssm set $name AppEnvironmentExtra @extraEnv
   & $Nssm set $name Start SERVICE_AUTO_START
   & $Nssm set $name AppExit Default Restart
   & $Nssm set $name AppRestartDelay 5000
@@ -26,17 +39,25 @@ function Install-Svc($name, $script, $cwd, $extraEnv) {
   & $Nssm set $name AppStderr (Join-Path $logs "$name.err.log")
   & $Nssm set $name AppRotateFiles 1
   & $Nssm set $name AppRotateBytes 10485760
-  & $Nssm set $name DependOnService postgresql-x64-16
+  if ($PgService) { & $Nssm set $name DependOnService $PgService }
 }
 
-# Run from the built monorepo; .env sits in the app root.
-Install-Svc "SchoolBillingWeb" "node_modules\next\dist\bin\next start -H 0.0.0.0 -p $Port" "$AppDir\apps\web" @()
-Install-Svc "SchoolBillingWorker" "dist\index.js" "$AppDir\apps\worker" @()
+$commonEnv = @(
+  "NODE_ENV=production",
+  "NEXT_TELEMETRY_DISABLED=1",
+  "SB_INSTANCE=$Instance",
+  "SB_HOST=$bind",
+  "SB_PORT=$webPort"
+)
+Install-Svc $webName "..\..\scripts\next-cli.mjs start" (Join-Path $AppDir "apps\web") $commonEnv
+Install-Svc $workerName "dist\index.js" (Join-Path $AppDir "apps\worker") $commonEnv
 
-# LAN-only firewall rule. Never port-forward this to the internet.
-Remove-NetFirewallRule -DisplayName "School Billing (LAN)" -ErrorAction SilentlyContinue
-New-NetFirewallRule -DisplayName "School Billing (LAN)" -Direction Inbound -Protocol TCP -LocalPort $Port -RemoteAddress $Subnet -Action Allow | Out-Null
+Remove-NetFirewallRule -DisplayName $firewallName -ErrorAction SilentlyContinue
+if ($AllowLan) {
+  New-NetFirewallRule -DisplayName $firewallName -Direction Inbound -Protocol TCP -LocalPort $webPort -RemoteAddress $Subnet -Action Allow | Out-Null
+}
 
-& $Nssm start SchoolBillingWeb
-& $Nssm start SchoolBillingWorker
-Write-Host "Services installed. Open http://<server-ip>:$Port from counter PCs."
+& $Nssm start $webName
+& $Nssm start $workerName
+if ($AllowLan) { Write-Host "Services installed. Open http://<server-ip>:$webPort from counter PCs." }
+else { Write-Host "Services installed. Open http://${bind}:$webPort on this computer." }

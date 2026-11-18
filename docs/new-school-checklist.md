@@ -19,9 +19,8 @@ Plan the visit with the school: setup, a printing test and training.
 ## On the school computer
 
 2. Install Node.js 22 or newer, then pnpm (npm install -g pnpm). Copy the program folder onto the computer.
-   If the school uses its own PostgreSQL instead of the built-in database, copy .env.example to .env and set DATABASE_URL before step 3.
-3. Double-click **setup.cmd** and type the profile file name (for example school-name.json). Setup checks the whole profile first and lists every problem; if there are problems, nothing is written. It refuses to run on a database that already has school data. At the end it shows the first admin password **once**. Write it down.
-4. Double-click **start.cmd**. Sign in as admin with that password and choose a new one.
+3. Double-click **new-institute.cmd** and enter a short lowercase code (for example `st-marys`), the display name and the profile file name. It creates `instances/<code>/` with its own `.env`, profile copy, storage folders and database (`sb_<code>`). Setup checks the whole profile first and lists every problem; at the end it shows the first admin password **once**. Write it down.
+4. Double-click **start-instance.cmd --instance <code>**. Sign in as admin with that password and choose a new one.
 5. In **Settings**, check:
    - the school details and receipt numbers, including the next receipt number
    - the **logo** (optional; PNG, JPG or WebP, wide and short; it appears on receipts and bills)
@@ -37,6 +36,6 @@ Plan the visit with the school: setup, a printing test and training.
 ## After go-live
 
 - **Settings > Backups & health**: check it weekly. When it says the weekly USB backup is overdue, copy the newest backup to a USB drive kept away from the server, then press **I have done it today**.
-- Copy the storage/photos and storage/branding folders with the backups. Student photos and the logo are files, not database rows.
+- Use `scripts\backup-instance.ps1 -Instance <code>`; it copies the database, `storage/photos` and `storage/branding` together. Keep the institute's `.env` with the backup because it contains the `APP_SECRET` used for saved provider passwords.
 - If the program should start by itself when the computer boots, ask for the service setup described in the README (*Production on the school server*).
-- Updates are done with the update script in the scripts folder (update.ps1), which takes a backup first.
+- Updates are done with `scripts\update-instance.ps1 -Instance <code>`, which takes a backup first.

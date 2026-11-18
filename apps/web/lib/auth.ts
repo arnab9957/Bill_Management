@@ -3,8 +3,9 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { accounts, can, type Permission, type SessionUser } from "@sb/core";
 import { cache } from "react";
+import { SESSION_COOKIE } from "./instance";
 
-export const SESSION_COOKIE = "sb_session";
+export { SESSION_COOKIE } from "./instance";
 
 /** Current user or null. Cached per request. */
 export const getUser = cache(async (): Promise<SessionUser | null> => {
