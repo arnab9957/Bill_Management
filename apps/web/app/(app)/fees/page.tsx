@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { fees, getSettings, toRupeeString } from "@sb/core";
 import { requireRole } from "@/lib/auth";
 import { getWorkingYear } from "@/lib/year";
+import { STANDARD_CLASSES, classOrder } from "@/lib/classes";
 import { formObject, run, type ActionState } from "@/lib/action";
 import { ActionForm, FieldError, Submit } from "@/components/action-form";
 import { Card, Money, PageHeader } from "@/components/ui";
@@ -42,6 +44,23 @@ async function saveLate(_: ActionState, fd: FormData): Promise<ActionState> {
   revalidatePath("/fees");
   return r;
 }
+async function addClassAndSetup(_: ActionState, fd: FormData): Promise<ActionState> {
+  "use server";
+  const u = await requireRole("fees");
+  const yearId = Number(fd.get("yearId"));
+  const sections = String(fd.get("sections") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  let classId: number;
+  try {
+    const name = String(fd.get("name") ?? "");
+    const c = await fees.createClass(u, name, classOrder(name));
+    classId = c.id;
+    for (const s of sections) await fees.createSection(u, classId, s).catch(() => undefined);
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Could not add the class", errors: { name: "Enter a class name" } };
+  }
+  revalidatePath("/fees");
+  redirect(`/fees/structure/${yearId}/${classId}`);
+}
 async function copy(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
   const u = await requireRole("fees");
@@ -71,6 +90,16 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
               <td className="text-right"><Link className="text-brand-700 hover:underline" href={`/fees/structure/${yearId}/${s.classId}`}>{s.items ? "Edit" : "Set up"}</Link></td></tr>
           ))}</tbody>
         </table>
+        <ActionForm action={addClassAndSetup} className="mt-4 flex flex-wrap items-end gap-2 border-t border-gray-100 pt-4">
+          <input type="hidden" name="yearId" value={yearId} />
+          <span className="text-sm font-medium">Add a class</span>
+          <select name="name" required defaultValue="">
+            <option value="" disabled>Choose class…</option>
+            {STANDARD_CLASSES.filter((c) => !m.classes.some((x) => x.name.toLowerCase() === c.toLowerCase())).map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <input name="sections" placeholder="Sections (e.g. A, B)" className="w-40" />
+          <Submit>Add class &amp; set up fees</Submit><FieldError name="name" />
+        </ActionForm>
         <ActionForm action={copy} className="mt-4 flex flex-wrap items-end gap-2 border-t border-gray-100 pt-4">
           <span className="text-sm">Copy all structures from</span>
           <select name="from">{m.years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}</select>

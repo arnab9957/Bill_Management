@@ -11,16 +11,13 @@ export const dynamic = "force-dynamic";
 
 const NAV: (NavItem & { perm: Permission })[] = [
   { href: "/", label: "Dashboard", perm: "dashboard", key: "d" },
-  { href: "/collect", label: "Collect fee", perm: "collect", key: "c" },
+  // { href: "/collect", label: "Collect fee", perm: "collect", key: "c" },
   { href: "/students", label: "Students", perm: "students", key: "s" },
   { href: "/invoices", label: "Bills", perm: "billing", key: "b" },
-  { href: "/billing", label: "Bill run", perm: "billing" },
-  { href: "/daybook", label: "Day book", perm: "dayClose", key: "y" },
-  { href: "/cheques", label: "Cheques", perm: "receiptsCancel" },
   { href: "/fees", label: "Fee setup", perm: "fees", key: "f" },
   { href: "/reports", label: "Reports", perm: "reports", key: "r" },
   { href: "/notifications", label: "Messages", perm: "notifications", key: "m" },
-  { href: "/settings", label: "Settings", perm: "settings" },
+  { href: "/settings", label: "School Profile", perm: "settings" },
   { href: "/audit", label: "Audit log", perm: "audit" },
 ];
 

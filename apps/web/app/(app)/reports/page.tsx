@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { addDays, formatDate, reports, today, getSettings } from "@sb/core";
+import { addDays, can, formatDate, reports, today, getSettings } from "@sb/core";
 import { requireRole } from "@/lib/auth";
 import { Card, LinkButton, Money, PageHeader, Stat } from "@/components/ui";
 
@@ -15,7 +15,7 @@ function Breakdown({ title, rows }: { title: string; rows: { key: string; v: num
 }
 
 export default async function Reports({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
-  await requireRole("reports");
+  const user = await requireRole("reports");
   const sp = await searchParams;
   const to = sp.to ?? today();
   const from = sp.from ?? `${to.slice(0, 7)}-01`;
@@ -29,6 +29,8 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
       <PageHeader title="Reports" subtitle={`${formatDate(from)} – ${formatDate(to)}`} actions={<>
         <form className="flex gap-2"><input type="date" name="from" defaultValue={from} /><input type="date" name="to" defaultValue={to} /><button className="rounded-md border border-gray-300 bg-white px-3 text-sm">Apply</button></form>
         <LinkButton href={`/reports?from=${addDays(today(), -6)}&to=${today()}`}>Last 7 days</LinkButton>
+        {can(user.role, "dayClose") && <LinkButton href="/daybook">Day book</LinkButton>}
+        {can(user.role, "receiptsCancel") && <LinkButton href="/cheques">Cheques</LinkButton>}
         <LinkButton variant="primary" href="/reports/defaulters">Defaulters</LinkButton>
       </>} />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
