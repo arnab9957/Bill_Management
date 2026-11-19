@@ -2,8 +2,9 @@ import "server-only";
 import { cookies } from "next/headers";
 import { cache } from "react";
 import { fees } from "@sb/core";
+import { YEAR_COOKIE } from "./instance";
 
-export const YEAR_COOKIE = "sb_year";
+export { YEAR_COOKIE } from "./instance";
 
 /**
  * The academic year the user is working in (sidebar switcher). Lists such as Students and

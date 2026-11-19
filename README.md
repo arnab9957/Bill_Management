@@ -14,6 +14,8 @@ It does everything below automatically:
 
 Code changes appear on a normal browser refresh. To stop, close its window and the "Database" window.
 
+For separate institutes, use `new-institute.cmd` once per institute and then `start-instance.cmd --instance <code>`. See *Setting up institutes* below.
+
 ## Quick start by hand (development, Windows)
 
 ```powershell
@@ -55,7 +57,8 @@ packages/db         Drizzle schema (single source of types), migrations and seed
 packages/core       All business logic as pure TypeScript with no React or Next. Web, worker and tests share it
 packages/validation Zod schemas shared by the browser, Server Actions, Excel import and jobs
 packages/notifications  Channel adapters: SMTP, WhatsApp Cloud API, SMS over HTTP (DLT), SMS through an Android gateway on the LAN (offline), and console
-scripts/            install-services.ps1 (NSSM + LAN firewall), backup.ps1, restore.ps1, update.ps1
+scripts/            instance.mjs/new-institute.mjs plus NSSM, backup, restore and update scripts
+instances/<code>/   one private installation per institute: .env, profile, storage, backups and logs
 ```
 
 ### Golden rules and where they are enforced
@@ -120,33 +123,46 @@ scripts/            install-services.ps1 (NSSM + LAN firewall), backup.ps1, rest
 1. Install PostgreSQL 16 or later as a Windows service and create the database and user. Set `DATABASE_URL`, `APP_SECRET` and `PG_DUMP_PATH` in `.env`.
 2. Build: `pnpm build`. This builds the web app (`apps/web/.next`) and bundles the worker into `apps/worker/dist`. The web app runs with `next start`. Next's "standalone" output is off by default because on Windows it needs symlink rights (Developer Mode); set `NEXT_STANDALONE=1` to build it anyway.
 3. Run migrations with `node apps/worker/dist/migrate.js` (set `MIGRATIONS_DIR=packages/db/migrations`). Then set up the school once with `pnpm new-school --profile profiles/local/<school>.json` (or `setup.cmd`), which also loads the profile and prints the first admin password. Do not run `pnpm db:seed` on a school database: it loads the development demo data.
-4. Run `scripts/install-services.ps1` as Administrator. It installs both services with auto-start and restart, and allows the port from the LAN subnet only. Never expose the port to the internet.
+4. Run `scripts/install-services.ps1 -AppDir <folder> -Nssm <nssm.exe> -Instance <code>` as Administrator. It installs uniquely named services for that institute and binds to `127.0.0.1`. Add `-AllowLan` only if counter PCs must connect over the school LAN; never expose the port to the internet.
 5. Under *Settings*, set:
    - the school details and UPI ID
    - a backup folder on a second disk
    - the providers (SMTP, WhatsApp, SMS)
    - one user per staff member
 
-## Setting up another school
+## Setting up institutes
 
-The same program serves any school or college. Each school gets its own installation and database.
-Everything specific to a school lives in its **profile** file and in its **Settings**; nothing is written into the code.
+One code base serves every school or college. Each institute gets a separate database, secret, storage folder, web port and browser cookies. This is database-level isolation: do not add a school ID to the shared tables.
+
+```text
+instances/<code>/
+  institute.json        non-secret instance settings (name, DB, port, service names)
+  .env                  DATABASE_URL, APP_SECRET and STORAGE_DIR for this institute only
+  profile.json          the profile used at first setup
+  storage/              branding, photos, backups and logs
+```
 
 1. Copy `profiles/school-default.json` to `profiles/local/<school>.json` and fill it in (see `profiles/README.md`).
-2. On the school's computer, double-click **`setup.cmd`**, type the profile file name, and write down the admin password it shows.
-3. Double-click **`start.cmd`**. Sign in as `admin` with the password from step 2 and choose a new one.
+2. Double-click **`new-institute.cmd`** and enter the code (for example `st-marys`), display name and profile file. It creates the folder above, a database named `sb_<code>`, a random `APP_SECRET`, and prints the one-time admin password.
+3. Double-click **`start-instance.cmd --instance <code>`**. Sign in as `admin` with that password and choose a new one.
 4. Follow `docs/new-school-checklist.md` for the rest: fee amounts, users, students, messages, backups and printing.
+5. Repeat steps 1-3 for each institute. If they are on separate PCs, copy the whole program folder and run only that institute's setup on each PC.
 
 | Command | What it does |
 |---|---|
-| `setup.cmd` | Sets up a new school (first time only). Refuses to run on a database that already has school data. |
-| `pnpm new-school --profile profiles/local/<school>.json` | The same setup from the command line. |
-| `start.cmd` | Starts the database, the web app and the reminder worker, then opens the browser. |
+| `new-institute.cmd` | Creates one institute's config, database and admin. Run once per institute. |
+| `start-instance.cmd --instance <code>` | Starts that institute's database, web app and worker on its own port. |
+| `pnpm instance:list` | Lists installed institute codes. |
+| `powershell scripts\doctor-instance.ps1 -Instance <code>` | Checks config, folders and database connection. |
+| `powershell scripts\backup-instance.ps1 -Instance <code>` | Backs up that database, logo and photos. |
+| `powershell scripts\restore-instance.ps1 -Instance <code> -File <dump>` | Restores that database after confirmation. |
+| `powershell scripts\update-instance.ps1 -Instance <code>` | Backs up, migrates and rebuilds that institute. |
+| `setup.cmd` / `start.cmd` | Legacy single-installation path for development/demo only. |
 | `pnpm db:seed -- --demo` | Development only: demo school, students and fee structures. |
 
 Notes:
-- Changing a school's details later is done in the app, not by running setup again.
-- A new installation gets its own random `APP_SECRET` in `.env`. An existing `.env` is never changed, because saved provider passwords depend on it.
+- `APP_SECRET` is unique per institute. Back it up with the database or saved provider passwords cannot be decrypted after a restore.
+- Browser cookies are named per institute, so signing in to one institute does not affect another on `127.0.0.1`.
+- Changing an institute's details later is done in the app, not by running setup again.
 - Parts that are specific to India stay as defaults: the U-DISE line, the ₹ sign and Indian number grouping, Indian mobile numbers and DLT SMS templates.
 - For a college, enter each course and year as a class (for example `BCA-1`) and its branches or groups as sections.
-- Not built yet: a web setup wizard, importing fee amounts from Excel, a Windows installer, and translated message templates.
