@@ -21,14 +21,18 @@ export default async function LoginPage() {
   if (await getUser()) redirect("/");
   const s = await getSettings();
   return (
-    <main className="flex min-h-screen items-center justify-center p-4">
-      <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h1 className="text-lg font-semibold">{s.name}</h1>
-        <p className="mb-5 text-sm text-gray-500">Fee billing — sign in</p>
-        <ActionForm action={loginAction} className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1">Username<input name="username" autoFocus autoComplete="username" required /></label>
-          <label className="flex flex-col gap-1">Password<input name="password" type="password" autoComplete="current-password" required /></label>
-          <Submit>Sign in</Submit>
+    <main className="flex min-h-screen items-center justify-center bg-canvas p-5 sm:p-8">
+      <div className="w-full max-w-[420px] rounded-xl border border-gray-200 bg-surface p-8 shadow-sm sm:p-10">
+        <div className="mb-8">
+          <div className="mb-6 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-ink text-xl font-semibold text-white">₹</div>
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-accent-ink">Fee Management</div>
+          <h1 className="text-[26px] font-semibold leading-tight tracking-[-0.02em] text-ink">{s.name}</h1>
+          <p className="mt-2 text-sm leading-relaxed text-gray-600">Sign in to manage accounts and collections.</p>
+        </div>
+        <ActionForm action={loginAction} className="flex flex-col gap-5">
+          <label className="flex flex-col gap-2">Username<input name="username" autoFocus autoComplete="username" required /></label>
+          <label className="flex flex-col gap-2">Password<input name="password" type="password" autoComplete="current-password" required /></label>
+          <div className="mt-1"><Submit className="w-full">Sign in</Submit></div>
         </ActionForm>
       </div>
     </main>

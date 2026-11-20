@@ -16,7 +16,7 @@ export function LogoCard({ hasLogo, version, upload, remove }: {
         {hasLogo ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={`/api/branding/logo?v=${encodeURIComponent(version)}`} alt="School logo"
-            className="h-16 max-w-48 rounded border border-gray-200 bg-white object-contain p-1" />
+            className="h-16 max-w-48 rounded-lg border border-gray-200 bg-surface object-contain p-1" />
         ) : (
           <div className="text-sm text-gray-500">No logo yet. Receipts and bills print without one.</div>
         )}

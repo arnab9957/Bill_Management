@@ -2,6 +2,7 @@
 import { createContext, useActionState, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import type { ActionState } from "@/lib/action";
+import { buttonClass, cx, Notice } from "./ui";
 
 const ErrCtx = createContext<Record<string, string>>({});
 const StateCtx = createContext<ActionState>(null);
@@ -15,20 +16,19 @@ export function useFieldError(name: string) {
 }
 export function FieldError({ name }: { name: string }) {
   const e = useFieldError(name);
-  return e ? <p className="text-xs text-red-600">{e}</p> : null;
+  return e ? <p className="text-xs font-medium text-red-700">{e}</p> : null;
 }
 
-export function Submit({ children, variant = "primary", confirm, name, value }: { children: ReactNode; variant?: "primary" | "danger" | "secondary"; confirm?: string; name?: string; value?: string }) {
+export function Submit({ children, variant = "primary", confirm, name, value, className, disabled }: { children: ReactNode; variant?: "primary" | "danger" | "secondary"; confirm?: string; name?: string; value?: string; className?: string; disabled?: boolean }) {
   const { pending } = useFormStatus();
-  const cls = { primary: "bg-brand-600 text-white hover:bg-brand-700", danger: "bg-red-600 text-white hover:bg-red-700", secondary: "border border-gray-300 bg-white hover:bg-gray-50" }[variant];
   return (
     <button
       type="submit"
       name={name}
       value={value}
-      disabled={pending}
+      disabled={pending || disabled}
       onClick={(e) => { if (confirm && !window.confirm(confirm)) e.preventDefault(); }}
-      className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${cls}`}
+      className={cx(buttonClass(variant), className)}
     >
       {pending ? "Working…" : children}
     </button>
@@ -67,9 +67,9 @@ export function ActionForm({
       <form ref={ref} action={formAction} className={className} aria-busy={!ready}>
         <fieldset disabled={!ready} className="contents">{children}</fieldset>
         {state?.message && (
-          <div className={`mt-3 rounded-md border px-3 py-2 text-sm ${state.ok ? "border-green-200 bg-green-50 text-green-900" : "border-red-200 bg-red-50 text-red-900"}`} role="status">
+          <Notice tone={state.ok ? "ok" : "error"} className="mt-5" role="status">
             {state.message}
-          </div>
+          </Notice>
         )}
       </form>
     </ErrCtx.Provider>

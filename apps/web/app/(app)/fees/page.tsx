@@ -80,14 +80,14 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   return (
     <div className="space-y-5">
       <PageHeader title="Fee setup" actions={
-        <form className="flex gap-2"><select name="year" defaultValue={yearId}>{m.years.map((y) => <option key={y.id} value={y.id}>{y.name}{y.isCurrent ? " (current)" : ""}</option>)}</select><button className="rounded-md border border-gray-300 bg-white px-3 text-sm">Go</button></form>
+        <form className="toolbar"><select name="year" defaultValue={yearId}>{m.years.map((y) => <option key={y.id} value={y.id}>{y.name}{y.isCurrent ? " (current)" : ""}</option>)}</select><button className="filter-button">Go</button></form>
       } />
       <Card title={`Fee structures ${year?.name ?? ""}`}>
         <table className="data">
           <thead><tr><th>Class</th><th className="num">Heads</th><th className="num">Monthly</th><th className="num">Yearly total</th><th /></tr></thead>
           <tbody>{structs.map((s) => (
             <tr key={s.classId}><td>{s.className}</td><td className="num">{s.items}</td><td className="num"><Money p={s.monthly} /></td><td className="num"><Money p={s.annualTotal} /></td>
-              <td className="text-right"><Link className="text-brand-700 hover:underline" href={`/fees/structure/${yearId}/${s.classId}`}>{s.items ? "Edit" : "Set up"}</Link></td></tr>
+              <td className="text-right"><Link className="text-ink hover:underline" href={`/fees/structure/${yearId}/${s.classId}`}>{s.items ? "Edit" : "Set up"}</Link></td></tr>
           ))}</tbody>
         </table>
         <ActionForm action={addClassAndSetup} className="mt-4 flex flex-wrap items-end gap-2 border-t border-gray-100 pt-4">
@@ -110,7 +110,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         </ActionForm>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2">
         <Card title="Fee heads">
           <table className="data"><thead><tr><th>Code</th><th>Name</th><th>Type</th></tr></thead>
             <tbody>{m.heads.map((h) => <tr key={h.id}><td className="font-mono text-xs">{h.code}</td><td>{h.name}{h.isRefundable ? " (refundable)" : ""}</td><td>{h.type.replace("_", " ")}</td></tr>)}</tbody></table>

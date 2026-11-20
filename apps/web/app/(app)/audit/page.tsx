@@ -11,7 +11,7 @@ export default async function Audit({ searchParams }: { searchParams: Promise<{ 
   return (
     <div>
       <PageHeader title="Audit log" subtitle="Append-only record of every change: who, when, before and after." actions={
-        <form className="flex gap-2"><select name="table" defaultValue={table}><option value="">All records</option>{TABLES.map((t) => <option key={t}>{t}</option>)}</select><button className="rounded-md border border-gray-300 bg-white px-3 text-sm">Filter</button></form>
+        <form className="toolbar"><select name="table" defaultValue={table}><option value="">All records</option>{TABLES.map((t) => <option key={t}>{t}</option>)}</select><button className="filter-button">Filter</button></form>
       } />
       <Card>
         <table className="data">
@@ -22,9 +22,9 @@ export default async function Audit({ searchParams }: { searchParams: Promise<{ 
               <td>{username ?? "system"}{a.ip ? <div className="text-xs text-gray-400">{a.ip}</div> : null}</td>
               <td>{a.action}</td><td className="text-xs">{a.tableName} #{a.recordId}</td>
               <td className="wrap max-w-xl">
-                <details><summary className="cursor-pointer text-xs text-brand-700">details</summary>
+                <details><summary className="cursor-pointer text-xs text-ink">details</summary>
                   {a.oldValues != null && <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-all bg-red-50 p-1 text-[10px]">{JSON.stringify(a.oldValues, null, 1)}</pre>}
-                  {a.newValues != null && <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-all bg-green-50 p-1 text-[10px]">{JSON.stringify(a.newValues, null, 1)}</pre>}
+                  {a.newValues != null && <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-all bg-gray-50 p-1 text-[10px]">{JSON.stringify(a.newValues, null, 1)}</pre>}
                 </details>
               </td>
             </tr>

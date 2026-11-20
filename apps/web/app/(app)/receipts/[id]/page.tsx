@@ -22,7 +22,7 @@ export default async function ReceiptDetail({ params }: { params: Promise<{ id: 
   if (!r) notFound();
   return (
     <div className="max-w-3xl space-y-4">
-      <PageHeader title={`Receipt ${r.p.receiptNo}`} subtitle={<><Link className="text-brand-700 hover:underline" href={`/students/${r.student.id}`}>{r.student.name}</Link> · {formatDate(r.p.date)} · <Badge>{r.p.status}</Badge></>}
+      <PageHeader title={`Receipt ${r.p.receiptNo}`} subtitle={<><Link className="text-ink hover:underline" href={`/students/${r.student.id}`}>{r.student.name}</Link> · {formatDate(r.p.date)} · <Badge>{r.p.status}</Badge></>}
         actions={<LinkButton href={`/receipts/${id}/print`} target="_blank">Print{r.p.printCount ? " duplicate" : ""}</LinkButton>} />
       <Card>
         <div className="text-2xl font-semibold"><Money p={r.p.amount} /></div>

@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import type { Channel } from "@sb/db";
 import type { ChannelAvailability } from "@sb/core";
 import { sendReminderAction } from "@/app/(app)/reminder-actions";
+import { buttonClass, cx } from "./ui";
 
 export function WhatsAppIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -27,9 +28,9 @@ export function SmsIcon({ className = "h-4 w-4" }: { className?: string }) {
 }
 
 const STYLE: Record<Channel, { label: string; cls: string; Icon: (p: { className?: string }) => React.ReactElement }> = {
-  whatsapp: { label: "WhatsApp", cls: "border-[#25D366] bg-[#25D366] text-white hover:bg-[#1ebe5b]", Icon: WhatsAppIcon },
-  email: { label: "Email", cls: "border-blue-600 bg-blue-600 text-white hover:bg-blue-700", Icon: MailIcon },
-  sms: { label: "SMS", cls: "border-gray-700 bg-gray-700 text-white hover:bg-gray-800", Icon: SmsIcon },
+  whatsapp: { label: "WhatsApp", cls: "border-brand-200 bg-brand-50 text-brand-800 hover:bg-brand-100", Icon: WhatsAppIcon },
+  email: { label: "Email", cls: "border-gray-300 bg-surface text-gray-700 hover:border-ink hover:text-ink", Icon: MailIcon },
+  sms: { label: "SMS", cls: "border-gray-300 bg-surface text-gray-700 hover:border-ink hover:text-ink", Icon: SmsIcon },
 };
 
 /**
@@ -40,12 +41,18 @@ export function ReminderButtons({ studentIds, availability, compact }: { student
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<Channel | "all" | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [links, setLinks] = useState<string[]>([]);
 
   const send = (channels: Channel[], key: Channel | "all") => {
     setBusy(key);
     setMsg(null);
+    setLinks([]);
     start(async () => {
       const r = await sendReminderAction(studentIds, channels);
+      if (r.whatsappLinks?.length) {
+        setLinks(r.whatsappLinks);
+        if (r.whatsappLinks.length === 1) window.open(r.whatsappLinks[0], "_blank", "noopener,noreferrer");
+      }
       setMsg({ ok: r.ok, text: r.message });
       setBusy(null);
     });
@@ -60,8 +67,8 @@ export function ReminderButtons({ studentIds, availability, compact }: { student
           const title = a.ok ? `Send ${label} reminder${a.to ? ` to ${a.to}` : ""}` : `${label}: ${a.reason}`;
           return (
             <button key={c} type="button" disabled={!a.ok || pending} title={title} aria-label={title} onClick={() => send([c], c)}
-              className={`inline-flex items-center gap-1.5 rounded-md border font-medium transition disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400 ${cls} ${compact ? "p-1.5" : "px-3 py-1.5 text-sm"}`}>
-              {busy === c ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <Icon />}
+              className={cx(buttonClass("secondary", "sm"), cls, compact && "px-2 py-1.5")}>
+              {busy === c ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-200 border-t-brand-700" /> : <Icon />}
               {!compact && label}
             </button>
           );
@@ -69,12 +76,21 @@ export function ReminderButtons({ studentIds, availability, compact }: { student
         {!compact && (
           <button type="button" disabled={pending || !availability || !Object.values(availability).some((x) => x.ok)}
             onClick={() => send((["whatsapp", "email", "sms"] as const).filter((c) => availability?.[c]?.ok), "all")}
-            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50">
+            className={buttonClass("secondary", "sm")}>
             {busy === "all" ? "Sending…" : "All channels"}
           </button>
         )}
       </div>
-      {msg && <p className={`text-xs ${msg.ok ? "text-green-700" : "text-red-700"}`}>{msg.text}</p>}
+      {msg && <p className={`text-xs ${msg.ok ? "text-brand-700" : "text-red-700"}`}>{msg.text}</p>}
+      {links.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {links.map((url, i) => (
+            <a key={url} href={url} target="_blank" rel="noopener noreferrer" className={cx(buttonClass("secondary", "sm"), "border-brand-200 bg-brand-50 text-brand-800 hover:bg-brand-100")}>
+              <WhatsAppIcon className="h-3.5 w-3.5" />Open chat {links.length > 1 ? i + 1 : ""}
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

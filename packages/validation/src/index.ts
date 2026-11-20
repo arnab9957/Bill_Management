@@ -279,8 +279,8 @@ export const receiptRowsSchema = z.array(z.object({
   label: z.string().trim().max(60).nullable(),
 }));
 export const providerConfigSchema = z.object({
-  emailMode: z.enum(["off", "smtp", "console"]).default("console"),
-  whatsappMode: z.enum(["off", "cloud", "console"]).default("console"),
+  emailMode: z.enum(["off", "smtp", "brevo"]).default("off"),
+  whatsappMode: z.preprocess((v) => (v === "console" ? "device" : v), z.enum(["off", "cloud", "device"]).default("device")),
   smsMode: z.enum(["off", "http", "gateway", "console"]).default("console"),
   smtpHost: z.string().default(""),
   smtpPort: z.coerce.number().int().default(587),
@@ -288,6 +288,9 @@ export const providerConfigSchema = z.object({
   smtpUser: z.string().default(""),
   smtpPass: z.string().default(""),
   smtpFrom: z.string().default(""),
+  brevoApiKey: z.string().default(""),
+  brevoSenderEmail: z.string().default(""),
+  brevoSenderName: z.string().default(""),
   waPhoneNumberId: z.string().default(""),
   waAccessToken: z.string().default(""),
   waApiVersion: z.string().default("v21.0"),
@@ -298,6 +301,10 @@ export const providerConfigSchema = z.object({
   /** gateway: Android SMS-gateway app on the LAN (works with no internet) */
   smsGatewayUrl: z.string().default(""),
   smsGatewayToken: z.string().default(""),
+}).superRefine((d, ctx) => {
+  if (d.emailMode !== "brevo") return;
+  if (!d.brevoApiKey.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["brevoApiKey"], message: "Brevo API key required" });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.brevoSenderEmail.trim())) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["brevoSenderEmail"], message: "Verified Brevo sender email required" });
 });
 export type ProviderConfig = z.infer<typeof providerConfigSchema>;
 

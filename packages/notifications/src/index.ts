@@ -36,6 +36,38 @@ export function emailAdapter(cfg: ProviderConfig): NotificationAdapter {
   };
 }
 
+export function brevoAdapter(cfg: ProviderConfig): NotificationAdapter {
+  return {
+    async send(m) {
+      try {
+        const payload: Record<string, unknown> = {
+          sender: { email: cfg.brevoSenderEmail.trim(), name: cfg.brevoSenderName.trim() || "School fee updates" },
+          to: [{ email: m.recipient }],
+          subject: m.subject ?? "School fee update",
+          textContent: m.body,
+        };
+        if (m.attachmentPath) {
+          payload.attachment = [{ name: basename(m.attachmentPath), content: (await readFile(m.attachmentPath)).toString("base64") }];
+        }
+        const r = await fetch("https://api.brevo.com/v3/smtp/email", {
+          method: "POST",
+          headers: { "api-key": cfg.brevoApiKey.trim(), "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(20_000),
+        });
+        const j = await r.json().catch(() => ({})) as { messageId?: string; code?: string | number; message?: string };
+        if (!r.ok) {
+          const error = [j.code, j.message].filter(Boolean).join(": ") || `Brevo HTTP ${r.status}`;
+          return fail(error, [400, 401, 403, 404, 422].includes(r.status));
+        }
+        return { ok: true, providerMsgId: j.messageId };
+      } catch (e) {
+        return fail(e instanceof Error ? e.message : String(e));
+      }
+    },
+  };
+}
+
 // ---------------------------------------------------------------- WhatsApp (Meta Cloud API)
 /**
  * Business-initiated messages must use an approved template. When the
@@ -150,10 +182,10 @@ export function consoleAdapter(channel: Channel, storageDir: string): Notificati
 export function buildAdapters(cfg: ProviderConfig, storageDir: string): { adapters: Partial<Record<Channel, NotificationAdapter>>; needsInternet: boolean } {
   const adapters: Partial<Record<Channel, NotificationAdapter>> = {};
   let needsInternet = false;
-  if (cfg.emailMode === "smtp" && cfg.smtpHost) { adapters.email = emailAdapter(cfg); needsInternet = true; }
-  else if (cfg.emailMode === "console") adapters.email = consoleAdapter("email", storageDir);
+  if (cfg.emailMode === "brevo" && cfg.brevoApiKey && cfg.brevoSenderEmail) { adapters.email = brevoAdapter(cfg); needsInternet = true; }
+  else if (cfg.emailMode === "smtp" && cfg.smtpHost) { adapters.email = emailAdapter(cfg); needsInternet = true; }
   if (cfg.whatsappMode === "cloud" && cfg.waAccessToken) { adapters.whatsapp = whatsappAdapter(cfg, (m) => orderedParams(m.templateParams)); needsInternet = true; }
-  else if (cfg.whatsappMode === "console") adapters.whatsapp = consoleAdapter("whatsapp", storageDir);
+  // "device" mode opens WhatsApp on this device via wa.me links; nothing is auto-sent by the worker.
   if (cfg.smsMode === "http" && cfg.smsUrl) { adapters.sms = smsHttpAdapter(cfg); needsInternet = true; }
   else if (cfg.smsMode === "gateway" && cfg.smsGatewayUrl) adapters.sms = smsGatewayAdapter(cfg);
   else if (cfg.smsMode === "console") adapters.sms = consoleAdapter("sms", storageDir);

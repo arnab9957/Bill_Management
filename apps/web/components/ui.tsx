@@ -6,87 +6,105 @@ export function cx(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(" ");
 }
 
+export const panelClass = "min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.04)]";
+
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h1 className="text-lg font-semibold text-gray-900 sm:text-xl">{title}</h1>
-        {subtitle && <div className="mt-0.5 text-sm text-gray-500">{subtitle}</div>}
+    <div className="mb-8 flex flex-wrap items-center justify-between gap-5">
+      <div className="min-w-0">
+        <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-[32px]">{title}</h1>
+        {subtitle && <div className="mt-1.5 max-w-3xl text-sm leading-relaxed text-gray-600">{subtitle}</div>}
       </div>
-      {actions && <div className="flex flex-wrap gap-2 no-print">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2.5 no-print">{actions}</div>}
     </div>
   );
 }
 
+export function SectionHeading({ children, className }: { children: ReactNode; className?: string }) {
+  return <h2 className={cx("eyebrow mb-2", className)}>{children}</h2>;
+}
+
 export function Card({ title, children, className, actions }: { title?: ReactNode; children: ReactNode; className?: string; actions?: ReactNode }) {
   return (
-    <section className={cx("min-w-0 rounded-lg border border-gray-200 bg-white shadow-sm", className)}>
+    <section className={cx(panelClass, className)}>
       {title && (
-        <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
-          <h2 className="text-sm font-semibold text-gray-800">{title}</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 bg-gray-50/60 px-5 py-4 sm:px-6">
+          <h2 className="text-sm font-semibold tracking-tight text-ink">{title}</h2>
           {actions}
         </div>
       )}
-      <div className="overflow-x-auto p-3 sm:p-4">{children}</div>
+      <div className="overflow-x-auto p-5 sm:p-6">{children}</div>
     </section>
   );
 }
 
-const btn = {
-  primary: "bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50",
-  secondary: "border border-gray-300 bg-white text-gray-800 hover:bg-gray-50",
-  danger: "bg-red-600 text-white hover:bg-red-700",
-  ghost: "text-brand-700 hover:bg-brand-50",
-};
-type Variant = keyof typeof btn;
+type Variant = "primary" | "secondary" | "danger" | "ghost";
+type Size = "md" | "sm";
 
-export function Button({ variant = "primary", className, ...p }: ComponentProps<"button"> & { variant?: Variant }) {
-  return <button className={cx("inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium", btn[variant], className)} {...p} />;
+const buttonVariants: Record<Variant, string> = {
+  primary: "bg-ink text-white shadow-sm hover:bg-gray-800",
+  secondary: "border border-gray-300 bg-surface text-gray-800 hover:border-ink hover:bg-gray-50 hover:text-ink",
+  danger: "bg-red-700 text-white shadow-sm hover:bg-red-800",
+  ghost: "text-ink hover:bg-gray-100",
+};
+const buttonSizes: Record<Size, string> = { md: "px-4 py-2.5 text-sm", sm: "px-3 py-1.5 text-sm" };
+const buttonBase = "inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20 disabled:cursor-not-allowed disabled:opacity-50";
+
+export function buttonClass(variant: Variant = "primary", size: Size = "md") {
+  return cx(buttonBase, buttonSizes[size], buttonVariants[variant]);
 }
-export function LinkButton({ variant = "secondary", className, ...p }: ComponentProps<typeof Link> & { variant?: Variant }) {
-  return <Link className={cx("inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium", btn[variant], className)} {...p} />;
+
+export function Button({ variant = "primary", size = "md", className, ...p }: ComponentProps<"button"> & { variant?: Variant; size?: Size }) {
+  return <button className={cx(buttonClass(variant, size), className)} {...p} />;
+}
+export function LinkButton({ variant = "secondary", size = "md", className, ...p }: ComponentProps<typeof Link> & { variant?: Variant; size?: Size }) {
+  return <Link className={cx(buttonClass(variant, size), className)} {...p} />;
 }
 
 export function Field({ label, name, error, hint, className, children }: { label: string; name?: string; error?: string; hint?: string; className?: string; children: ReactNode }) {
   return (
-    <div className={cx("flex flex-col gap-1", className)}>
+    <div className={cx("field-stack", className)}>
       <label htmlFor={name}>{label}</label>
       {children}
-      {error ? <p className="text-xs text-red-600">{error}</p> : hint ? <p className="text-xs text-gray-400">{hint}</p> : null}
+      {error ? <p className="text-xs font-medium text-red-700">{error}</p> : hint ? <p className="text-xs leading-relaxed text-gray-500">{hint}</p> : null}
     </div>
   );
 }
 
 export function Money({ p, className }: { p: number; className?: string }) {
-  return <span className={cx("tabular-nums", p < 0 && "text-red-600", className)}>{formatINR(p)}</span>;
+  return <span className={cx("tabular-nums", p < 0 && "text-red-700", className)}>{formatINR(p)}</span>;
 }
 
 const badgeColors: Record<string, string> = {
-  paid: "bg-green-100 text-green-800", sent: "bg-green-100 text-green-800", valid: "bg-green-100 text-green-800", active: "bg-green-100 text-green-800", cleared: "bg-green-100 text-green-800",
-  partial: "bg-amber-100 text-amber-800", queued: "bg-amber-100 text-amber-800", pending: "bg-amber-100 text-amber-800", sending: "bg-amber-100 text-amber-800",
-  overdue: "bg-red-100 text-red-800", failed: "bg-red-100 text-red-800", bounced: "bg-red-100 text-red-800",
-  cancelled: "bg-gray-200 text-gray-600", left: "bg-gray-200 text-gray-600", alumni: "bg-gray-200 text-gray-600",
-  issued: "bg-blue-100 text-blue-800",
+  paid: "border-brand-200 bg-brand-50 text-brand-900", sent: "border-brand-200 bg-brand-50 text-brand-900", valid: "border-brand-200 bg-brand-50 text-brand-900", active: "border-brand-200 bg-brand-50 text-brand-900", cleared: "border-brand-200 bg-brand-50 text-brand-900",
+  partial: "border-amber-200 bg-amber-50 text-amber-900", queued: "border-amber-200 bg-amber-50 text-amber-900", pending: "border-amber-200 bg-amber-50 text-amber-900", sending: "border-amber-200 bg-amber-50 text-amber-900",
+  overdue: "border-red-200 bg-red-50 text-red-800", failed: "border-red-200 bg-red-50 text-red-800", bounced: "border-red-200 bg-red-50 text-red-800",
+  cancelled: "border-gray-200 bg-gray-100 text-gray-600", left: "border-gray-200 bg-gray-100 text-gray-600", alumni: "border-gray-200 bg-gray-100 text-gray-600",
+  issued: "border-ink bg-ink text-white",
 };
 export function Badge({ children }: { children: string }) {
-  return <span className={cx("inline-block rounded px-1.5 py-0.5 text-xs font-medium capitalize", badgeColors[children] ?? "bg-gray-100 text-gray-700")}>{children.replace(/_/g, " ")}</span>;
+  return <span className={cx("inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em]", badgeColors[children] ?? "border-gray-200 bg-gray-100 text-gray-700")}>{children.replace(/_/g, " ")}</span>;
 }
 
 export function Stat({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: "red" | "green" }) {
   return (
-    <div className="min-w-0 rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:p-4">
-      <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</div>
-      <div className={cx("mt-1 wrap-break-word text-xl font-semibold tabular-nums sm:text-2xl", tone === "red" && "text-red-700", tone === "green" && "text-green-700")}>{value}</div>
-      {sub && <div className="mt-0.5 text-xs text-gray-500">{sub}</div>}
+    <div className={cx(panelClass, "p-5 sm:p-6")}>
+      <div className="eyebrow">{label}</div>
+      <div className={cx("mt-3 wrap-break-word text-2xl font-semibold tracking-tight tabular-nums text-ink sm:text-[28px]", tone === "red" && "text-red-700", tone === "green" && "text-ink")}>{value}</div>
+      {sub && <div className="mt-2 text-xs leading-relaxed text-gray-500">{sub}</div>}
     </div>
   );
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <div className="rounded-md border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">{children}</div>;
+  return <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/60 p-10 text-center text-sm leading-relaxed text-gray-500">{children}</div>;
 }
 
-export function Notice({ tone = "info", children }: { tone?: "info" | "warn" | "error" | "ok"; children: ReactNode }) {
-  const c = { info: "border-blue-200 bg-blue-50 text-blue-900", warn: "border-amber-200 bg-amber-50 text-amber-900", error: "border-red-200 bg-red-50 text-red-900", ok: "border-green-200 bg-green-50 text-green-900" }[tone];
-  return <div className={cx("rounded-md border px-3 py-2 text-sm", c)}>{children}</div>;
+export function TableEmpty({ colSpan, children }: { colSpan: number; children: ReactNode }) {
+  return <tr><td colSpan={colSpan} className="px-4 py-8 text-center text-sm text-gray-500">{children}</td></tr>;
+}
+
+export function Notice({ tone = "info", className, role, children }: { tone?: "info" | "warn" | "error" | "ok"; className?: string; role?: "status" | "alert"; children: ReactNode }) {
+  const c = { info: "border-gray-200 bg-surface text-gray-700", warn: "border-amber-200 bg-amber-50 text-amber-900", error: "border-red-200 bg-red-50 text-red-900", ok: "border-brand-200 bg-brand-50 text-brand-900" }[tone];
+  return <div role={role} className={cx("rounded-lg border px-4 py-3 text-sm leading-relaxed shadow-sm", c, className)}>{children}</div>;
 }

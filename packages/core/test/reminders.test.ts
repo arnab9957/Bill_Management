@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { reminderFor } from "../src/notifications";
+import { providerConfigSchema } from "@sb/validation";
+import { applyProviderAvailability, channelAvailability, reminderFor, waChatUrl } from "../src/notifications";
 
 // School defaults: remind 3 days before; overdue reminders at +3, +7, +15 days.
 const at = (due: string, on: string) => reminderFor(due, on, 3, [3, 7, 15]);
@@ -33,5 +34,22 @@ describe("which reminder a bill gets on a given day", () => {
   });
   it("no 'due soon' when the school sets 0 days before", () => {
     expect(reminderFor("2026-11-17", "2026-11-16", 0, [3])).toBeNull();
+  });
+});
+
+describe("WhatsApp device mode", () => {
+  it("builds a wa.me link with a 10-digit Indian mobile and encoded text", () => {
+    expect(waChatUrl("9876543210", "Fee due: ₹100")).toBe("https://wa.me/919876543210?text=Fee%20due%3A%20%E2%82%B9100");
+  });
+  it("keeps off modes unavailable on the reminder buttons", () => {
+    const guardian = { messagingConsent: true, mobile: "9876543210", whatsappNo: null, email: "p@example.com", notifySms: true, notifyWhatsapp: true, notifyEmail: true };
+    const a = applyProviderAvailability(channelAvailability(guardian), { emailMode: "off", whatsappMode: "device", smsMode: "console" });
+    expect(a.email.ok).toBe(false);
+    expect(a.whatsapp.ok).toBe(true);
+    expect(a.sms.ok).toBe(true);
+  });
+  it("migrates a saved console mode to device and defaults to device", () => {
+    expect(providerConfigSchema.parse({ whatsappMode: "console" }).whatsappMode).toBe("device");
+    expect(providerConfigSchema.parse({}).whatsappMode).toBe("device");
   });
 });

@@ -39,7 +39,7 @@ export default async function EditStudent({ params, searchParams }: { params: Pr
           <span className="text-gray-600">Edit class for:</span>
           {history.map((h) => (
             <Link key={h.e.id} href={`?year=${h.e.academicYearId}`}
-              className={`rounded-md border px-3 py-1 ${h.e.id === sel?.e.id ? "border-brand-600 bg-brand-50 font-semibold text-brand-700" : "border-gray-300 bg-white"}`}>
+              className={`rounded-md border px-3 py-1 ${h.e.id === sel?.e.id ? "border-ink bg-ink font-semibold text-white" : "border-gray-300 bg-white"}`}>
               {h.yearName} · {h.className}
             </Link>
           ))}

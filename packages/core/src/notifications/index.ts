@@ -3,7 +3,7 @@ import {
   getDb, guardians, studentGuardians, students, classes, invoices, notificationOutbox, notificationTemplates,
   type Channel, type Executor, type NotifyEvent, type OutboxRow,
 } from "@sb/db";
-import { getSettings, audit, type Actor, SYSTEM } from "../common";
+import { getSettings, getProviderConfig, audit, type Actor, SYSTEM } from "../common";
 import { addDays, daysBetween, formatDate, today, type ISODate } from "../dates";
 import { formatINR } from "../money";
 
@@ -65,12 +65,16 @@ export async function enqueue(tx: Executor, a: EnqueueArgs): Promise<number> {
   if (!g || !g.g.messagingConsent) return 0;
   const guardian = g.g;
   const settings = await getSettings(tx);
+  const provider = await getProviderConfig(tx);
   const templates = await tx.select().from(notificationTemplates)
     .where(and(eq(notificationTemplates.event, a.event), eq(notificationTemplates.isActive, true)));
 
   const vars = { guardian_name: guardian.name, school_name: settings.name, school_phone: settings.phone, ...a.vars };
   let count = 0;
   for (const channel of a.channels ?? CHANNELS) {
+    if (channel === "whatsapp" && (provider.whatsappMode === "off" || provider.whatsappMode === "device")) continue;
+    if (channel === "email" && provider.emailMode === "off") continue;
+    if (channel === "sms" && provider.smsMode === "off") continue;
     const recipient = channel === "sms" ? (guardian.notifySms ? guardian.mobile : null)
       : channel === "whatsapp" ? (guardian.notifyWhatsapp ? guardian.whatsappNo ?? guardian.mobile : null)
       : guardian.notifyEmail ? guardian.email : null;
@@ -199,14 +203,23 @@ export function channelAvailability(g: { messagingConsent: boolean; mobile: stri
   };
 }
 
-/**
- * Manual reminder ("Send reminder now", or the WhatsApp / Email / SMS buttons).
- * One combined message per guardian covering all their children's unpaid bills.
- * Keyed to the minute, so a double-click doesn't send twice but staff can resend later.
- */
-export async function sendReminderNow(actor: Actor, studentIds: number[], channels: Channel[] = CHANNELS): Promise<number> {
+export function applyProviderAvailability(a: ChannelAvailability, modes: { emailMode: string; whatsappMode: string; smsMode: string }): ChannelAvailability {
+  const off = (reason: string) => ({ ok: false as const, reason });
+  return {
+    whatsapp: modes.whatsappMode === "off" ? off("WhatsApp is turned off in Settings → Providers") : a.whatsapp,
+    email: modes.emailMode === "off" ? off("Email is turned off in Settings → Providers") : a.email,
+    sms: modes.smsMode === "off" ? off("SMS is turned off in Settings → Providers") : a.sms,
+  };
+}
+
+export function waChatUrl(mobile: string, text: string) {
+  const num = mobile.length === 10 ? `91${mobile}` : mobile.replace(/\D/g, "");
+  return `https://wa.me/${num}?text=${encodeURIComponent(text)}`;
+}
+
+async function manualReminderGroups(studentIds: number[]) {
   const db = getDb();
-  if (!studentIds.length) return 0;
+  if (!studentIds.length) return { db, groups: new Map<number, { event: NotifyEvent; studentIds: number[]; invoiceIds: number[]; vars: Record<string, string> }>(), day: today() };
   const rows = await db.select({
     invoiceId: invoices.id, invoiceNo: invoices.invoiceNo, balance: invoices.balance, dueDate: invoices.dueDate,
     studentId: students.id, studentName: students.name, cls: classes.name, guardianId: studentGuardians.guardianId,
@@ -217,27 +230,74 @@ export async function sendReminderNow(actor: Actor, studentIds: number[], channe
     .where(and(inArray(students.id, studentIds), gt(invoices.balance, 0), ne(invoices.status, "cancelled")));
   const byGuardian = new Map<number, typeof rows>();
   for (const r of rows) byGuardian.set(r.guardianId, [...(byGuardian.get(r.guardianId) ?? []), r]);
-  let n = 0;
   const d = today();
-  const minute = new Date().toISOString().slice(0, 16);
+  const groups = new Map<number, { event: NotifyEvent; studentIds: number[]; invoiceIds: number[]; vars: Record<string, string> }>();
   for (const [guardianId, list] of byGuardian) {
     const oldest = list.map((r) => r.dueDate).sort()[0]!;
+    groups.set(guardianId, {
+      event: oldest < d ? "OVERDUE" : "DUE_UPCOMING",
+      studentIds: [...new Set(list.map((r) => r.studentId))],
+      invoiceIds: list.map((r) => r.invoiceId),
+      vars: {
+        student_name: [...new Set(list.map((r) => r.studentName))].join(", "),
+        class: [...new Set(list.map((r) => r.cls))].join(", "),
+        amount_due: formatINR(list.reduce((a, r) => a + r.balance, 0), { symbol: false }),
+        due_date: formatDate(oldest),
+        invoice_no: list.map((r) => r.invoiceNo).join(", "),
+        dues_detail: list.map((r) => `${r.studentName} (${r.cls}): ${formatINR(r.balance)} – ${r.invoiceNo}`).join("\n"),
+      },
+    });
+  }
+  return { db, groups, day: d };
+}
+
+export interface WhatsappReminderLink { guardianId: number; to: string; url: string }
+
+/** Build wa.me links for manual WhatsApp reminders (for "device" mode). */
+export async function getManualWhatsappLinks(studentIds: number[]): Promise<WhatsappReminderLink[]> {
+  const { db, groups } = await manualReminderGroups(studentIds);
+  if (!groups.size) return [];
+  const settings = await getSettings(db);
+  const links: WhatsappReminderLink[] = [];
+  for (const [guardianId, g] of groups) {
+    const [grow] = await db.select({ g: guardians }).from(guardians).where(eq(guardians.id, guardianId));
+    const guardian = grow?.g;
+    if (!guardian || !guardian.messagingConsent || !guardian.notifyWhatsapp) continue;
+    const recipient = guardian.whatsappNo ?? guardian.mobile;
+    if (!recipient) continue;
+    const templates = await db.select().from(notificationTemplates)
+      .where(and(eq(notificationTemplates.event, g.event), eq(notificationTemplates.isActive, true), eq(notificationTemplates.channel, "whatsapp")));
+    const t = templates.find((x) => x.language === guardian.preferredLanguage)
+      ?? templates.find((x) => x.language === settings.defaultLanguage)
+      ?? templates[0];
+    if (!t) continue;
+    const vars = { guardian_name: guardian.name, school_name: settings.name, school_phone: settings.phone, ...g.vars };
+    const body = renderTemplate(t.body, vars);
+    links.push({ guardianId, to: recipient, url: waChatUrl(recipient, body) });
+  }
+  return links;
+}
+
+/**
+ * Manual reminder ("Send reminder now", or the WhatsApp / Email / SMS buttons).
+ * One combined message per guardian covering all their children's unpaid bills.
+ * Keyed to the minute, so a double-click doesn't send twice but staff can resend later.
+ */
+export async function sendReminderNow(actor: Actor, studentIds: number[], channels: Channel[] = CHANNELS): Promise<number> {
+  const { db, groups, day } = await manualReminderGroups(studentIds);
+  if (!groups.size) return 0;
+  let n = 0;
+  const minute = new Date().toISOString().slice(0, 16);
+  for (const [guardianId, g] of groups) {
     n += await db.transaction(async (tx) => {
       const c = await enqueue(tx, {
-        event: oldest < d ? "OVERDUE" : "DUE_UPCOMING",
+        event: g.event,
         keyBase: `MANUAL:g${guardianId}:${minute}`,
         channels,
-        studentIds: [...new Set(list.map((r) => r.studentId))],
-        invoiceIds: list.map((r) => r.invoiceId),
-        vars: {
-          student_name: [...new Set(list.map((r) => r.studentName))].join(", "),
-          class: [...new Set(list.map((r) => r.cls))].join(", "),
-          amount_due: formatINR(list.reduce((a, r) => a + r.balance, 0), { symbol: false }),
-          due_date: formatDate(oldest),
-          invoice_no: list.map((r) => r.invoiceNo).join(", "),
-          dues_detail: list.map((r) => `${r.studentName} (${r.cls}): ${formatINR(r.balance)} – ${r.invoiceNo}`).join("\n"),
-        },
-        expiresAt: new Date(`${addDays(d, 1)}T23:59:59`),
+        studentIds: g.studentIds,
+        invoiceIds: g.invoiceIds,
+        vars: g.vars,
+        expiresAt: new Date(`${addDays(day, 1)}T23:59:59`),
       });
       if (c) await audit(tx, actor, "send_reminder", "guardian", guardianId, null, { channels, studentIds });
       return c;
@@ -408,10 +468,11 @@ export const SAMPLE_VARS: Record<string, string> = {
 export async function availabilityForStudents(studentIds: number[]): Promise<Map<number, ChannelAvailability>> {
   const out = new Map<number, ChannelAvailability>();
   if (!studentIds.length) return out;
+  const provider = await getProviderConfig();
   const rows = await getDb().select({ sid: studentGuardians.studentId, g: guardians }).from(studentGuardians)
     .innerJoin(guardians, eq(guardians.id, studentGuardians.guardianId))
     .where(inArray(studentGuardians.studentId, studentIds)).orderBy(desc(studentGuardians.isPrimary));
-  for (const r of rows) if (!out.has(r.sid)) out.set(r.sid, channelAvailability(r.g));
-  for (const id of studentIds) if (!out.has(id)) out.set(id, channelAvailability(null));
+  for (const r of rows) if (!out.has(r.sid)) out.set(r.sid, applyProviderAvailability(channelAvailability(r.g), provider));
+  for (const id of studentIds) if (!out.has(id)) out.set(id, applyProviderAvailability(channelAvailability(null), provider));
   return out;
 }

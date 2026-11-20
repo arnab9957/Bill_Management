@@ -23,12 +23,12 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
         <LinkButton variant="primary" href="/billing">Run billing</LinkButton>
       </>} />
       <Card>
-        <form className="mb-4 flex flex-wrap gap-2">
+        <form className="toolbar mb-6">
           <input name="q" defaultValue={sp.q} placeholder="Bill no., student, adm. no." />
           <input name="period" type="month" defaultValue={sp.period} />
           <select name="classId" defaultValue={sp.classId}><option value="">All classes</option>{classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
           <select name="status" defaultValue={sp.status}><option value="">Any status</option>{["issued", "partial", "overdue", "paid", "cancelled"].map((s) => <option key={s}>{s}</option>)}</select>
-          <button className="rounded-md border border-gray-300 bg-white px-3 text-sm">Filter</button>
+          <button className="filter-button">Filter</button>
         </form>
         {rows.length === 0 ? <Empty>No bills.</Empty> : (
           <table className="data">
@@ -36,11 +36,11 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
             <tbody>
               {rows.map((r) => (
                 <tr key={r.inv.id}>
-                  <td><Link className="text-brand-700 hover:underline" href={`/invoices/${r.inv.id}`}>{r.inv.invoiceNo}</Link></td>
+                  <td><Link className="text-ink hover:underline" href={`/invoices/${r.inv.id}`}>{r.inv.invoiceNo}</Link></td>
                   <td><Link className="hover:underline" href={`/students/${r.inv.studentId}`}>{r.studentName}</Link> <span className="text-xs text-gray-500">{r.admissionNo}</span></td>
                   <td>{r.className}</td><td>{periodLabel(r.inv.period)}</td><td>{formatDate(r.inv.dueDate)}</td><td><Badge>{r.inv.status}</Badge></td>
                   <td className="num"><Money p={r.inv.net} /></td><td className="num"><Money p={r.inv.balance} /></td>
-                  <td><a className="rounded border border-gray-300 px-2 py-0.5 text-xs text-brand-700 hover:bg-brand-50" target="_blank" href={`/invoices/${r.inv.id}/print?auto=1`}>Print</a></td>
+                  <td><a className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs text-ink hover:border-ink hover:bg-gray-50" target="_blank" href={`/invoices/${r.inv.id}/print?auto=1`}>Print</a></td>
                   {canSend && <td>{r.inv.balance > 0 && r.inv.status !== "cancelled" && <ReminderButtons compact studentIds={[r.inv.studentId]} availability={reach.get(r.inv.studentId)} />}</td>}
                 </tr>
               ))}

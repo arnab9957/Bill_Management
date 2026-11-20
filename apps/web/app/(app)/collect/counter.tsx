@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { formatINR, formatDate } from "@sb/core/src/money-dates-client";
 import { collectAction, loadStudentAction, searchAction } from "./actions";
 import { Avatar } from "@/components/student-photo";
+import { buttonClass, Empty, Notice, panelClass, SectionHeading } from "@/components/ui";
 
 type Found = Awaited<ReturnType<typeof searchAction>>[number];
 type Loaded = NonNullable<Awaited<ReturnType<typeof loadStudentAction>>>;
@@ -98,11 +99,11 @@ export function Counter({ today, initialStudentId }: { today: string; initialStu
               if (e.key === "Enter" && results[sel]) { e.preventDefault(); load(results[sel]!.id); setQ(""); }
             }} />
           {results.length > 0 && (
-            <ul className="absolute z-10 mt-1 max-h-80 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+            <ul className="absolute z-10 mt-1 max-h-80 w-full overflow-auto rounded-xl border border-gray-200 bg-surface shadow-lg">
               {results.map((r, i) => (
                 <li key={r.id}>
                   <button type="button" onClick={() => { load(r.id); setQ(""); }}
-                    className={`flex w-full justify-between px-3 py-2 text-left text-sm ${i === sel ? "bg-brand-50" : "hover:bg-gray-50"}`}>
+                    className={`flex w-full justify-between px-3 py-2 text-left text-sm ${i === sel ? "bg-gray-100 text-ink" : "hover:bg-gray-50"}`}>
                     <span><b>{r.name}</b> <span className="text-gray-500">{r.admissionNo} · {r.className}{r.sectionName ? "-" + r.sectionName : ""}</span></span>
                     <span className="tabular-nums text-red-700">{r.outstanding ? formatINR(r.outstanding) : ""}</span>
                   </button>
@@ -113,7 +114,7 @@ export function Counter({ today, initialStudentId }: { today: string; initialStu
         </div>
 
         {student && (
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div className={`${panelClass} p-5`}>
             <div className="flex gap-3">
               <Avatar studentId={student.id} name={student.name} photoPath={student.photoPath} size={72} />
               <div className="min-w-0">
@@ -122,22 +123,22 @@ export function Counter({ today, initialStudentId }: { today: string; initialStu
                 <div className="truncate text-xs text-gray-500">{student.guardian}</div>
               </div>
             </div>
-            {student.status !== "active" && <div className="mt-2 rounded bg-amber-50 px-2 py-1 text-xs text-amber-800">Student status: {student.status}</div>}
+            {student.status !== "active" && <div className="mt-3"><Notice tone="warn">Student status: {student.status}</Notice></div>}
             {student.siblings.length > 0 && (
               <div className="mt-2 text-xs text-gray-600">Siblings: {student.siblings.map((s) => (
-                <button key={s.id} type="button" className="mr-2 text-brand-700 hover:underline" onClick={() => load(s.id)}>{s.name} ({s.className})</button>
+                <button key={s.id} type="button" className="mr-2 text-ink hover:underline" onClick={() => load(s.id)}>{s.name} ({s.className})</button>
               ))}</div>
             )}
             <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
               <dt className="text-gray-500">Total due</dt><dd className="text-right font-semibold tabular-nums text-red-700">{formatINR(student.total)}</dd>
               <dt className="text-gray-500">Advance (wallet)</dt><dd className="text-right tabular-nums">{formatINR(student.wallet)}</dd>
             </dl>
-            <h3 className="mt-4 text-xs font-semibold uppercase text-gray-500">Last payments</h3>
+            <SectionHeading className="mt-4">Last payments</SectionHeading>
             <ul className="mt-1 space-y-1 text-xs">
               {student.recent.length === 0 && <li className="text-gray-400">None</li>}
               {student.recent.map((p) => (
                 <li key={p.id} className="flex justify-between">
-                  <a className="text-brand-700 hover:underline" href={`/receipts/${p.id}/print`} target="_blank">{p.receiptNo}</a>
+                  <a className="text-ink hover:underline" href={`/receipts/${p.id}/print`} target="_blank">{p.receiptNo}</a>
                   <span className={p.status === "cancelled" ? "text-gray-400 line-through" : ""}>{formatDate(p.date)} · {formatINR(p.amount)}</span>
                 </li>
               ))}
@@ -148,10 +149,10 @@ export function Counter({ today, initialStudentId }: { today: string; initialStu
 
       <div>
         {!student ? (
-          <div className="rounded-md border border-dashed border-gray-300 p-10 text-center text-sm text-gray-500">Search for a student to begin. Use ↑ ↓ and Enter.</div>
+          <Empty>Search for a student to begin. Use ↑ ↓ and Enter.</Empty>
         ) : (
           <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-4">
-            <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+            <div className={panelClass}>
               <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2">
                 <h2 className="text-sm font-semibold">Pending dues</h2>
                 <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={manual} onChange={(e) => setManual(e.target.checked)} />Allocate head-wise</label>
@@ -174,7 +175,7 @@ export function Counter({ today, initialStudentId }: { today: string; initialStu
               )}
             </div>
 
-            <div className="grid gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-2">
+            <div className={`${panelClass} grid gap-4 p-5 sm:grid-cols-2`}>
               <label className="flex flex-col gap-1">Amount received (₹)
                 <input ref={amountRef} value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" className="text-lg font-semibold"
                   onKeyDown={(e) => { if (e.altKey) { const m = MODES.find((x) => x.k === e.key); if (m) { e.preventDefault(); setMode(m.v); } } }} />
@@ -185,7 +186,7 @@ export function Counter({ today, initialStudentId }: { today: string; initialStu
                 <div className="flex flex-wrap gap-1.5">
                   {MODES.map((m) => (
                     <button key={m.v} type="button" onClick={() => setMode(m.v)}
-                      className={`rounded-md border px-2.5 py-1 text-sm ${mode === m.v ? "border-brand-600 bg-brand-600 text-white" : "border-gray-300 bg-white"}`}>{m.l}</button>
+                      className={buttonClass(mode === m.v ? "primary" : "secondary", "sm")}>{m.l}</button>
                   ))}
                 </div>
               </div>
@@ -198,15 +199,13 @@ export function Counter({ today, initialStudentId }: { today: string; initialStu
                 <label className="flex flex-col gap-1">Date on cheque<input type="date" value={ref.chequeDate} onChange={(e) => setRef({ ...ref, chequeDate: e.target.value })} /></label>
               </>)}
               <div className="flex items-end sm:col-span-2">
-                <button disabled={pending || !paise} className="w-full rounded-md bg-green-600 px-5 py-3 text-base font-semibold text-white hover:bg-green-700 disabled:opacity-50 sm:w-auto sm:py-2">
+                <button disabled={pending || !paise} className={`${buttonClass("primary")} w-full sm:w-auto`}>
                   {pending ? "Saving…" : `Save & print receipt${paise ? " · " + formatINR(paise) : ""}`}
                 </button>
               </div>
             </div>
             {msg && (
-              <div className={`rounded-md border px-3 py-2 text-sm ${msg.ok ? "border-green-200 bg-green-50 text-green-900" : "border-red-200 bg-red-50 text-red-900"}`}>
-                {msg.text} {msg.paymentId && <a className="ml-2 underline" href={`/receipts/${msg.paymentId}/print`} target="_blank">Print again</a>}
-              </div>
+              <Notice tone={msg.ok ? "ok" : "error"}>{msg.text} {msg.paymentId && <a className="ml-2 underline" href={`/receipts/${msg.paymentId}/print`} target="_blank">Print again</a>}</Notice>
             )}
           </form>
         )}

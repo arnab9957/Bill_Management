@@ -41,7 +41,7 @@ export default async function Users() {
               <td>{u.username}</td><td>{u.fullName}</td><td title={ROLE_HELP[u.role]}>{u.role}</td>
               <td><Badge>{u.isActive ? "active" : "cancelled"}</Badge>{u.lockedUntil && u.lockedUntil > new Date() && <span className="ml-1 text-xs text-red-600">locked</span>}</td>
               <td><ActionForm action={reset.bind(null, u.id)} className="flex gap-1"><input name="password" type="password" placeholder="New password" className="w-36" minLength={8} required /><Submit variant="secondary">Reset</Submit><FieldError name="_" /></ActionForm></td>
-              <td>{u.id !== me.id && <form action={toggle.bind(null, u.id, !u.isActive)}><button className="text-xs text-brand-700 hover:underline">{u.isActive ? "Deactivate" : "Activate"}</button></form>}</td>
+              <td>{u.id !== me.id && <form action={toggle.bind(null, u.id, !u.isActive)}><button className="text-xs text-ink hover:underline">{u.isActive ? "Deactivate" : "Activate"}</button></form>}</td>
             </tr>
           ))}</tbody>
         </table>
