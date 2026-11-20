@@ -20,23 +20,40 @@ type EmailFields = {
   brevoSenderName: string;
 };
 
-export function EmailProviderForm({ action, config }: { action: (prev: ActionState, fd: FormData) => Promise<ActionState>; config: EmailFields }) {
+export function EmailProviderForm({ action, config, revealApiKey }: { action: (prev: ActionState, fd: FormData) => Promise<ActionState>; config: EmailFields; revealApiKey: () => Promise<string> }) {
   const [editing, setEditing] = useState(false);
   const [mode, setMode] = useState<ProviderConfig["emailMode"]>(config.emailMode);
   const [dirty, setDirty] = useState(false);
   const [version, setVersion] = useState(0);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [apiKey, setApiKey] = useState(config.hasBrevoApiKey ? MASK : "");
+  const [apiKeyEdited, setApiKeyEdited] = useState(false);
+  const [revealing, setRevealing] = useState(false);
   const masked = (has: boolean) => (has ? MASK : "");
-  const cancel = () => { setMode(config.emailMode); setDirty(false); setEditing(false); setVersion((v) => v + 1); };
+  const resetApiKey = () => { setApiKey(masked(config.hasBrevoApiKey)); setApiKeyEdited(false); setShowApiKey(false); };
+  const toggleApiKey = async () => {
+    if (showApiKey) {
+      setShowApiKey(false);
+      if (!apiKeyEdited) setApiKey(masked(config.hasBrevoApiKey));
+      return;
+    }
+    if (!apiKeyEdited && config.hasBrevoApiKey) {
+      setRevealing(true);
+      try { setApiKey(await revealApiKey()); } finally { setRevealing(false); }
+    }
+    setShowApiKey(true);
+  };
+  const cancel = () => { setMode(config.emailMode); setDirty(false); setEditing(false); resetApiKey(); setVersion((v) => v + 1); };
   return (
     <Card
       title="Email (Brevo or SMTP)"
       actions={!editing ? <button type="button" onClick={() => { setEditing(true); setDirty(false); }} className={buttonClass("secondary")}>Edit</button> : undefined}
     >
-      <ActionForm key={version} action={action} className="space-y-5" onSuccess={() => { setDirty(false); setEditing(false); }}>
+      <ActionForm key={version} action={action} className="space-y-5" onSuccess={() => { setDirty(false); setEditing(false); resetApiKey(); }}>
         <fieldset disabled={!editing} className="space-y-5" onChange={() => setDirty(true)}>
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="flex flex-col gap-2">Mode
-              <select name="emailMode" value={mode} onChange={(e) => setMode(e.target.value as ProviderConfig["emailMode"])}>
+              <select name="emailMode" value={mode} onChange={(e) => { setMode(e.target.value as ProviderConfig["emailMode"]); if (e.target.value !== "brevo") resetApiKey(); }}>
                 <option value="brevo">Brevo API</option>
                 <option value="smtp">SMTP</option>
                 <option value="off">Off</option>
@@ -51,7 +68,13 @@ export function EmailProviderForm({ action, config }: { action: (prev: ActionSta
               <label className="flex items-center gap-2"><input type="checkbox" name="smtpSecure" defaultChecked={config.smtpSecure} />TLS on connect (port 465)</label>
             </>}
             {mode === "brevo" && <>
-              <label className="flex flex-col gap-2">Brevo API key<input name="brevoApiKey" type="password" defaultValue={masked(config.hasBrevoApiKey)} autoComplete="new-password" /><FieldError name="brevoApiKey" /></label>
+              <label className="flex flex-col gap-2">Brevo API key
+                <span className="flex items-center gap-2">
+                  <input name="brevoApiKey" type={showApiKey ? "text" : "password"} value={apiKey} onChange={(e) => { setApiKey(e.target.value); setApiKeyEdited(true); }} autoComplete="new-password" className="min-w-0 flex-1" />
+                  <button type="button" onClick={toggleApiKey} disabled={revealing} className={buttonClass("secondary", "sm")}>{revealing ? "Loading…" : showApiKey ? "Hide" : "Show"}</button>
+                </span>
+                <FieldError name="brevoApiKey" />
+              </label>
               <label className="flex flex-col gap-2">Brevo sender email<input name="brevoSenderEmail" type="email" defaultValue={config.brevoSenderEmail} placeholder="fees@school.in" /><FieldError name="brevoSenderEmail" /></label>
               <label className="flex flex-col gap-2">Brevo sender name<input name="brevoSenderName" defaultValue={config.brevoSenderName} placeholder="School Fees" /></label>
             </>}
