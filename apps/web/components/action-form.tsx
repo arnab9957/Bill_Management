@@ -50,17 +50,24 @@ export function ActionForm({
 }) {
   const [state, formAction] = useActionState(action, null);
   const ref = useRef<HTMLFormElement>(null);
+  const lastStateRef = useRef<ActionState>(null);
+  const onSuccessRef = useRef(onSuccess);
+  onSuccessRef.current = onSuccess;
+
   // Until the page's JavaScript has loaded, the form is disabled. A submit before that would be a
   // plain HTML post, which Next.js can't route to these actions (500 "reading 'bind'").
   // On a slow link (e.g. a shared demo URL) people can otherwise click before the page is ready.
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
   useEffect(() => {
-    if (state?.ok) {
-      if (resetOnSuccess) ref.current?.reset();
-      onSuccess?.(state);
+    if (state !== lastStateRef.current) {
+      lastStateRef.current = state;
+      if (state?.ok) {
+        if (resetOnSuccess) ref.current?.reset();
+        onSuccessRef.current?.(state);
+      }
     }
-  }, [state, resetOnSuccess, onSuccess]);
+  }, [state, resetOnSuccess]);
   return (
     <StateCtx.Provider value={state}>
     <ErrCtx.Provider value={state?.errors ?? {}}>

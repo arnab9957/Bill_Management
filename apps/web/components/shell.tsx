@@ -55,17 +55,96 @@ function SchoolMark({ school, logo }: { school: string; logo?: { hasLogo: boolea
   return <div role="img" aria-label={`${school} logo`} title={`${school} logo`} className={tile}>{schoolInitials(school)}</div>;
 }
 
+function CalendarIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  );
+}
+
+function ClockIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="9" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
+function LiveClock() {
+  const [mounted, setMounted] = useState(false);
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setNow(new Date());
+    setMounted(true);
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  if (!mounted || !now) {
+    return (
+      <div className="hidden md:flex flex-col justify-center border-l border-white/10 pl-4 py-0.5 opacity-0 pointer-events-none" aria-hidden>
+        <span className="text-xs font-semibold uppercase tracking-[0.14em]">&nbsp;</span>
+        <span className="text-sm font-semibold">&nbsp;</span>
+      </div>
+    );
+  }
+
+  const dayDate = now.toLocaleDateString("en-IN", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+  let hours = now.getHours();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const hStr = String(hours).padStart(2, "0");
+  const mStr = String(now.getMinutes()).padStart(2, "0");
+  const sStr = String(now.getSeconds()).padStart(2, "0");
+  const timeFormatted = `${hStr}:${mStr}:${sStr} ${ampm}`;
+
+  return (
+    <div className="hidden md:flex flex-col justify-center gap-1 border-l border-white/15 pl-4 sm:pl-5 py-0.5" title="Current date and time">
+      <div className="flex items-center gap-2 text-xs sm:text-[13px] font-medium text-white/90 whitespace-nowrap">
+        <CalendarIcon className="h-4 w-4 text-white/70 shrink-0" />
+        <span>{dayDate}</span>
+      </div>
+      <div className="flex items-center gap-2 text-sm sm:text-base font-bold tracking-wide text-white whitespace-nowrap">
+        <ClockIcon className="h-4 w-4 text-white/80 shrink-0" />
+        <span className="font-mono">{timeFormatted}</span>
+      </div>
+    </div>
+  );
+}
+
 function YearPicker({ year, switchYear }: { year: YearInfo; switchYear: (fd: FormData) => Promise<void> }) {
   return (
-    <form action={switchYear} className="flex min-w-0 flex-1 items-center gap-2">
-      <label htmlFor="academic-year" className="shrink-0 text-[9px] font-bold uppercase leading-[1.1] tracking-[0.14em] text-navy/50">
-        <span className="block">Academic</span>
-        <span className="block">Session</span>
-      </label>
-      <select id="academic-year" name="yearId" defaultValue={year.id} onChange={(e) => e.currentTarget.form?.requestSubmit()}
+    <form action={switchYear} className="flex min-w-0 flex-1 items-center">
+      <select
+        id="academic-year"
+        name="yearId"
+        defaultValue={year.id}
+        onChange={(e) => e.currentTarget.form?.requestSubmit()}
         aria-label="Academic session"
-        className={`min-w-0 flex-1 border-0 bg-transparent p-0 text-right text-xs font-semibold shadow-none focus:border-0 focus:ring-0 focus-visible:underline ${year.isCurrent ? "text-navy" : "text-amber-700"}`}>
-        {year.options.map((o) => <option key={o.id} value={o.id} className="bg-white text-ink">{o.name}{o.isCurrent ? " (current)" : ""}</option>)}
+        title="Academic session"
+        className={`h-10 w-full cursor-pointer rounded-lg border border-white/20 bg-white px-3 py-2 text-sm font-semibold shadow-sm outline-none transition focus:ring-2 focus:ring-white/40 ${year.isCurrent ? "text-navy" : "text-amber-800 font-bold"}`}
+      >
+        <option value="" disabled className="text-gray-400 font-medium">
+          Academic Sessions
+        </option>
+        {year.options.map((o) => (
+          <option key={o.id} value={o.id} className="bg-white text-ink">
+            {o.name}{o.isCurrent ? " (current)" : ""}
+          </option>
+        ))}
       </select>
     </form>
   );
@@ -99,16 +178,19 @@ export function Shell({ nav, user, school, logo, children, logout, year, switchY
             className="-ml-1 rounded-lg p-2 text-white/75 hover:bg-white/10 hover:text-white lg:hidden">
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
           </button>
-          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-white px-3 py-2 text-navy">
+          <div className="min-w-0 flex-1">
             <YearPicker year={year} switchYear={switchYear} />
           </div>
         </div>
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-3 px-3 sm:px-6">
-          <div className="min-w-0 text-right">
-            <div className="truncate text-sm font-semibold text-white">{school}</div>
-            <div className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-white/55">Fees Management</div>
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3 sm:px-6">
+          <LiveClock />
+          <div className="flex min-w-0 items-center gap-3 ml-auto">
+            <div className="min-w-0 text-right">
+              <div className="truncate text-sm font-semibold text-white">{school}</div>
+              <div className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-white/55">Fees Management</div>
+            </div>
+            <SchoolMark school={school} logo={logo} />
           </div>
-          <SchoolMark school={school} logo={logo} />
         </div>
       </header>
       {menuOpen && <div className="no-print fixed inset-x-0 bottom-0 top-20 z-40 bg-navy/30 lg:hidden" onClick={() => setMenuOpen(false)} aria-hidden />}

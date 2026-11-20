@@ -39,7 +39,11 @@ body { font-feature-settings: "cv02", "cv03", "cv04", "cv11"; }
 input, select, textarea {
   @apply max-w-full rounded-lg border border-gray-300 bg-surface px-3 py-2 text-base text-ink outline-none transition sm:text-sm placeholder:text-gray-400 focus:border-ink focus:ring-4 focus:ring-ink/10;
 }
+input:disabled, select:disabled, textarea:disabled {
+  @apply cursor-not-allowed border-gray-200 bg-gray-100 text-gray-600 shadow-none;
+}
 input[type="checkbox"] { @apply h-4 w-4 rounded border-gray-300 p-0 accent-ink; }
+input[type="checkbox"]:disabled { @apply cursor-not-allowed opacity-40; }
 label { @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600; }
 label:has(input[type="checkbox"]), label:has(input[type="radio"]) { @apply text-sm font-medium normal-case tracking-normal text-gray-700; }
 .page-stack { @apply space-y-6; }

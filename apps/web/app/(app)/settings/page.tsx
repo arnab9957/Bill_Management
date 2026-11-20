@@ -97,22 +97,41 @@ export default async function SettingsPage() {
         <LinkButton href="/settings/promotion">Year-end promotion</LinkButton>
       </>} />
 
-      <ProfileSection title="School identity" action={saveIdentity}>
-        <label className={field}>School name <span className={hint}>(printed in capitals on bills and receipts)</span><input name="name" defaultValue={s.name} required /></label>
-        <label className={field}>Line under the name <span className={hint}>(e.g. managing society)</span><input name="headerSubtitle" defaultValue={s.headerSubtitle} placeholder="(Managed by … Parishad)" /></label>
+      <ProfileSection title="School identity" action={saveIdentity} saveLabel="Save school identity">
+        <label className={field}>
+          <span className="flex items-baseline gap-1.5">
+            School name <span className="text-xs font-normal text-gray-500">(printed in capitals on bills and receipts)</span>
+          </span>
+          <input name="name" defaultValue={s.name} required />
+        </label>
+        <label className={field}>
+          <span className="flex items-baseline gap-1.5">
+            Line under the name <span className="text-xs font-normal text-gray-500">(e.g. managing society)</span>
+          </span>
+          <input name="headerSubtitle" defaultValue={s.headerSubtitle} placeholder="(Managed by … Parishad)" />
+        </label>
         <label className={field}>Address / location line<input name="address" defaultValue={s.address} placeholder="Village * Post * District" /></label>
         <label className={field}>U-DISE code<input name="udiseCode" defaultValue={s.udiseCode} inputMode="numeric" /></label>
-        <label className={`${field} sm:col-span-2`}>Registration lines <span className={hint}>(one per line)</span>
-          <textarea name="registrationNote" defaultValue={s.registrationNote} rows={2} /></label>
+        <label className={`${field} sm:col-span-2`}>
+          <span className="flex items-baseline gap-1.5">
+            Registration lines <span className="text-xs font-normal text-gray-500">(one per line)</span>
+          </span>
+          <textarea name="registrationNote" defaultValue={s.registrationNote} rows={2} />
+        </label>
       </ProfileSection>
 
-      <ProfileSection title="Contact & payment" action={saveContact}>
+      <ProfileSection title="Contact & payment" action={saveContact} saveLabel="Save contact & payment">
         <label className={field}>Phone<input name="phone" defaultValue={s.phone} /></label>
         <label className={field}>Email<input name="email" defaultValue={s.email} /><FieldError name="email" /></label>
-        <label className={field}>UPI ID <span className={hint}>(for QR on bills)</span><input name="upiId" defaultValue={s.upiId ?? ""} placeholder="school@bank" /></label>
+        <label className={field}>
+          <span className="flex items-baseline gap-1.5">
+            UPI ID <span className="text-xs font-normal text-gray-500">(for QR on bills)</span>
+          </span>
+          <input name="upiId" defaultValue={s.upiId ?? ""} placeholder="school@bank" />
+        </label>
       </ProfileSection>
 
-      <ProfileSection title="Bills & receipts" action={saveBilling}>
+      <ProfileSection title="Bills & receipts" action={saveBilling} saveLabel="Save bills & receipts">
         <label className={field}>Bill prefix<input name="invoicePrefix" defaultValue={s.invoicePrefix} /></label>
         <label className={field}>Receipt prefix<input name="receiptPrefix" defaultValue={s.receiptPrefix} /><FieldError name="receiptPrefix" /></label>
         <label className={field}>Receipt numbering
@@ -120,18 +139,29 @@ export default async function SettingsPage() {
             <option value="continuous">One running series ({s.receiptPrefix}/6434)</option>
             <option value="per_year">Restarts every academic year ({s.receiptPrefix}/2026-27/1)</option>
           </select></label>
-        <label className={field}>Number digits <span className={hint}>(1 = no leading zeros)</span><input name="receiptDigits" type="number" min={1} max={10} defaultValue={s.receiptDigits} /><FieldError name="receiptDigits" /></label>
+        <label className={field}>
+          <span className="flex items-baseline gap-1.5">
+            Number digits <span className="text-xs font-normal text-gray-500">(1 = no leading zeros)</span>
+          </span>
+          <input name="receiptDigits" type="number" min={1} max={10} defaultValue={s.receiptDigits} />
+          <FieldError name="receiptDigits" />
+        </label>
       </ProfileSection>
 
-      <ProfileSection title="Reminder timing" action={saveReminders}>
+      <ProfileSection title="Reminder timing" action={saveReminders} saveLabel="Save reminder timing">
         <label className={field}>Send messages from<input name="quietStart" defaultValue={s.quietStart} /><FieldError name="quietStart" /></label>
         <label className={field}>…until<input name="quietEnd" defaultValue={s.quietEnd} /><FieldError name="quietEnd" /></label>
         <label className={field}>Reminder days before due<input name="reminderDaysBefore" type="number" defaultValue={s.reminderDaysBefore} /></label>
         <label className={field}>Overdue reminders after (days)<input name="overdueSteps" defaultValue={s.overdueSteps.join(", ")} /></label>
       </ProfileSection>
 
-      <ProfileSection title="Features & backup" action={saveFeatures}>
-        <label className={`${field} sm:col-span-2`}>Backup folder <span className={hint}>(second disk recommended)</span><input name="backupPath" defaultValue={s.backupPath ?? ""} placeholder="D:\SchoolBackups" /></label>
+      <ProfileSection title="Features & backup" action={saveFeatures} saveLabel="Save features & backup">
+        <label className={`${field} sm:col-span-2`}>
+          <span className="flex items-baseline gap-1.5">
+            Backup folder <span className="text-xs font-normal text-gray-500">(second disk recommended)</span>
+          </span>
+          <input name="backupPath" defaultValue={s.backupPath ?? ""} placeholder="D:\SchoolBackups" />
+        </label>
         <label className="flex items-start gap-2"><input type="checkbox" name="concessionsEnabled" defaultChecked={s.concessionsEnabled} className="mt-0.5" />
           <span>Fee concessions <span className={hint}>— sibling, staff ward or merit discounts applied to new bills.</span></span></label>
         <label className="flex items-start gap-2"><input type="checkbox" name="dayCloseEnabled" defaultChecked={s.dayCloseEnabled} className="mt-0.5" />
@@ -158,14 +188,29 @@ export default async function SettingsPage() {
           </>) : <p className="text-sm text-gray-500">Set a current academic year first.</p>}
         </Card>
 
-        <Card title="Academic years">
+        <Card title="Academic sessions">
           <ul className="space-y-1 text-sm">{m.years.map((y) => (
-            <li key={y.id} className="flex justify-between"><span>{y.name} ({y.startDate} → {y.endDate})</span>
-              {y.isCurrent ? <b className="text-ink">current</b> : <form action={makeCurrent.bind(null, y.id)}><button className="text-xs text-ink hover:underline">Make current</button></form>}</li>
+            <li key={y.id} className="flex justify-between items-center py-1">
+              <span><b>{y.name}</b> <span className="text-gray-500">({y.startDate} → {y.endDate})</span></span>
+              {y.isCurrent ? <b className="text-ink">current</b> : <form action={makeCurrent.bind(null, y.id)}><button className="text-xs text-ink hover:underline">Make current</button></form>}
+            </li>
           ))}</ul>
-          <ActionForm action={addYear} className="mt-3 flex flex-wrap gap-2" resetOnSuccess>
-            <input name="name" placeholder="2027-28" className="w-24" required /><input type="date" name="startDate" required /><input type="date" name="endDate" required />
-            <Submit variant="secondary">Add</Submit><FieldError name="name" /><FieldError name="endDate" />
+          <ActionForm action={addYear} className="mt-4 border-t border-gray-100 pt-3" resetOnSuccess>
+            <div className="overflow-x-auto">
+              <div className="grid grid-cols-[1.1fr_1.2fr_1.2fr_auto] items-center gap-x-2.5 gap-y-1.5 min-w-[380px]">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600">Academic session</span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600">Start date</span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600">End date</span>
+                <span></span>
+
+                <input name="name" placeholder="2027-28" required className="min-w-0" />
+                <input type="date" name="startDate" required className="min-w-0" />
+                <input type="date" name="endDate" required className="min-w-0" />
+                <Submit variant="secondary">Add</Submit>
+              </div>
+            </div>
+            <FieldError name="name" />
+            <FieldError name="endDate" />
           </ActionForm>
         </Card>
 
