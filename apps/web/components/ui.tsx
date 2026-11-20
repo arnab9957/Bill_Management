@@ -42,13 +42,13 @@ type Variant = "primary" | "secondary" | "danger" | "ghost";
 type Size = "md" | "sm";
 
 const buttonVariants: Record<Variant, string> = {
-  primary: "bg-ink text-white shadow-sm hover:bg-gray-800",
-  secondary: "border border-gray-300 bg-surface text-gray-800 hover:border-ink hover:bg-gray-50 hover:text-ink",
+  primary: "bg-blue-600 text-white shadow-xs hover:bg-blue-700",
+  secondary: "border border-gray-300 bg-surface text-gray-800 hover:border-blue-400 hover:bg-blue-50/50 hover:text-blue-900",
   danger: "bg-red-700 text-white shadow-sm hover:bg-red-800",
-  ghost: "text-ink hover:bg-gray-100",
+  ghost: "text-ink hover:bg-blue-50 hover:text-blue-900",
 };
 const buttonSizes: Record<Size, string> = { md: "px-4 py-2.5 text-sm", sm: "px-3 py-1.5 text-sm" };
-const buttonBase = "inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20 disabled:cursor-not-allowed disabled:opacity-50";
+const buttonBase = "inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/25 disabled:cursor-not-allowed disabled:opacity-50";
 
 export function buttonClass(variant: Variant = "primary", size: Size = "md") {
   return cx(buttonBase, buttonSizes[size], buttonVariants[variant]);
@@ -80,7 +80,7 @@ const badgeColors: Record<string, string> = {
   partial: "border-amber-200 bg-amber-50 text-amber-900", queued: "border-amber-200 bg-amber-50 text-amber-900", pending: "border-amber-200 bg-amber-50 text-amber-900", sending: "border-amber-200 bg-amber-50 text-amber-900",
   overdue: "border-red-200 bg-red-50 text-red-800", failed: "border-red-200 bg-red-50 text-red-800", bounced: "border-red-200 bg-red-50 text-red-800",
   cancelled: "border-gray-200 bg-gray-100 text-gray-600", left: "border-gray-200 bg-gray-100 text-gray-600", alumni: "border-gray-200 bg-gray-100 text-gray-600",
-  issued: "border-ink bg-ink text-white",
+  issued: "border-blue-200 bg-blue-50 text-blue-800",
 };
 export function Badge({ children }: { children: string }) {
   return <span className={cx("inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em]", badgeColors[children] ?? "border-gray-200 bg-gray-100 text-gray-700")}>{children.replace(/_/g, " ")}</span>;

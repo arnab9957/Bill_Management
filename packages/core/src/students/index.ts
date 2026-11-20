@@ -7,7 +7,7 @@ import {
   transportRoutes, notificationOutbox, payments, env, studentEnrollments, type Executor,
 } from "@sb/db";
 import { admissionSchema, guardianSchema, importRowSchema, studentEditSchema, fieldErrors, type ImportRow } from "@sb/validation";
-import { AppError, audit, getCurrentYear, type Actor } from "../common";
+import { AppError, audit, getCurrentYear, getSettings, type Actor } from "../common";
 import { today, type ISODate } from "../dates";
 import { createOpeningBalance } from "../billing";
 import { recalcWallet } from "../payments/wallet";
@@ -15,17 +15,276 @@ import { carryForwardDues, promoteStudent, upsertEnrollment } from "./enrollment
 
 export * from "./enrollment";
 
+// ---------------------------------------------------------------- Sequence generation & auto-numbering
+
+export interface AdmissionFormatConfig {
+  prefix?: string;
+  includeYear?: "none" | "year" | "session";
+  separator?: string;
+  digits?: number;
+  startNumber?: number;
+}
+
+export interface RollFormatConfig {
+  digits?: number;
+  prefixSection?: boolean;
+  startNumber?: number;
+}
+
+/**
+ * Compute the next sequence string given a list of existing admission numbers.
+ * Follows the configured format (prefix, year, separator, padding, startNumber) or
+ * examines existing students' format if unconfigured.
+ */
+export function computeNextAdmissionNo(
+  existingAdmissionNos: string[],
+  cfg?: AdmissionFormatConfig,
+  academicYear?: { name: string; startDate: string },
+): string {
+  const existingSet = new Set(existingAdmissionNos.map((a) => a.trim()));
+
+  // If specific format configuration is supplied (e.g. from School Settings)
+  if (cfg && (cfg.prefix || cfg.includeYear !== "none" || (cfg.digits && cfg.digits > 0) || (cfg.startNumber && cfg.startNumber > 1))) {
+    const prefixText = (cfg.prefix ?? "").trim();
+    const sep = cfg.separator ?? "/";
+    let yearPart = "";
+    if (cfg.includeYear === "year" && academicYear) {
+      yearPart = academicYear.startDate.slice(0, 4);
+    } else if (cfg.includeYear === "session" && academicYear) {
+      yearPart = academicYear.name;
+    }
+
+    let expectedPrefix = "";
+    if (prefixText && yearPart) {
+      expectedPrefix = `${prefixText}${sep}${yearPart}${sep}`;
+    } else if (prefixText && !yearPart) {
+      expectedPrefix = `${prefixText}${sep === "/" ? "" : sep}`;
+    } else if (!prefixText && yearPart) {
+      expectedPrefix = `${yearPart}${sep}`;
+    }
+
+    const padLen = cfg.digits && cfg.digits >= 1 ? cfg.digits : 4;
+    const startNum = cfg.startNumber && cfg.startNumber >= 1 ? cfg.startNumber : 1;
+
+    let maxNum = 0;
+    for (const raw of existingAdmissionNos) {
+      const a = raw.trim();
+      if (expectedPrefix ? a.startsWith(expectedPrefix) : true) {
+        const sub = a.slice(expectedPrefix.length).match(/^(\d+)$/);
+        if (sub && sub[1] !== undefined) {
+          const val = parseInt(sub[1], 10);
+          if (val > maxNum) maxNum = val;
+        }
+      }
+    }
+
+    let next = maxNum > 0 ? maxNum + 1 : startNum;
+    let candidate = `${expectedPrefix}${String(next).padStart(padLen, "0")}`;
+    while (existingSet.has(candidate)) {
+      next++;
+      candidate = `${expectedPrefix}${String(next).padStart(padLen, "0")}`;
+    }
+    return candidate;
+  }
+
+  if (existingAdmissionNos.length === 0) {
+    return "1001";
+  }
+
+  for (const raw of existingAdmissionNos) {
+    const trimmed = raw.trim();
+    const match = trimmed.match(/^(.*?)(\d+)$/);
+    if (!match || match[1] === undefined || match[2] === undefined) continue;
+    const prefix = match[1];
+    const numStr = match[2];
+    const padLen = numStr.length;
+
+    let maxNum = parseInt(numStr, 10);
+    for (const other of existingAdmissionNos) {
+      const o = other.trim();
+      if (o.startsWith(prefix)) {
+        const sub = o.slice(prefix.length).match(/^(\d+)$/);
+        if (sub && sub[1] !== undefined) {
+          const val = parseInt(sub[1], 10);
+          if (val > maxNum) maxNum = val;
+        }
+      }
+    }
+
+    let next = maxNum + 1;
+    let candidate = `${prefix}${String(next).padStart(padLen, "0")}`;
+    while (existingSet.has(candidate)) {
+      next++;
+      candidate = `${prefix}${String(next).padStart(padLen, "0")}`;
+    }
+    return candidate;
+  }
+
+  let candidateNum = 1;
+  while (existingSet.has(String(candidateNum))) {
+    candidateNum++;
+  }
+  return String(candidateNum);
+}
+
+/**
+ * Compute the next sequence roll number in a class & section given existing roll numbers.
+ * Respects configured digits (zero padding), section prefix, and start number.
+ */
+export function computeNextRollNumber(
+  existingRolls: string[] | undefined,
+  cfg?: RollFormatConfig,
+  sectionName?: string | null,
+): string {
+  const existingSet = new Set((existingRolls || []).map((r) => r.trim()));
+  let padLen = cfg?.digits && cfg.digits >= 1 ? cfg.digits : 1;
+  const startNum = cfg?.startNumber && cfg.startNumber >= 1 ? cfg.startNumber : 1;
+  const rollPrefix = cfg?.prefixSection && sectionName ? `${sectionName}-` : "";
+
+  let maxNum = 0;
+  let inferredPadLen = 1;
+  for (const r of existingRolls || []) {
+    const trimmed = r.trim();
+    if (rollPrefix ? trimmed.startsWith(rollPrefix) : true) {
+      const sub = trimmed.slice(rollPrefix.length).match(/^(\d+)$/);
+      if (sub && sub[1] !== undefined) {
+        if (sub[1].length > inferredPadLen) {
+          inferredPadLen = sub[1].length;
+        }
+        const val = parseInt(sub[1], 10);
+        if (val > maxNum) {
+          maxNum = val;
+        }
+      }
+    }
+  }
+
+  if (!cfg?.digits && inferredPadLen > 1) {
+    padLen = inferredPadLen;
+  }
+
+  let next = maxNum > 0 ? maxNum + 1 : startNum;
+  let candidate = `${rollPrefix}${String(next).padStart(padLen, "0")}`;
+  while (existingSet.has(candidate)) {
+    next++;
+    candidate = `${rollPrefix}${String(next).padStart(padLen, "0")}`;
+  }
+  return candidate;
+}
+
+/** Get the auto-generated next admission number for the school. */
+export async function getNextAdmissionNo(): Promise<string> {
+  const db = getDb();
+  const [settingsRow, currentYearRow, rows] = await Promise.all([
+    getSettings(db),
+    getCurrentYear(db),
+    db.select({ admissionNo: students.admissionNo }).from(students).orderBy(desc(students.id)),
+  ]);
+  const admCfg: AdmissionFormatConfig = {
+    prefix: settingsRow.admissionPrefix,
+    includeYear: settingsRow.admissionIncludeYear as "none" | "year" | "session",
+    separator: settingsRow.admissionSeparator,
+    digits: settingsRow.admissionDigits,
+    startNumber: settingsRow.admissionStartNumber,
+  };
+  return computeNextAdmissionNo(rows.map((r) => r.admissionNo), admCfg, currentYearRow);
+}
+
+/** Get existing roll numbers grouped by class and section for an academic year. */
+export async function getClassRollNumbers(yearId: number): Promise<Record<string, string[]>> {
+  const db = getDb();
+  const rows = await db
+    .select({
+      classId: studentEnrollments.classId,
+      sectionId: studentEnrollments.sectionId,
+      rollNo: studentEnrollments.rollNo,
+    })
+    .from(studentEnrollments)
+    .where(and(
+      eq(studentEnrollments.academicYearId, yearId),
+      ne(studentEnrollments.status, "left")
+    ));
+
+  const map: Record<string, string[]> = {};
+  for (const r of rows) {
+    if (!r.rollNo) continue;
+    const key = `${r.classId}_${r.sectionId ?? ""}`;
+    (map[key] ??= []).push(r.rollNo.trim());
+  }
+  return map;
+}
+
+/** Form data needed for admission: auto-generated admission number and class-section roll maps. */
+export async function getAdmissionFormData(yearId: number) {
+  const db = getDb();
+  const [settingsRow, yearRow, rows, rollsMap] = await Promise.all([
+    getSettings(db),
+    db.select().from(academicYears).where(eq(academicYears.id, yearId)),
+    db.select({ id: students.id, admissionNo: students.admissionNo }).from(students).orderBy(desc(students.id)),
+    getClassRollNumbers(yearId),
+  ]);
+
+  const year = yearRow[0] ?? { name: "2026-27", startDate: "2026-04-01" };
+  const admCfg: AdmissionFormatConfig = {
+    prefix: settingsRow.admissionPrefix,
+    includeYear: settingsRow.admissionIncludeYear as "none" | "year" | "session",
+    separator: settingsRow.admissionSeparator,
+    digits: settingsRow.admissionDigits,
+    startNumber: settingsRow.admissionStartNumber,
+  };
+  const rollCfg: RollFormatConfig = {
+    digits: settingsRow.rollDigits,
+    prefixSection: settingsRow.rollPrefixSection,
+    startNumber: settingsRow.rollStartNumber,
+  };
+
+  const existingAdmissionList = rows.map((r) => r.admissionNo.trim());
+  const nextAdmissionNo = computeNextAdmissionNo(existingAdmissionList, admCfg, year);
+
+  return {
+    nextAdmissionNo,
+    existingAdmissionNos: rows.map((r) => ({ id: r.id, admissionNo: r.admissionNo.trim() })),
+    rollsByClassSection: rollsMap,
+    admissionFormat: admCfg,
+    rollFormat: rollCfg,
+    academicYear: { name: year.name, startDate: year.startDate },
+  };
+}
+
 export async function admitStudent(actor: Actor, input: unknown) {
   const d = admissionSchema.parse(input);
   const db = getDb();
   return db.transaction(async (tx) => {
-    const dup = await tx.select({ id: students.id }).from(students).where(eq(students.admissionNo, d.admissionNo));
-    if (dup.length) throw new AppError("Admission number already exists", { admissionNo: "Already used" });
+    const dup = await tx.select({ id: students.id }).from(students).where(eq(students.admissionNo, d.admissionNo.trim()));
+    if (dup.length) throw new AppError("Admission number already exists", { admissionNo: "Admission number already used by another student" });
+    const yearId = d.academicYearId ?? (await getCurrentYear(tx)).id;
+
+    if (d.rollNo && d.rollNo.trim()) {
+      const rollConds = [
+        eq(studentEnrollments.academicYearId, yearId),
+        eq(studentEnrollments.classId, d.classId),
+        eq(studentEnrollments.rollNo, d.rollNo.trim()),
+        ne(studentEnrollments.status, "left"),
+      ];
+      if (d.sectionId) {
+        rollConds.push(eq(studentEnrollments.sectionId, d.sectionId));
+      } else {
+        rollConds.push(sql`${studentEnrollments.sectionId} is null`);
+      }
+      const dupRoll = await tx.select({ id: studentEnrollments.id })
+        .from(studentEnrollments)
+        .where(and(...rollConds));
+      if (dupRoll.length) {
+        throw new AppError("Roll number already assigned to another student in this class and section", {
+          rollNo: "Roll number already assigned to another student in this class and section",
+        });
+      }
+    }
+
     const [s] = await tx.insert(students).values({
       admissionNo: d.admissionNo, name: d.name, dob: d.dob ?? null, gender: d.gender ?? null, classId: d.classId,
       sectionId: d.sectionId ?? null, rollNo: d.rollNo || null, admissionDate: d.admissionDate, transportRouteId: d.transportRouteId ?? null,
     }).returning();
-    const yearId = d.academicYearId ?? (await getCurrentYear(tx)).id;
     await upsertEnrollment(tx, { studentId: s!.id, academicYearId: yearId, classId: d.classId, sectionId: d.sectionId, rollNo: d.rollNo });
     let guardianId = d.existingGuardianId;
     if (!guardianId && d.guardian) {
@@ -49,14 +308,6 @@ export async function updateStudent(actor: Actor, studentId: number, input: unkn
   return db.transaction(async (tx) => {
     const [old] = await tx.select().from(students).where(eq(students.id, studentId)).for("update");
     if (!old) throw new AppError("Student not found");
-    if (d.admissionNo !== old.admissionNo) {
-      const dup = await tx.select({ id: students.id }).from(students).where(eq(students.admissionNo, d.admissionNo));
-      if (dup.length) throw new AppError("Admission number already exists", { admissionNo: "Already used" });
-    }
-    await tx.update(students).set({
-      admissionNo: d.admissionNo, name: d.name, dob: d.dob ?? null, gender: d.gender ?? null,
-      admissionDate: d.admissionDate, transportRouteId: d.transportRouteId ?? null,
-    }).where(eq(students.id, studentId));
     let yearId = d.academicYearId;
     if (!yearId) {
       const [latest] = await tx.select({ y: studentEnrollments.academicYearId }).from(studentEnrollments)
@@ -64,6 +315,36 @@ export async function updateStudent(actor: Actor, studentId: number, input: unkn
         .where(eq(studentEnrollments.studentId, studentId)).orderBy(desc(academicYears.startDate)).limit(1);
       yearId = latest?.y ?? (await getCurrentYear(tx)).id;
     }
+    if (d.admissionNo !== old.admissionNo) {
+      const dup = await tx.select({ id: students.id }).from(students).where(eq(students.admissionNo, d.admissionNo.trim()));
+      if (dup.length) throw new AppError("Admission number already exists", { admissionNo: "Admission number already used by another student" });
+    }
+    if (d.rollNo && d.rollNo.trim()) {
+      const rollConds = [
+        eq(studentEnrollments.academicYearId, yearId),
+        eq(studentEnrollments.classId, d.classId),
+        eq(studentEnrollments.rollNo, d.rollNo.trim()),
+        ne(studentEnrollments.studentId, studentId),
+        ne(studentEnrollments.status, "left"),
+      ];
+      if (d.sectionId) {
+        rollConds.push(eq(studentEnrollments.sectionId, d.sectionId));
+      } else {
+        rollConds.push(sql`${studentEnrollments.sectionId} is null`);
+      }
+      const dupRoll = await tx.select({ id: studentEnrollments.id })
+        .from(studentEnrollments)
+        .where(and(...rollConds));
+      if (dupRoll.length) {
+        throw new AppError("Roll number already assigned to another student in this class and section", {
+          rollNo: "Roll number already assigned to another student in this class and section",
+        });
+      }
+    }
+    await tx.update(students).set({
+      admissionNo: d.admissionNo, name: d.name, dob: d.dob ?? null, gender: d.gender ?? null,
+      admissionDate: d.admissionDate, transportRouteId: d.transportRouteId ?? null,
+    }).where(eq(students.id, studentId));
     const [prev] = await tx.select().from(studentEnrollments).where(and(eq(studentEnrollments.studentId, studentId), eq(studentEnrollments.academicYearId, yearId)));
     await upsertEnrollment(tx, { studentId, academicYearId: yearId, classId: d.classId, sectionId: d.sectionId, rollNo: d.rollNo, status: prev?.status ?? "studying" });
     const [s] = await tx.select().from(students).where(eq(students.id, studentId));
@@ -202,8 +483,8 @@ export const IMPORT_COLUMNS: { key: keyof ImportRow; header: string; note: strin
   { key: "admissionDate", header: "Admission Date", note: "YYYY-MM-DD" },
   { key: "guardianName", header: "Guardian Name", note: "" },
   { key: "guardianMobile", header: "Guardian Mobile", note: "10 digits" },
-  { key: "guardianEmail", header: "Guardian Email", note: "" },
-  { key: "guardianWhatsapp", header: "Guardian WhatsApp", note: "If different" },
+  { key: "guardianEmail", header: "Guardian Email", note: "WhatsApp or Email required" },
+  { key: "guardianWhatsapp", header: "Guardian WhatsApp", note: "WhatsApp or Email required" },
   { key: "openingBalance", header: "Opening Balance", note: "Old dues in rupees" },
 ];
 

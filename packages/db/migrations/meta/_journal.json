@@ -43,6 +43,13 @@
       "when": 1794910916847,
       "tag": "0005_receipt_series_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795183831498,
+      "tag": "0006_futuristic_shinko_yamashiro",
+      "breakpoints": true
     }
   ]
 }

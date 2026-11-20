@@ -13,10 +13,17 @@ export const rupeesToPaise = z.union([z.string(), z.number()]).transform((v, ctx
 });
 export const positiveRupees = rupeesToPaise.refine((p) => p > 0, "Amount must be greater than zero");
 
-export const mobile = z.string().trim().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number");
-const blank = (v: unknown) => (v === "" || v == null ? undefined : v);
+export const mobile = z.preprocess((v) => {
+  if (typeof v !== "string") return v;
+  let s = v.replace(/[\s\-\(\)]/g, "");
+  if (s.startsWith("+91")) s = s.slice(3);
+  else if (s.startsWith("91") && s.length === 12) s = s.slice(2);
+  else if (s.startsWith("0") && s.length === 11) s = s.slice(1);
+  return s;
+}, z.string().trim().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number"));
+const blank = (v: unknown) => (v == null || (typeof v === "string" && v.trim() === "") ? undefined : v);
 const optionalMobile = z.preprocess(blank, mobile.optional());
-const optionalEmail = z.preprocess(blank, z.string().trim().email("Invalid email").optional());
+const optionalEmail = z.preprocess(blank, z.string().trim().max(128, "Email max 128 characters").email("Invalid email").optional());
 export const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 const optionalDate = z.preprocess(blank, isoDate.optional());
 const id = z.coerce.number().int().positive();
@@ -39,26 +46,34 @@ export const userSchema = z.object({
 });
 
 // ---------------------------------------------------------------- students
-export const guardianSchema = z.object({
-  name: z.string().trim().min(1, "Guardian name required"),
-  relation: z.string().trim().default("Parent"),
-  mobile,
-  whatsappNo: optionalMobile,
-  email: optionalEmail,
-  preferredLanguage: z.string().default("en"),
-  notifySms: checkbox,
-  notifyWhatsapp: checkbox,
-  notifyEmail: checkbox,
-  messagingConsent: checkbox,
-});
+export const guardianSchema = z
+  .object({
+    name: z.string().trim().min(1, "Guardian name required").max(128, "Guardian name max 128 characters"),
+    relation: z.string().trim().default("Father"),
+    mobile,
+    whatsappNo: optionalMobile,
+    email: optionalEmail,
+    preferredLanguage: z.string().default("en"),
+    notifySms: checkbox,
+    notifyWhatsapp: checkbox,
+    notifyEmail: checkbox,
+    messagingConsent: checkbox,
+  })
+  .superRefine((d, ctx) => {
+    if (!d.whatsappNo && !d.email) {
+      const message = "Either WhatsApp number or Email is required";
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ["whatsappNo"] });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ["email"] });
+    }
+  });
 export const studentSchema = z.object({
-  admissionNo: z.string().trim().min(1, "Admission no. required").max(32),
-  name: z.string().trim().min(1, "Name required"),
+  admissionNo: z.string().trim().min(1, "Admission no. required").max(32, "Admission no. max 32 characters"),
+  name: z.string().trim().min(1, "Name required").max(128, "Name max 128 characters"),
   dob: optionalDate,
   gender: z.preprocess(blank, z.enum(["M", "F", "O"]).optional()),
   classId: id,
   sectionId: optionalId,
-  rollNo: z.string().trim().optional(),
+  rollNo: z.preprocess(blank, z.string().trim().max(16, "Roll no. max 16 characters").optional()),
   admissionDate: isoDate,
   transportRouteId: optionalId,
 });
@@ -85,21 +100,29 @@ export const promoteStudentSchema = z.object({
 });
 
 const str = (v: unknown) => (v == null || v === "" ? undefined : String(v).trim());
-export const importRowSchema = z.object({
-  admissionNo: z.preprocess(str, z.string().min(1, "Admission no. required")),
-  name: z.preprocess(str, z.string().min(1, "Name required")),
-  className: z.preprocess(str, z.string().min(1, "Class required")),
-  section: z.preprocess(str, z.string().optional()),
-  rollNo: z.preprocess(str, z.string().optional()),
-  dob: z.preprocess(str, isoDate.optional()),
-  gender: z.preprocess(str, z.enum(["M", "F", "O"]).optional()),
-  admissionDate: z.preprocess(str, isoDate),
-  guardianName: z.preprocess(str, z.string().min(1, "Guardian name required")),
-  guardianMobile: z.preprocess(str, mobile),
-  guardianEmail: z.preprocess(str, z.string().email("Invalid email").optional()),
-  guardianWhatsapp: z.preprocess(str, mobile.optional()),
-  openingBalance: z.preprocess((v) => str(v) ?? "0", rupeesToPaise),
-});
+export const importRowSchema = z
+  .object({
+    admissionNo: z.preprocess(str, z.string().min(1, "Admission no. required")),
+    name: z.preprocess(str, z.string().min(1, "Name required")),
+    className: z.preprocess(str, z.string().min(1, "Class required")),
+    section: z.preprocess(str, z.string().optional()),
+    rollNo: z.preprocess(str, z.string().optional()),
+    dob: z.preprocess(str, isoDate.optional()),
+    gender: z.preprocess(str, z.enum(["M", "F", "O"]).optional()),
+    admissionDate: z.preprocess(str, isoDate),
+    guardianName: z.preprocess(str, z.string().min(1, "Guardian name required")),
+    guardianMobile: z.preprocess(str, mobile),
+    guardianEmail: z.preprocess(str, z.string().email("Invalid email").optional()),
+    guardianWhatsapp: z.preprocess(str, mobile.optional()),
+    openingBalance: z.preprocess((v) => str(v) ?? "0", rupeesToPaise),
+  })
+  .superRefine((d, ctx) => {
+    if (!d.guardianWhatsapp && !d.guardianEmail) {
+      const message = "Either Guardian WhatsApp or Email is required";
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ["guardianWhatsapp"] });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ["guardianEmail"] });
+    }
+  });
 export type ImportRow = z.infer<typeof importRowSchema>;
 
 // ---------------------------------------------------------------- fees
@@ -268,6 +291,15 @@ export const schoolSettingsSchema = z.object({
   registrationNote: z.string().trim().max(500).optional(),
   receiptNumbering: z.enum(["per_year", "continuous"]).optional(),
   receiptDigits: z.coerce.number().int().min(1).max(10).optional(),
+  // Admission and roll numbering formats
+  admissionPrefix: z.string().trim().max(16).optional(),
+  admissionIncludeYear: z.enum(["none", "year", "session"]).optional(),
+  admissionSeparator: z.string().max(8).optional(),
+  admissionDigits: z.coerce.number().int().min(1).max(8).optional(),
+  admissionStartNumber: z.coerce.number().int().min(1).optional(),
+  rollDigits: z.coerce.number().int().min(1).max(4).optional(),
+  rollPrefixSection: checkbox,
+  rollStartNumber: z.coerce.number().int().min(1).optional(),
 });
 export const setNextReceiptNumberSchema = z.object({ next: z.coerce.number().int().min(1, "Enter a number, 1 or more").max(2_000_000_000) });
 

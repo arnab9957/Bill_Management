@@ -210,7 +210,7 @@ describe.skipIf(!run)("real-life scenarios (50 students)", () => {
 
   it("wrong input is refused with a clear message", async () => {
     const c = (await core.fees.masters()).classes[0]!;
-    const base = { admissionNo: "S2001", name: "Copy", classId: c.id, admissionDate: "2026-04-01", guardian: { name: "X", mobile: "9876500099", messagingConsent: "on" } };
+    const base = { admissionNo: "S2001", name: "Copy", classId: c.id, admissionDate: "2026-04-01", guardian: { name: "X", mobile: "9876500099", whatsappNo: "9876500099", messagingConsent: "on" } };
     await expect(core.students.admitStudent(L.admin, base)).rejects.toThrow(/already exists/);
     await expect(core.students.admitStudent(L.admin, { ...base, admissionNo: "NEW1", guardian: { ...base.guardian, mobile: "12345" } })).rejects.toThrow(/mobile/);
     const pay = (x: object) => core.payments.collectPayment({ studentId: id("S2028"), amount: 10000, mode: "cash", date: "2026-11-19", ...x } as never, L.cashier);

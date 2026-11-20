@@ -1,14 +1,14 @@
 import { revalidatePath } from "next/cache";
-import { fees, getSettings, receiptNumberPreview, setNextReceiptNumber, updateSchoolSettings } from "@sb/core";
+import { fees, getSettings, receiptNumberPreview, removeSchoolLogo, setNextReceiptNumber, setSchoolLogo, updateSchoolSettings } from "@sb/core";
 import { setNextReceiptNumberSchema } from "@sb/validation";
 import { requireRole } from "@/lib/auth";
 import { formObject, run, type ActionState } from "@/lib/action";
-import { LogoCard } from "@/components/logo-card";
 import { STANDARD_CLASSES, classOrder } from "@/lib/classes";
-import { removeLogoAction, uploadLogoAction } from "./logo-actions";
 import { ActionForm, FieldError, Submit } from "@/components/action-form";
 import { Card, LinkButton, PageHeader } from "@/components/ui";
 import { ProfileSection } from "./profile-section";
+import { NumberingFormatFields } from "./numbering-format-fields";
+import { SchoolLogoField } from "./school-logo-field";
 
 async function saveSection(_: ActionState, fd: FormData, message: string): Promise<ActionState> {
   const u = await requireRole("settings");
@@ -19,11 +19,36 @@ async function saveSection(_: ActionState, fd: FormData, message: string): Promi
 
 async function saveIdentity(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
+  const u = await requireRole("settings");
+  const logoFile = fd.get("logo");
+  if (logoFile instanceof File && logoFile.size > 0) {
+    if (logoFile.size > 1024 * 1024) {
+      return { ok: false, message: "The logo is larger than 1 MB. Use a smaller picture." };
+    }
+    const buf = new Uint8Array(await logoFile.arrayBuffer());
+    try {
+      await setSchoolLogo(u, buf);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to save logo";
+      return { ok: false, message: msg };
+    }
+  } else if (fd.get("removeLogo") === "true") {
+    await removeSchoolLogo(u);
+  }
   return saveSection(_, fd, "School identity saved");
 }
 async function saveContact(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
   return saveSection(_, fd, "Contact and payment details saved");
+}
+async function saveNumbering(_: ActionState, fd: FormData): Promise<ActionState> {
+  "use server";
+  const raw = formObject(fd);
+  raw.rollPrefixSection = fd.has("rollPrefixSection");
+  const u = await requireRole("settings");
+  const r = await run(() => updateSchoolSettings(u, raw), "Admission and roll number formats saved");
+  revalidatePath("/", "layout");
+  return r;
 }
 async function saveBilling(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
@@ -118,6 +143,7 @@ export default async function SettingsPage() {
           </span>
           <textarea name="registrationNote" defaultValue={s.registrationNote} rows={2} />
         </label>
+        <SchoolLogoField hasLogo={!!s.logoPath} version={s.logoPath ?? ""} />
       </ProfileSection>
 
       <ProfileSection title="Contact & payment" action={saveContact} saveLabel="Save contact & payment">
@@ -148,6 +174,10 @@ export default async function SettingsPage() {
         </label>
       </ProfileSection>
 
+      <ProfileSection title="Admission & roll numbering" action={saveNumbering} saveLabel="Save numbering formats">
+        <NumberingFormatFields s={s} currentYear={m.years.find((y) => y.isCurrent) ?? m.years[0]} />
+      </ProfileSection>
+
       <ProfileSection title="Reminder timing" action={saveReminders} saveLabel="Save reminder timing">
         <label className={field}>Send messages from<input name="quietStart" defaultValue={s.quietStart} /><FieldError name="quietStart" /></label>
         <label className={field}>…until<input name="quietEnd" defaultValue={s.quietEnd} /><FieldError name="quietEnd" /></label>
@@ -169,8 +199,6 @@ export default async function SettingsPage() {
       </ProfileSection>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <LogoCard hasLogo={!!s.logoPath} version={s.logoPath ?? ""} upload={uploadLogoAction} remove={removeLogoAction} />
-
         <Card title="Receipt numbers">
           {num ? (<>
             <p className="text-sm">The next receipt will be numbered <b className="font-mono text-base">{num.text}</b>

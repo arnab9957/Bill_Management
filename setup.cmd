@@ -24,8 +24,9 @@ node scripts\wait-port.mjs 5433 0 --check
 if errorlevel 1 (
   echo Starting the built-in database...
   start "School Billing - Database (keep open)" /min cmd /k "pnpm db:start"
-  node scripts\wait-port.mjs 5433 120 || (echo The database did not start. Check the Database window. & goto :fail)
 )
+echo Waiting for the database...
+node scripts\wait-port.mjs 5433 120 || (echo The database did not start. Check the Database window. & goto :fail)
 
 echo.
 echo Profiles ready to use:

@@ -44,8 +44,8 @@ function schoolInitials(school: string) {
 function SchoolMark({ school, logo }: { school: string; logo?: { hasLogo: boolean; version: string } }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [logo?.version]);
-  const tile = "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-xs font-bold tracking-wide text-navy";
-  const imageTile = "h-9 w-9 shrink-0 rounded-lg border border-white/15 bg-white object-contain p-1";
+  const tile = "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-200/80 bg-blue-50/80 text-xs font-bold tracking-wide text-blue-900 shadow-2xs";
+  const imageTile = "h-9 w-9 shrink-0 rounded-lg border border-gray-200 bg-white object-contain p-1 shadow-2xs";
   if (logo?.hasLogo && !failed) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
@@ -88,7 +88,7 @@ function LiveClock() {
 
   if (!mounted || !now) {
     return (
-      <div className="hidden md:flex flex-col justify-center border-l border-white/10 pl-4 py-0.5 opacity-0 pointer-events-none" aria-hidden>
+      <div className="hidden md:flex flex-col justify-center border-l border-gray-200/80 pl-4 py-0.5 opacity-0 pointer-events-none" aria-hidden>
         <span className="text-xs font-semibold uppercase tracking-[0.14em]">&nbsp;</span>
         <span className="text-sm font-semibold">&nbsp;</span>
       </div>
@@ -112,14 +112,14 @@ function LiveClock() {
   const timeFormatted = `${hStr}:${mStr}:${sStr} ${ampm}`;
 
   return (
-    <div className="hidden md:flex flex-col justify-center gap-1 border-l border-white/15 pl-4 sm:pl-5 py-0.5" title="Current date and time">
-      <div className="flex items-center gap-2 text-xs sm:text-[13px] font-medium text-white/90 whitespace-nowrap">
-        <CalendarIcon className="h-4 w-4 text-white/70 shrink-0" />
+    <div className="hidden md:flex flex-col justify-center gap-0.5 border-l border-gray-200/90 pl-4 sm:pl-5 py-0.5" title="Current date and time">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 whitespace-nowrap">
+        <CalendarIcon className="h-3.5 w-3.5 text-gray-400 shrink-0" />
         <span>{dayDate}</span>
       </div>
-      <div className="flex items-center gap-2 text-sm sm:text-base font-bold tracking-wide text-white whitespace-nowrap">
-        <ClockIcon className="h-4 w-4 text-white/80 shrink-0" />
-        <span className="font-mono">{timeFormatted}</span>
+      <div className="flex items-center gap-1.5 text-sm sm:text-[15px] font-bold tracking-tight text-gray-850 whitespace-nowrap">
+        <ClockIcon className="h-3.5 w-3.5 text-accent-ink shrink-0" />
+        <span className="font-mono text-gray-900">{timeFormatted}</span>
       </div>
     </div>
   );
@@ -135,13 +135,13 @@ function YearPicker({ year, switchYear }: { year: YearInfo; switchYear: (fd: For
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
         aria-label="Academic session"
         title="Academic session"
-        className={`h-10 w-full cursor-pointer rounded-lg border border-white/20 bg-white px-3 py-2 text-sm font-semibold shadow-sm outline-none transition focus:ring-2 focus:ring-white/40 ${year.isCurrent ? "text-navy" : "text-amber-800 font-bold"}`}
+        className={`h-9 w-full cursor-pointer rounded-lg border border-gray-200 bg-gray-50/80 px-2.5 py-1.5 text-xs sm:text-[13px] font-semibold shadow-2xs outline-none transition hover:bg-gray-100/70 hover:border-gray-300 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 ${year.isCurrent ? "text-gray-900" : "text-amber-800 bg-amber-50/70 border-amber-200 font-bold"}`}
       >
         <option value="" disabled className="text-gray-400 font-medium">
           Academic Sessions
         </option>
         {year.options.map((o) => (
-          <option key={o.id} value={o.id} className="bg-white text-ink">
+          <option key={o.id} value={o.id} className="bg-white text-gray-900">
             {o.name}{o.isCurrent ? " (current)" : ""}
           </option>
         ))}
@@ -172,10 +172,10 @@ export function Shell({ nav, user, school, logo, children, logout, year, switchY
 
   return (
     <div className="min-h-screen bg-canvas">
-      <header className="no-print sticky top-0 z-50 flex h-20 items-stretch bg-navy text-white shadow-sm">
-        <div className="flex w-60 shrink-0 items-center gap-2 px-3 sm:px-4">
+      <header className="no-print sticky top-0 z-50 flex h-20 items-stretch border-b border-gray-200/80 bg-white text-gray-900 shadow-[0_1px_3px_0_rgba(0,0,0,0.03)]">
+        <div className="flex w-60 shrink-0 items-center gap-2 border-r border-gray-200/80 px-3 sm:px-4 bg-white">
           <button type="button" aria-label="Open menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}
-            className="-ml-1 rounded-lg p-2 text-white/75 hover:bg-white/10 hover:text-white lg:hidden">
+            className="-ml-1 rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 lg:hidden">
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
           </button>
           <div className="min-w-0 flex-1">
@@ -186,20 +186,20 @@ export function Shell({ nav, user, school, logo, children, logout, year, switchY
           <LiveClock />
           <div className="flex min-w-0 items-center gap-3 ml-auto">
             <div className="min-w-0 text-right">
-              <div className="truncate text-sm font-semibold text-white">{school}</div>
-              <div className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-white/55">Fees Management</div>
+              <div className="truncate text-sm sm:text-[15px] font-bold tracking-tight text-gray-900">{school}</div>
+              <div className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-400">Fees Management</div>
             </div>
             <SchoolMark school={school} logo={logo} />
           </div>
         </div>
       </header>
-      {menuOpen && <div className="no-print fixed inset-x-0 bottom-0 top-20 z-40 bg-navy/30 lg:hidden" onClick={() => setMenuOpen(false)} aria-hidden />}
+      {menuOpen && <div className="no-print fixed inset-x-0 bottom-0 top-20 z-40 bg-gray-900/20 backdrop-blur-xs lg:hidden" onClick={() => setMenuOpen(false)} aria-hidden />}
       <div className="flex">
-        <aside aria-label="Main navigation" className={`no-print fixed bottom-0 left-0 top-20 z-50 flex w-60 shrink-0 flex-col border-r border-white/10 bg-navy text-white shadow-xl transition-transform duration-200 lg:sticky lg:top-20 lg:z-auto lg:h-[calc(100vh-5rem)] lg:translate-x-0 lg:shadow-none ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <aside aria-label="Main navigation" className={`no-print fixed bottom-0 left-0 top-20 z-50 flex w-60 shrink-0 flex-col border-r border-gray-200/80 bg-white text-gray-800 shadow-xl transition-transform duration-200 lg:sticky lg:top-20 lg:z-auto lg:h-[calc(100vh-5rem)] lg:translate-x-0 lg:shadow-none ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}>
           <nav className="flex-1 overflow-y-auto px-2.5 py-4">
-            <div className="flex items-center justify-between px-3 pb-2">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">Workspace</div>
-              <button type="button" aria-label="Close menu" onClick={() => setMenuOpen(false)} className="rounded-md p-1 text-white/60 hover:bg-white/10 hover:text-white lg:hidden">
+            <div className="flex items-center justify-between px-3 pb-2.5">
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400">Workspace</div>
+              <button type="button" aria-label="Close menu" onClick={() => setMenuOpen(false)} className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 lg:hidden">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
               </button>
             </div>
@@ -209,30 +209,30 @@ export function Shell({ nav, user, school, logo, children, logout, year, switchY
               const showDivider = i > 0 && ADMIN_HREFS.includes(n.href) && !ADMIN_HREFS.includes(nav[i - 1]?.href ?? "");
               return (
                 <div key={n.href}>
-                  {showDivider && <div className="mx-2 my-2 border-t border-white/10" />}
+                  {showDivider && <div className="mx-2 my-2.5 border-t border-gray-100" />}
                   <Link href={n.href} aria-current={active ? "page" : undefined} title={n.key ? `Alt+${n.key.toUpperCase()}` : undefined}
                     onClick={(e) => { if (!e.ctrlKey && !e.metaKey && !e.shiftKey) go(n.href); }}
-                    className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-colors duration-150 ${active ? "bg-white/10 font-semibold text-white ring-1 ring-white/10" : "font-medium text-white/70 hover:bg-white/10 hover:text-white"}`}>
-                    {active && <span className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-r-full bg-accent" />}
-                    <span className={active ? "text-white" : "text-white/45 group-hover:text-white"}><NavIcon href={n.href} /></span>
+                    className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-all duration-150 ${active ? "bg-blue-50/80 font-semibold text-blue-900 shadow-2xs ring-1 ring-blue-100" : "font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"}`}>
+                    {active && <span className="absolute bottom-1.5 left-0 top-1.5 w-1 rounded-r-full bg-blue-600" />}
+                    <span className={active ? "text-blue-600" : "text-gray-400 group-hover:text-gray-600 transition-colors"}><NavIcon href={n.href} /></span>
                     <span className="truncate">{n.label}</span>
                   </Link>
                 </div>
               );
             })}
           </nav>
-          <div className="border-t border-white/10 bg-navy-soft/50 px-3 py-3">
-            <div className="px-1 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">Signed in as</div>
+          <div className="border-t border-gray-200/80 bg-gray-50/70 px-3.5 py-3.5">
+            <div className="px-1 pb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400">Signed in as</div>
             <div className="flex items-center gap-2.5 px-1 py-1">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/70"><UserIcon /></div>
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-blue-200/80 bg-blue-50/70 text-blue-700 shadow-2xs"><UserIcon /></div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-xs font-semibold text-white">{user.fullName}</div>
-                <div className="truncate text-[11px] capitalize text-white/55">{user.role}</div>
+                <div className="truncate text-xs font-bold text-gray-900">{user.fullName}</div>
+                <div className="truncate text-[11px] capitalize text-gray-500 font-medium">{user.role}</div>
               </div>
             </div>
             <div className="mt-1 flex items-center justify-between px-1 text-[11px]">
-              <Link href="/account/password" className="text-white/55 underline-offset-4 hover:text-white hover:underline">Password</Link>
-              <form action={logout}><button className="text-white/55 underline-offset-4 hover:text-white hover:underline">Sign out</button></form>
+              <Link href="/account/password" className="text-gray-500 underline-offset-4 hover:text-gray-800 hover:underline transition-colors">Password</Link>
+              <form action={logout}><button className="text-gray-500 underline-offset-4 hover:text-gray-800 hover:underline transition-colors">Sign out</button></form>
             </div>
           </div>
         </aside>
@@ -243,7 +243,7 @@ export function Shell({ nav, user, school, logo, children, logout, year, switchY
           {children}
         </main>
       </div>
-      {pendingHref && <div className="no-print fixed inset-x-0 top-20 z-50 h-1 overflow-hidden bg-white/20"><div className="h-full w-1/3 animate-[navbar_1s_ease-in-out_infinite] bg-accent" /></div>}
+      {pendingHref && <div className="no-print fixed inset-x-0 top-20 z-50 h-0.5 overflow-hidden bg-blue-100"><div className="h-full w-1/3 animate-[navbar_1s_ease-in-out_infinite] bg-blue-600" /></div>}
     </div>
   );
 }
