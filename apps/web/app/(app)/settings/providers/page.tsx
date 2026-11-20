@@ -19,6 +19,12 @@ async function saveConfigSection(fd: FormData) {
   return providerConfigSchema.parse({ ...current, ...raw });
 }
 
+async function revealBrevoApiKey(): Promise<string> {
+  "use server";
+  await requireRole("settings");
+  return (await getProviderConfig()).brevoApiKey;
+}
+
 async function saveEmail(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
   const u = await requireRole("settings");
@@ -43,7 +49,7 @@ export default async function Providers() {
   return (
     <div className="max-w-5xl space-y-6">
       <PageHeader title="Message providers" subtitle="Choose how fee reminders and receipts reach parents. Each section saves on its own; credentials stay encrypted." actions={<LinkButton href="/settings">Back</LinkButton>} />
-      <EmailProviderForm action={saveEmail} config={{
+      <EmailProviderForm action={saveEmail} revealApiKey={revealBrevoApiKey} config={{
         emailMode: c.emailMode,
         smtpHost: c.smtpHost,
         smtpPort: c.smtpPort,
