@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { getProviderConfig, saveProviderConfig } from "@sb/core";
 import { getDb } from "@sb/db";
 import { providerConfigSchema } from "@sb/validation";
@@ -28,19 +29,25 @@ async function revealBrevoApiKey(): Promise<string> {
 async function saveEmail(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
   const u = await requireRole("settings");
-  return run(async () => saveProviderConfig(getDb(), u, await saveConfigSection(fd)), "Email settings saved (secrets stay encrypted)");
+  const r = await run(async () => saveProviderConfig(getDb(), u, await saveConfigSection(fd)), "Email settings saved (secrets stay encrypted)");
+  if (r?.ok) revalidatePath("/settings/providers");
+  return r;
 }
 
 async function saveWhatsapp(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
   const u = await requireRole("settings");
-  return run(async () => saveProviderConfig(getDb(), u, await saveConfigSection(fd)), "WhatsApp settings saved");
+  const r = await run(async () => saveProviderConfig(getDb(), u, await saveConfigSection(fd)), "WhatsApp settings saved");
+  if (r?.ok) revalidatePath("/settings/providers");
+  return r;
 }
 
 async function saveSms(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
   const u = await requireRole("settings");
-  return run(async () => saveProviderConfig(getDb(), u, await saveConfigSection(fd)), "SMS settings saved (secrets stay encrypted)");
+  const r = await run(async () => saveProviderConfig(getDb(), u, await saveConfigSection(fd)), "SMS settings saved (secrets stay encrypted)");
+  if (r?.ok) revalidatePath("/settings/providers");
+  return r;
 }
 
 export default async function Providers() {

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ActionForm, Submit } from "@/components/action-form";
 import { buttonClass, Card } from "@/components/ui";
 import type { ActionState } from "@/lib/action";
@@ -18,27 +18,85 @@ export function WhatsAppProviderForm({ action, config }: { action: (prev: Action
   const [editing, setEditing] = useState(false);
   const [mode, setMode] = useState<ProviderConfig["whatsappMode"]>(config.whatsappMode);
   const [dirty, setDirty] = useState(false);
-  const [version, setVersion] = useState(0);
-  const cancel = () => { setMode(config.whatsappMode); setDirty(false); setEditing(false); setVersion((v) => v + 1); };
+  const [formValues, setFormValues] = useState({
+    waPhoneNumberId: config.waPhoneNumberId,
+    waApiVersion: config.waApiVersion,
+    waAccessToken: config.hasWaAccessToken ? MASK : "",
+  });
+
+  useEffect(() => {
+    setMode(config.whatsappMode);
+    setFormValues({
+      waPhoneNumberId: config.waPhoneNumberId,
+      waApiVersion: config.waApiVersion,
+      waAccessToken: config.hasWaAccessToken ? MASK : "",
+    });
+  }, [config]);
+
+  const cancel = () => {
+    setMode(config.whatsappMode);
+    setDirty(false);
+    setEditing(false);
+    setFormValues({
+      waPhoneNumberId: config.waPhoneNumberId,
+      waApiVersion: config.waApiVersion,
+      waAccessToken: config.hasWaAccessToken ? MASK : "",
+    });
+  };
+
   return (
     <Card
       title="WhatsApp (device or Meta Cloud API)"
       actions={!editing ? <button type="button" onClick={() => { setEditing(true); setDirty(false); }} className={buttonClass("secondary")}>Edit</button> : undefined}
     >
-      <ActionForm key={version} action={action} className="space-y-5" onSuccess={() => { setDirty(false); setEditing(false); }}>
-        <fieldset disabled={!editing} className="space-y-5" onChange={() => setDirty(true)}>
+      <ActionForm
+        action={action}
+        className="space-y-5"
+        onSuccess={() => {
+          setDirty(false);
+          setEditing(false);
+        }}
+      >
+        <fieldset disabled={!editing} className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="flex flex-col gap-2">Mode
-              <select name="whatsappMode" value={mode} onChange={(e) => setMode(e.target.value as ProviderConfig["whatsappMode"])}>
+              <select
+                name="whatsappMode"
+                value={mode}
+                onChange={(e) => {
+                  setMode(e.target.value as ProviderConfig["whatsappMode"]);
+                  setDirty(true);
+                }}
+              >
                 <option value="device">Device WhatsApp (wa.me)</option>
                 <option value="cloud">Meta Cloud API</option>
                 <option value="off">Off</option>
               </select>
             </label>
             {mode === "cloud" && <>
-              <label className="flex flex-col gap-2">Phone number ID<input name="waPhoneNumberId" defaultValue={config.waPhoneNumberId} /></label>
-              <label className="flex flex-col gap-2">API version<input name="waApiVersion" defaultValue={config.waApiVersion} /></label>
-              <label className="flex flex-col gap-2 sm:col-span-3">Access token<input name="waAccessToken" type="password" defaultValue={config.hasWaAccessToken ? MASK : ""} autoComplete="new-password" /></label>
+              <label className="flex flex-col gap-2">Phone number ID
+                <input
+                  name="waPhoneNumberId"
+                  value={formValues.waPhoneNumberId}
+                  onChange={(e) => { setFormValues((v) => ({ ...v, waPhoneNumberId: e.target.value })); setDirty(true); }}
+                />
+              </label>
+              <label className="flex flex-col gap-2">API version
+                <input
+                  name="waApiVersion"
+                  value={formValues.waApiVersion}
+                  onChange={(e) => { setFormValues((v) => ({ ...v, waApiVersion: e.target.value })); setDirty(true); }}
+                />
+              </label>
+              <label className="flex flex-col gap-2 sm:col-span-3">Access token
+                <input
+                  name="waAccessToken"
+                  type="password"
+                  value={formValues.waAccessToken}
+                  onChange={(e) => { setFormValues((v) => ({ ...v, waAccessToken: e.target.value })); setDirty(true); }}
+                  autoComplete="new-password"
+                />
+              </label>
             </>}
           </div>
           {mode === "device" && <p className="text-xs leading-relaxed text-gray-500">Reminders open a chat in the WhatsApp app or WhatsApp Web logged in on this device. The message is ready to review and send; nothing is sent automatically in the background.</p>}

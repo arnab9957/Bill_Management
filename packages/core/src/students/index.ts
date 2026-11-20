@@ -99,7 +99,7 @@ export async function setStudentStatus(actor: Actor, studentId: number, status: 
  * Search students. With `yearId`, only students enrolled in that academic year are returned,
  * with the class/section/roll of that year.
  */
-export async function searchStudents(q: string, opts: { classId?: number; status?: string; limit?: number; yearId?: number } = {}) {
+export async function searchStudents(q: string, opts: { classId?: number; sectionId?: number; sectionName?: string; status?: string; limit?: number; yearId?: number } = {}) {
   if (opts.yearId) return searchInYear(q, { ...opts, yearId: opts.yearId });
   const db = getDb();
   const conds = [];
@@ -112,6 +112,8 @@ export async function searchStudents(q: string, opts: { classId?: number; status
     ));
   }
   if (opts.classId) conds.push(eq(students.classId, opts.classId));
+  if (opts.sectionId) conds.push(eq(students.sectionId, opts.sectionId));
+  if (opts.sectionName) conds.push(eq(sections.name, opts.sectionName));
   if (opts.status) conds.push(eq(students.status, opts.status as "active"));
   return db.select({
     id: students.id, admissionNo: students.admissionNo, name: students.name, status: students.status, rollNo: students.rollNo,
@@ -129,11 +131,13 @@ function termCond(term: string) {
   );
 }
 
-async function searchInYear(q: string, opts: { classId?: number; status?: string; limit?: number; yearId: number }) {
+async function searchInYear(q: string, opts: { classId?: number; sectionId?: number; sectionName?: string; status?: string; limit?: number; yearId: number }) {
   const conds = [eq(studentEnrollments.academicYearId, opts.yearId)];
   const term = q.trim();
   if (term) conds.push(termCond(term)!);
   if (opts.classId) conds.push(eq(studentEnrollments.classId, opts.classId));
+  if (opts.sectionId) conds.push(eq(studentEnrollments.sectionId, opts.sectionId));
+  if (opts.sectionName) conds.push(eq(sections.name, opts.sectionName));
   if (opts.status) conds.push(eq(students.status, opts.status as "active"));
   return getDb().select({
     id: students.id, admissionNo: students.admissionNo, name: students.name, status: students.status, rollNo: studentEnrollments.rollNo,

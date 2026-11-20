@@ -23,7 +23,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ repo
   if (report === "students") {
     const u = await apiUser("students"); if (u instanceof Response) return u;
     const { year } = await getWorkingYear();
-    const rows = await students.searchStudents(sp.get("q") ?? "", { classId: sp.get("classId") ? Number(sp.get("classId")) : undefined, status: sp.get("status") ?? "active", limit: 100000, yearId: year.id });
+    const rows = await students.searchStudents(sp.get("q") ?? "", {
+      classId: sp.get("classId") ? Number(sp.get("classId")) : undefined,
+      sectionId: sp.get("sectionId") ? Number(sp.get("sectionId")) : undefined,
+      sectionName: sp.get("section") ?? undefined,
+      status: sp.get("status") ?? "active",
+      limit: 100000,
+      yearId: year.id,
+    });
     return xlsx(await reports.toXlsx("Students", [
       { header: "Admission No", key: "admissionNo" }, { header: "Name", key: "name", width: 28 }, { header: "Class", key: "className" },
       { header: "Section", key: "sectionName" }, { header: "Roll", key: "rollNo" }, { header: "Status", key: "status" }, { header: "Outstanding", key: "outstanding", money: true },

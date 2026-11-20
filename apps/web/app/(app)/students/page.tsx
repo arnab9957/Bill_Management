@@ -3,13 +3,20 @@ import { can, fees, students } from "@sb/core";
 import { requireRole } from "@/lib/auth";
 import { getWorkingYear } from "@/lib/year";
 import { Badge, Card, Empty, LinkButton, Money, PageHeader } from "@/components/ui";
+import { StudentFilters } from "./student-filters";
 
-export default async function StudentsPage({ searchParams }: { searchParams: Promise<{ q?: string; classId?: string; status?: string }> }) {
+export default async function StudentsPage({ searchParams }: { searchParams: Promise<{ q?: string; classId?: string; section?: string; sectionId?: string; status?: string }> }) {
   const user = await requireRole("students");
   const sp = await searchParams;
-  const { classes } = await fees.masters();
+  const { classes, sections } = await fees.masters();
   const { year } = await getWorkingYear();
-  const list = await students.searchStudents(sp.q ?? "", { classId: sp.classId ? Number(sp.classId) : undefined, status: sp.status ?? "active", yearId: year.id });
+  const sectionName = sp.section ?? (sp.sectionId ? sections.find((s) => String(s.id) === String(sp.sectionId))?.name : undefined);
+  const list = await students.searchStudents(sp.q ?? "", {
+    classId: sp.classId ? Number(sp.classId) : undefined,
+    sectionName: sectionName || undefined,
+    status: sp.status ?? "active",
+    yearId: year.id,
+  });
   const qs = new URLSearchParams(Object.entries(sp).filter(([, v]) => v) as [string, string][]).toString();
   return (
     <div>
@@ -19,12 +26,15 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
         {can(user.role, "studentsEdit") && <LinkButton variant="primary" href="/students/new">New admission</LinkButton>}
       </>} />
       <Card>
-        <form className="toolbar mb-6">
-          <input name="q" defaultValue={sp.q} placeholder="Name, admission no., guardian mobile" className="w-full sm:w-72" autoFocus />
-          <select name="classId" defaultValue={sp.classId}><option value="">All classes</option>{classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-          <select name="status" defaultValue={sp.status ?? "active"}><option value="active">Active</option><option value="left">Left</option><option value="alumni">Alumni</option><option value="">All</option></select>
-          <button className="filter-button">Search</button>
-        </form>
+        <StudentFilters
+          classes={classes}
+          sections={sections}
+          defaultQ={sp.q}
+          defaultClassId={sp.classId}
+          defaultSection={sp.section}
+          defaultSectionId={sp.sectionId}
+          defaultStatus={sp.status}
+        />
         {list.length === 0 ? <Empty>No students found in {year.name}. New admissions and promotions into this year appear here.</Empty> : (
           <table className="data">
             <thead><tr><th>Adm. no.</th><th>Name</th><th>Class</th><th>Roll</th><th>Status</th><th className="num">Outstanding</th><th /></tr></thead>
