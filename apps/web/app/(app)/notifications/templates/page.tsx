@@ -28,7 +28,7 @@ export default async function Templates() {
       <p className="text-sm text-gray-600">WhatsApp and SMS text must match the template approved by Meta / DLT exactly. Put the approved template name / DLT template ID in “Provider template ID”.</p>
       {list.map((t) => (
         <Card key={t.id} title={<>{t.event.replace(/_/g, " ")} · <span className="capitalize">{t.channel}</span> · {t.language.toUpperCase()}</>}
-          actions={t.language === "en" && !list.some((x) => x.event === t.event && x.channel === t.channel && x.language === "hi") ? <form action={addHindi.bind(null, t.id)}><button className="text-xs text-brand-700 hover:underline">+ Hindi version</button></form> : null}>
+          actions={t.language === "en" && !list.some((x) => x.event === t.event && x.channel === t.channel && x.language === "hi") ? <form action={addHindi.bind(null, t.id)}><button className="text-xs text-ink hover:underline">+ Hindi version</button></form> : null}>
           <ActionForm action={save} className="grid gap-3 lg:grid-cols-2">
             <input type="hidden" name="id" value={t.id} />
             <div className="flex flex-col gap-2">

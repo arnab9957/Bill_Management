@@ -14,7 +14,7 @@ export function Avatar({ studentId, name, photoPath, size = 56 }: { studentId: n
       className="shrink-0 rounded-full border border-gray-200 bg-gray-100 object-cover" />;
   }
   return (
-    <div style={{ ...style, fontSize: size / 2.8 }} className="flex shrink-0 items-center justify-center rounded-full bg-brand-100 font-semibold text-brand-700">
+    <div style={{ ...style, fontSize: size / 2.8 }} className="flex shrink-0 items-center justify-center rounded-full bg-gray-100 font-semibold text-gray-700">
       {initials(name)}
     </div>
   );
@@ -40,7 +40,7 @@ export function StudentPhoto({ studentId, name, photoPath, canEdit, upload, remo
   return (
     <div className="flex flex-col items-center gap-1.5">
       <button type="button" disabled={!canEdit || busy} onClick={() => inputRef.current?.click()}
-        className="group relative rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 disabled:cursor-default"
+        className="group relative rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/20 disabled:cursor-default"
         title={canEdit ? (photoPath ? "Change photo" : "Add photo") : name}>
         <Avatar studentId={studentId} name={name} photoPath={photoPath} size={96} />
         {canEdit && (
@@ -62,8 +62,8 @@ export function StudentPhoto({ studentId, name, photoPath, canEdit, upload, remo
                 setTooBig(false);
                 formRef.current?.requestSubmit();
               }} />
-            <button type="button" disabled={busy} onClick={() => inputRef.current?.click()} className="text-brand-700 hover:underline disabled:opacity-50">
-              {photoPath ? "Change photo" : "📷 Add photo"}
+            <button type="button" disabled={busy} onClick={() => inputRef.current?.click()} className="text-ink hover:underline disabled:opacity-50">
+              {photoPath ? "Change photo" : "Add photo"}
             </button>
           </form>
           {photoPath && (
@@ -74,7 +74,7 @@ export function StudentPhoto({ studentId, name, photoPath, canEdit, upload, remo
           )}
         </div>
       )}
-      {msg?.message && <p className={`max-w-40 text-center text-xs ${msg.ok ? "text-green-700" : "text-red-700"}`}>{msg.message}</p>}
+      {msg?.message && <p className={`max-w-40 text-center text-xs ${msg.ok ? "text-ink" : "text-red-700"}`}>{msg.message}</p>}
     </div>
   );
 }

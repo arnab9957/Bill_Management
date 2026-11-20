@@ -19,11 +19,11 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
         {can(user.role, "studentsEdit") && <LinkButton variant="primary" href="/students/new">New admission</LinkButton>}
       </>} />
       <Card>
-        <form className="mb-4 flex flex-wrap gap-2">
+        <form className="toolbar mb-6">
           <input name="q" defaultValue={sp.q} placeholder="Name, admission no., guardian mobile" className="w-full sm:w-72" autoFocus />
           <select name="classId" defaultValue={sp.classId}><option value="">All classes</option>{classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
           <select name="status" defaultValue={sp.status ?? "active"}><option value="active">Active</option><option value="left">Left</option><option value="alumni">Alumni</option><option value="">All</option></select>
-          <button className="rounded-md border border-gray-300 bg-white px-3 text-sm">Search</button>
+          <button className="filter-button">Search</button>
         </form>
         {list.length === 0 ? <Empty>No students found in {year.name}. New admissions and promotions into this year appear here.</Empty> : (
           <table className="data">
@@ -32,12 +32,12 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
               {list.map((s) => (
                 <tr key={s.id}>
                   <td>{s.admissionNo}</td>
-                  <td><Link className="font-medium text-brand-700 hover:underline" href={`/students/${s.id}`}>{s.name}</Link></td>
+                  <td><Link className="font-medium text-ink hover:underline" href={`/students/${s.id}`}>{s.name}</Link></td>
                   <td>{s.className}{s.sectionName ? "-" + s.sectionName : ""}</td>
                   <td>{s.rollNo}</td>
                   <td><Badge>{s.status}</Badge>{"yearStatus" in s && s.yearStatus !== "studying" && <span className="ml-1"><Badge>{String(s.yearStatus)}</Badge></span>}</td>
                   <td className="num">{s.outstanding ? <Money p={s.outstanding} className="text-red-700" /> : "—"}</td>
-                  <td className="text-right">{can(user.role, "collect") && <Link className="text-xs text-brand-700 hover:underline" href={`/collect?student=${s.id}`}>Collect</Link>}</td>
+                  <td className="text-right">{can(user.role, "collect") && <Link className="text-xs text-ink hover:underline" href={`/collect?student=${s.id}`}>Collect</Link>}</td>
                 </tr>
               ))}
             </tbody>

@@ -8,14 +8,42 @@ import { STANDARD_CLASSES, classOrder } from "@/lib/classes";
 import { removeLogoAction, uploadLogoAction } from "./logo-actions";
 import { ActionForm, FieldError, Submit } from "@/components/action-form";
 import { Card, LinkButton, PageHeader } from "@/components/ui";
+import { ProfileSection } from "./profile-section";
 
-async function saveSchool(_: ActionState, fd: FormData): Promise<ActionState> {
-  "use server";
+async function saveSection(_: ActionState, fd: FormData, message: string): Promise<ActionState> {
   const u = await requireRole("settings");
-  const r = await run(() => updateSchoolSettings(u, formObject(fd)), "School profile saved");
+  const r = await run(() => updateSchoolSettings(u, formObject(fd)), message);
   revalidatePath("/", "layout");
   return r;
 }
+
+async function saveIdentity(_: ActionState, fd: FormData): Promise<ActionState> {
+  "use server";
+  return saveSection(_, fd, "School identity saved");
+}
+async function saveContact(_: ActionState, fd: FormData): Promise<ActionState> {
+  "use server";
+  return saveSection(_, fd, "Contact and payment details saved");
+}
+async function saveBilling(_: ActionState, fd: FormData): Promise<ActionState> {
+  "use server";
+  return saveSection(_, fd, "Bill and receipt settings saved");
+}
+async function saveReminders(_: ActionState, fd: FormData): Promise<ActionState> {
+  "use server";
+  return saveSection(_, fd, "Reminder timing saved");
+}
+async function saveFeatures(_: ActionState, fd: FormData): Promise<ActionState> {
+  "use server";
+  const raw = formObject(fd);
+  raw.concessionsEnabled = fd.has("concessionsEnabled");
+  raw.dayCloseEnabled = fd.has("dayCloseEnabled");
+  const u = await requireRole("settings");
+  const r = await run(() => updateSchoolSettings(u, raw), "Feature settings saved");
+  revalidatePath("/", "layout");
+  return r;
+}
+
 async function setNextNumber(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
   const u = await requireRole("settings");
@@ -54,76 +82,61 @@ async function addSection(_: ActionState, fd: FormData): Promise<ActionState> {
   return r;
 }
 
-const field = "flex flex-col gap-1";
-const hint = "text-xs text-gray-500";
-
-function Group({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <fieldset className="grid gap-3 sm:col-span-2 sm:grid-cols-2">
-      <legend className="mb-1 border-b pb-1 text-sm font-semibold text-gray-700 sm:col-span-2">{title}</legend>
-      {children}
-    </fieldset>
-  );
-}
+const field = "field-stack";
+const hint = "hint";
 
 export default async function SettingsPage() {
   await requireRole("settings");
   const [s, m, num] = await Promise.all([getSettings(), fees.masters(), receiptNumberPreview()]);
   return (
-    <div className="space-y-5">
-      <PageHeader title="School Profile" actions={<>
+    <div className="page-stack">
+      <PageHeader title="School Settings" actions={<>
         <LinkButton href="/settings/users">Users</LinkButton>
         <LinkButton href="/settings/providers">SMS / WhatsApp / Email</LinkButton>
         <LinkButton href="/settings/health">Backups & health</LinkButton>
         <LinkButton href="/settings/promotion">Year-end promotion</LinkButton>
       </>} />
 
-      <Card title="School details">
-        <ActionForm action={saveSchool} className="grid gap-5 sm:grid-cols-2">
-          <Group title="Name & header">
-            <label className={field}>School name <span className={hint}>(printed in capitals on bills and receipts)</span><input name="name" defaultValue={s.name} required /></label>
-            <label className={field}>Line under the name <span className={hint}>(e.g. managing society)</span><input name="headerSubtitle" defaultValue={s.headerSubtitle} placeholder="(Managed by … Parishad)" /></label>
-            <label className={field}>Address / location line<input name="address" defaultValue={s.address} placeholder="Village * Post * District" /></label>
-            <label className={field}>U-DISE code<input name="udiseCode" defaultValue={s.udiseCode} inputMode="numeric" /></label>
-            <label className={`${field} sm:col-span-2`}>Registration lines <span className={hint}>(one per line)</span>
-              <textarea name="registrationNote" defaultValue={s.registrationNote} rows={2} /></label>
-          </Group>
+      <ProfileSection title="School identity" action={saveIdentity}>
+        <label className={field}>School name <span className={hint}>(printed in capitals on bills and receipts)</span><input name="name" defaultValue={s.name} required /></label>
+        <label className={field}>Line under the name <span className={hint}>(e.g. managing society)</span><input name="headerSubtitle" defaultValue={s.headerSubtitle} placeholder="(Managed by … Parishad)" /></label>
+        <label className={field}>Address / location line<input name="address" defaultValue={s.address} placeholder="Village * Post * District" /></label>
+        <label className={field}>U-DISE code<input name="udiseCode" defaultValue={s.udiseCode} inputMode="numeric" /></label>
+        <label className={`${field} sm:col-span-2`}>Registration lines <span className={hint}>(one per line)</span>
+          <textarea name="registrationNote" defaultValue={s.registrationNote} rows={2} /></label>
+      </ProfileSection>
 
-          <Group title="Contact & payment">
-            <label className={field}>Phone<input name="phone" defaultValue={s.phone} /></label>
-            <label className={field}>Email<input name="email" defaultValue={s.email} /><FieldError name="email" /></label>
-            <label className={field}>UPI ID <span className={hint}>(for QR on bills)</span><input name="upiId" defaultValue={s.upiId ?? ""} placeholder="school@bank" /></label>
-          </Group>
+      <ProfileSection title="Contact & payment" action={saveContact}>
+        <label className={field}>Phone<input name="phone" defaultValue={s.phone} /></label>
+        <label className={field}>Email<input name="email" defaultValue={s.email} /><FieldError name="email" /></label>
+        <label className={field}>UPI ID <span className={hint}>(for QR on bills)</span><input name="upiId" defaultValue={s.upiId ?? ""} placeholder="school@bank" /></label>
+      </ProfileSection>
 
-          <Group title="Bills & receipts">
-            <label className={field}>Bill prefix<input name="invoicePrefix" defaultValue={s.invoicePrefix} /></label>
-            <label className={field}>Receipt prefix<input name="receiptPrefix" defaultValue={s.receiptPrefix} /><FieldError name="receiptPrefix" /></label>
-            <label className={field}>Receipt numbering
-              <select name="receiptNumbering" defaultValue={s.receiptIncludeYear ? "per_year" : "continuous"}>
-                <option value="continuous">One running series ({s.receiptPrefix}/6434)</option>
-                <option value="per_year">Restarts every academic year ({s.receiptPrefix}/2026-27/1)</option>
-              </select></label>
-            <label className={field}>Number digits <span className={hint}>(1 = no leading zeros)</span><input name="receiptDigits" type="number" min={1} max={10} defaultValue={s.receiptDigits} /><FieldError name="receiptDigits" /></label>
-          </Group>
+      <ProfileSection title="Bills & receipts" action={saveBilling}>
+        <label className={field}>Bill prefix<input name="invoicePrefix" defaultValue={s.invoicePrefix} /></label>
+        <label className={field}>Receipt prefix<input name="receiptPrefix" defaultValue={s.receiptPrefix} /><FieldError name="receiptPrefix" /></label>
+        <label className={field}>Receipt numbering
+          <select name="receiptNumbering" defaultValue={s.receiptIncludeYear ? "per_year" : "continuous"}>
+            <option value="continuous">One running series ({s.receiptPrefix}/6434)</option>
+            <option value="per_year">Restarts every academic year ({s.receiptPrefix}/2026-27/1)</option>
+          </select></label>
+        <label className={field}>Number digits <span className={hint}>(1 = no leading zeros)</span><input name="receiptDigits" type="number" min={1} max={10} defaultValue={s.receiptDigits} /><FieldError name="receiptDigits" /></label>
+      </ProfileSection>
 
-          <Group title="Reminders">
-            <label className={field}>Send messages from<input name="quietStart" defaultValue={s.quietStart} /><FieldError name="quietStart" /></label>
-            <label className={field}>…until<input name="quietEnd" defaultValue={s.quietEnd} /><FieldError name="quietEnd" /></label>
-            <label className={field}>Reminder days before due<input name="reminderDaysBefore" type="number" defaultValue={s.reminderDaysBefore} /></label>
-            <label className={field}>Overdue reminders after (days)<input name="overdueSteps" defaultValue={s.overdueSteps.join(", ")} /></label>
-          </Group>
+      <ProfileSection title="Reminder timing" action={saveReminders}>
+        <label className={field}>Send messages from<input name="quietStart" defaultValue={s.quietStart} /><FieldError name="quietStart" /></label>
+        <label className={field}>…until<input name="quietEnd" defaultValue={s.quietEnd} /><FieldError name="quietEnd" /></label>
+        <label className={field}>Reminder days before due<input name="reminderDaysBefore" type="number" defaultValue={s.reminderDaysBefore} /></label>
+        <label className={field}>Overdue reminders after (days)<input name="overdueSteps" defaultValue={s.overdueSteps.join(", ")} /></label>
+      </ProfileSection>
 
-          <Group title="Other">
-            <label className={`${field} sm:col-span-2`}>Backup folder <span className={hint}>(second disk recommended)</span><input name="backupPath" defaultValue={s.backupPath ?? ""} placeholder="D:\SchoolBackups" /></label>
-            <label className="flex items-start gap-2"><input type="checkbox" name="concessionsEnabled" defaultChecked={s.concessionsEnabled} className="mt-0.5" />
-              <span>Fee concessions <span className={hint}>— sibling, staff ward or merit discounts applied to new bills.</span></span></label>
-            <label className="flex items-start gap-2"><input type="checkbox" name="dayCloseEnabled" defaultChecked={s.dayCloseEnabled} className="mt-0.5" />
-              <span>Cash counter closing <span className={hint}>— cashiers count the drawer and lock the day. Most schools leave this off.</span></span></label>
-          </Group>
-
-          <div className="sm:col-span-2"><Submit>Save</Submit></div>
-        </ActionForm>
-      </Card>
+      <ProfileSection title="Features & backup" action={saveFeatures}>
+        <label className={`${field} sm:col-span-2`}>Backup folder <span className={hint}>(second disk recommended)</span><input name="backupPath" defaultValue={s.backupPath ?? ""} placeholder="D:\SchoolBackups" /></label>
+        <label className="flex items-start gap-2"><input type="checkbox" name="concessionsEnabled" defaultChecked={s.concessionsEnabled} className="mt-0.5" />
+          <span>Fee concessions <span className={hint}>— sibling, staff ward or merit discounts applied to new bills.</span></span></label>
+        <label className="flex items-start gap-2"><input type="checkbox" name="dayCloseEnabled" defaultChecked={s.dayCloseEnabled} className="mt-0.5" />
+          <span>Cash counter closing <span className={hint}>— cashiers count the drawer and lock the day. Most schools leave this off.</span></span></label>
+      </ProfileSection>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <LogoCard hasLogo={!!s.logoPath} version={s.logoPath ?? ""} upload={uploadLogoAction} remove={removeLogoAction} />
@@ -148,7 +161,7 @@ export default async function SettingsPage() {
         <Card title="Academic years">
           <ul className="space-y-1 text-sm">{m.years.map((y) => (
             <li key={y.id} className="flex justify-between"><span>{y.name} ({y.startDate} → {y.endDate})</span>
-              {y.isCurrent ? <b className="text-green-700">current</b> : <form action={makeCurrent.bind(null, y.id)}><button className="text-xs text-brand-700 hover:underline">Make current</button></form>}</li>
+              {y.isCurrent ? <b className="text-ink">current</b> : <form action={makeCurrent.bind(null, y.id)}><button className="text-xs text-ink hover:underline">Make current</button></form>}</li>
           ))}</ul>
           <ActionForm action={addYear} className="mt-3 flex flex-wrap gap-2" resetOnSuccess>
             <input name="name" placeholder="2027-28" className="w-24" required /><input type="date" name="startDate" required /><input type="date" name="endDate" required />
@@ -158,7 +171,7 @@ export default async function SettingsPage() {
 
         <Card title="Classes & sections">
           <div className="flex flex-wrap gap-2 text-sm">{m.classes.map((c) => (
-            <span key={c.id} className="rounded bg-gray-100 px-2 py-0.5">{c.name}: {m.sections.filter((x) => x.classId === c.id).map((x) => x.name).join(", ") || "—"}</span>
+            <span key={c.id} className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs">{c.name}: {m.sections.filter((x) => x.classId === c.id).map((x) => x.name).join(", ") || "—"}</span>
           ))}</div>
           <ActionForm action={addClass} className="mt-3 flex flex-wrap gap-2" resetOnSuccess>
             <select name="name" required defaultValue="">

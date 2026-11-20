@@ -173,7 +173,7 @@ export async function saveProviderConfig(db: Executor, actor: Actor, cfg: Provid
 
 export async function updateSchoolSettings(actor: Actor, input: unknown) {
   const { schoolSettingsSchema } = await import("@sb/validation");
-  const d = schoolSettingsSchema.parse(input);
+  const d = schoolSettingsSchema.partial().parse(input);
   const db = getDb();
   const old = await getSettings(db);
   const { receiptNumbering, ...rest } = d;
@@ -181,7 +181,8 @@ export async function updateSchoolSettings(actor: Actor, input: unknown) {
   await db.update(schoolSettings).set({
     ...rest,
     receiptIncludeYear: receiptNumbering === undefined ? undefined : receiptNumbering === "per_year",
-    upiId: d.upiId || null, backupPath: d.backupPath || null,
+    upiId: d.upiId === undefined ? undefined : d.upiId || null,
+    backupPath: d.backupPath === undefined ? undefined : d.backupPath || null,
   }).where(eq(schoolSettings.id, 1));
   clearSettingsCache();
   await audit(db, actor, "update", "school_settings", 1, { ...old, providerConfigEnc: undefined }, d);

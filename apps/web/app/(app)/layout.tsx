@@ -17,7 +17,7 @@ const NAV: (NavItem & { perm: Permission })[] = [
   { href: "/fees", label: "Fee setup", perm: "fees", key: "f" },
   { href: "/reports", label: "Reports", perm: "reports", key: "r" },
   { href: "/notifications", label: "Messages", perm: "notifications", key: "m" },
-  { href: "/settings", label: "School Profile", perm: "settings" },
+  { href: "/settings", label: "School Settings", perm: "settings" },
   { href: "/audit", label: "Audit log", perm: "audit" },
 ];
 
@@ -44,7 +44,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const nav = NAV.filter((n) => can(user.role, n.perm)).map(({ perm: _p, ...n }) => n);
   const wy = await getWorkingYear();
   return (
-    <Shell nav={nav} user={{ fullName: user.fullName, role: user.role }} school={settings.name} logout={logout}
+    <Shell nav={nav} user={{ fullName: user.fullName, role: user.role }} school={settings.name} logo={{ hasLogo: !!settings.logoPath, version: settings.logoPath ?? "" }} logout={logout}
       year={{ id: wy.year.id, name: wy.year.name, isCurrent: wy.isCurrent, currentName: wy.current.name, options: wy.years.map((y) => ({ id: y.id, name: y.name, isCurrent: y.isCurrent })) }}
       switchYear={switchYear}>
       {children}

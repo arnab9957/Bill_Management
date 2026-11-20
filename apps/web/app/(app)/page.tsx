@@ -2,7 +2,7 @@ import Link from "next/link";
 import { addDays, formatDate, formatINR, ops, periodLabel, periodOf, reports, today } from "@sb/core";
 import { requireRole } from "@/lib/auth";
 import { getWorkingYear } from "@/lib/year";
-import { Badge, Card, Money, Notice, PageHeader, Stat, cx } from "@/components/ui";
+import { Badge, buttonClass, Card, Empty, Money, Notice, PageHeader, SectionHeading, Stat, cx } from "@/components/ui";
 
 type View = "today" | "yesterday" | "month" | "lastmonth" | "session" | "pick";
 
@@ -60,7 +60,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="page-stack">
       <PageHeader title={`Dashboard · ${year.name}`} subtitle={<>Welcome, {user.fullName}. Showing <b>{label}</b>{!isCurrent && " (not the current session)"}.</>} />
       {sp.denied && <Notice tone="warn">You don&apos;t have access to that page.</Notice>}
       {"issues" in h && h.issues && h.issues.length > 0 && user.role === "ADMIN" && (
@@ -71,22 +71,22 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       )}
 
       {/* Period picker */}
-      <div className="no-print flex flex-wrap items-center gap-2">
+      <div className="no-print toolbar mb-6">
         {tabs.map((t) => (
-          <Link key={t.key} href={t.href} className={cx("rounded-full border px-3 py-1 text-sm", view === t.key ? "border-brand-600 bg-brand-600 text-white" : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50")}>{t.label}</Link>
+          <Link key={t.key} href={t.href} className={buttonClass(view === t.key ? "primary" : "secondary")}>{t.label}</Link>
         ))}
-        <form className="flex items-center gap-1.5">
+        <form className="toolbar">
           <input type="month" name="m" defaultValue={selMonth ?? thisMonth} min={periodOf(year.startDate)} max={periodOf(year.endDate)}
-            className={cx("py-1", view === "pick" && "border-brand-600 ring-2 ring-brand-100")} aria-label="Pick a month" />
-          <button className="rounded-full border border-gray-300 bg-white px-3 py-1 text-sm hover:bg-gray-50">Show month</button>
+            className={cx("w-40", view === "pick" && "border-ink ring-4 ring-ink/10")} aria-label="Pick a month" />
+          <button className="filter-button">Show month</button>
         </form>
       </div>
       {outside && <Notice>That period is outside the {year.name} session, so there is nothing to show.</Notice>}
 
       {/* Period figures */}
       <div>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</h2>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <SectionHeading>{label}</SectionHeading>
+        <div className="stat-grid">
           <Stat label="Collected" value={formatINR(d.period.collected)} sub={`${d.period.receipts} receipt${d.period.receipts === 1 ? "" : "s"}`} tone="green" />
           <Stat label="Billed" value={formatINR(d.period.billed)} sub={`${d.period.bills} bill${d.period.bills === 1 ? "" : "s"} issued`} />
           <Stat label="Collected vs billed" value={pct === null ? "—" : `${pct}%`} sub={pct === null ? "No bills issued in this period" : "of amount billed in this period"} />
@@ -96,8 +96,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
       {/* Session figures */}
       <div>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Session {year.name} so far</h2>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <SectionHeading>Session {year.name} so far</SectionHeading>
+        <div className="stat-grid">
           <Stat label="Billed in session" value={formatINR(d.session.billed)} />
           <Stat label="Collected in session" value={formatINR(d.session.collected)} sub={`${sessionPct}% of billed`} tone="green" />
           <Stat label="Outstanding" value={formatINR(d.session.outstanding)} sub={<>Overdue {formatINR(d.session.overdue)}</>} tone={d.session.outstanding ? "red" : undefined} />
@@ -105,17 +105,17 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card title={`Month by month · ${year.name}`} actions={<span className="flex items-center gap-3 text-xs text-gray-500"><span className="inline-flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-brand-600" />Collected</span><span className="inline-flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-gray-300" />Billed</span></span>}>
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Card title={`Month by month · ${year.name}`} actions={<span className="flex items-center gap-3 text-xs text-gray-500"><span className="inline-flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-ink" />Collected</span><span className="inline-flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-gray-300" />Billed</span></span>}>
           <div className="flex h-48 items-end gap-1 sm:gap-2">
             {d.months.map((m) => (
               <Link key={m.month} href={`/?m=${m.month}`} title={`${periodLabel(m.month)}: collected ${formatINR(m.collected)}, billed ${formatINR(m.billed)}`}
-                className={cx("group flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1 rounded px-0.5", selMonth === m.month && "bg-brand-50")}>
+                className={cx("group flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1 rounded px-0.5", selMonth === m.month && "bg-gray-50")}>
                 <div className="flex h-36 w-full items-end justify-center gap-0.5">
                   <div className="w-1/2 rounded-t bg-gray-300 group-hover:bg-gray-400" style={{ height: `${m.billed ? Math.max(3, (m.billed / maxMonth) * 100) : 0}%` }} />
-                  <div className="w-1/2 rounded-t bg-brand-600 group-hover:bg-brand-700" style={{ height: `${m.collected ? Math.max(3, (m.collected / maxMonth) * 100) : 0}%` }} />
+                  <div className="w-1/2 rounded-t bg-ink group-hover:bg-gray-800" style={{ height: `${m.collected ? Math.max(3, (m.collected / maxMonth) * 100) : 0}%` }} />
                 </div>
-                <div className={cx("truncate text-[10px] sm:text-xs", selMonth === m.month ? "font-semibold text-brand-700" : "text-gray-600")}>{periodLabel(m.month).split(" ")[0]}</div>
+                <div className={cx("truncate text-[10px] sm:text-xs", selMonth === m.month ? "font-semibold text-ink" : "text-gray-600")}>{periodLabel(m.month).split(" ")[0]}</div>
               </Link>
             ))}
           </div>
@@ -124,7 +124,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
         <Card title={view === "today" || view === "yesterday" ? `Collected by mode · ${label}` : `Day by day · ${label}`}>
           {view === "today" || view === "yesterday" || d.period.daily.length === 0 || view === "session" ? (
-            d.period.byMode.length === 0 ? <p className="text-sm text-gray-500">Nothing collected in this period.</p> : (
+            d.period.byMode.length === 0 ? <Empty>Nothing collected in this period.</Empty> : (
               <table className="data"><tbody>{d.period.byMode.map((m) => (
                 <tr key={m.mode}><td className="capitalize">{m.mode.replace("_", " ")}</td><td className="num text-gray-500">{m.n}</td><td className="num"><Money p={m.v} /></td></tr>
               ))}</tbody></table>
@@ -134,7 +134,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               <div className="flex h-40 items-end gap-0.5 border-b border-gray-200">
                 {days.map((x) => (
                   <div key={x.day} title={`${formatDate(x.day)}: ${formatINR(x.v)}`} className="flex h-full min-w-0 flex-1 flex-col justify-end hover:bg-gray-50">
-                    {x.v > 0 && <div className="rounded-t bg-green-600" style={{ height: `${Math.max(4, (x.v / maxDay) * 100)}%` }} />}
+                    {x.v > 0 && <div className="rounded-t bg-ink" style={{ height: `${Math.max(4, (x.v / maxDay) * 100)}%` }} />}
                   </div>
                 ))}
               </div>
@@ -146,11 +146,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           )}
         </Card>
 
-        <Card title={`Recent receipts · ${label}`} actions={<Link href={`/reports?from=${from}&to=${to}`} className="text-xs text-brand-700 hover:underline">Full report →</Link>}>
-          {d.period.recent.length === 0 ? <p className="text-sm text-gray-500">No receipts in this period.</p> : (
+        <Card title={`Recent receipts · ${label}`} actions={<Link href={`/reports?from=${from}&to=${to}`} className="text-xs text-ink hover:underline">Full report →</Link>}>
+          {d.period.recent.length === 0 ? <Empty>No receipts in this period.</Empty> : (
             <table className="data"><tbody>{d.period.recent.map((x) => (
               <tr key={x.id}>
-                <td><Link className="text-brand-700 hover:underline" href={`/receipts/${x.id}`}>{x.receiptNo}</Link><div className="text-xs text-gray-500">{formatDate(x.date)}</div></td>
+                <td><Link className="text-ink hover:underline" href={`/receipts/${x.id}`}>{x.receiptNo}</Link><div className="text-xs text-gray-500">{formatDate(x.date)}</div></td>
                 <td><Link className="hover:underline" href={`/students/${x.studentId}`}>{x.studentName}</Link></td>
                 <td><Badge>{x.mode}</Badge></td>
                 <td className="num"><Money p={x.amount} /></td>
@@ -159,8 +159,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           )}
         </Card>
 
-        <Card title={`Top overdue classes · ${year.name}`} actions={<Link href="/reports/defaulters" className="text-xs text-brand-700 hover:underline">Defaulters →</Link>}>
-          {d.topClasses.length === 0 ? <p className="text-sm text-gray-500">No overdue dues in this session. 🎉</p> : (
+        <Card title={`Top overdue classes · ${year.name}`} actions={<Link href="/reports/defaulters" className="text-xs text-ink hover:underline">Defaulters →</Link>}>
+          {d.topClasses.length === 0 ? <Empty>No overdue dues in this session.</Empty> : (
             <table className="data"><thead><tr><th>Class</th><th className="num">Students</th><th className="num">Overdue</th></tr></thead>
               <tbody>{d.topClasses.map((c) => <tr key={c.className}><td>{c.className}</td><td className="num">{c.students}</td><td className="num"><Money p={c.v} /></td></tr>)}</tbody>
             </table>

@@ -30,7 +30,7 @@ export default async function InvoiceDetail({ params }: { params: Promise<{ id: 
   const { inv } = d;
   return (
     <div className="space-y-4">
-      <PageHeader title={`Bill ${inv.invoiceNo}`} subtitle={<><Link className="text-brand-700 hover:underline" href={`/students/${inv.studentId}`}>{d.student.name}</Link> · {d.className} · {periodLabel(inv.period)} · <Badge>{inv.status}</Badge></>}
+      <PageHeader title={`Bill ${inv.invoiceNo}`} subtitle={<><Link className="text-ink hover:underline" href={`/students/${inv.studentId}`}>{d.student.name}</Link> · {d.className} · {periodLabel(inv.period)} · <Badge>{inv.status}</Badge></>}
         actions={<LinkButton variant="primary" href={`/invoices/${id}/print?auto=1`} target="_blank">🖨 Print bill</LinkButton>} />
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Lines" className="lg:col-span-2">
@@ -48,7 +48,7 @@ export default async function InvoiceDetail({ params }: { params: Promise<{ id: 
           <Card title="Payments applied">
             {d.allocations.length === 0 ? <p className="text-sm text-gray-500">None</p> : (
               <ul className="space-y-1 text-sm">{d.allocations.map(({ a, receiptNo, date }) => (
-                <li key={a.id} className={`flex justify-between ${a.reversedAt ? "text-gray-400 line-through" : ""}`}><Link className="text-brand-700 hover:underline" href={`/receipts/${a.paymentId}`}>{receiptNo}</Link><span>{formatDate(date)} · <Money p={a.amount} /></span></li>
+                <li key={a.id} className={`flex justify-between ${a.reversedAt ? "text-gray-400 line-through" : ""}`}><Link className="text-ink hover:underline" href={`/receipts/${a.paymentId}`}>{receiptNo}</Link><span>{formatDate(date)} · <Money p={a.amount} /></span></li>
               ))}</ul>
             )}
             {d.creditNotes.length > 0 && <ul className="mt-3 space-y-1 border-t border-gray-100 pt-2 text-sm">{d.creditNotes.map((c) => <li key={c.id}>{c.creditNoteNo}: <Money p={c.amount} /> — {c.reason}</li>)}</ul>}

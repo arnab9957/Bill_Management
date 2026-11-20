@@ -24,18 +24,18 @@ export default async function Messages({ searchParams }: { searchParams: Promise
   const [rows, stats] = await Promise.all([notifications.listOutbox(sp), notifications.outboxStats()]);
   const link = (k: string, v?: string) => `?${new URLSearchParams({ ...sp, [k]: v ?? "" } as Record<string, string>)}`;
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <PageHeader title="Messages" subtitle="Every SMS, WhatsApp and email goes through this queue and is sent when the internet is available (09:00–20:00 by default)."
         actions={<LinkButton href="/notifications/templates">Templates</LinkButton>} />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-5 md:grid-cols-3 xl:grid-cols-5">
         {(["queued", "sending", "sent", "failed", "cancelled"] as const).map((s) => (
-          <Link key={s} href={link("status", s)}><Stat label={s} value={stats[s] ?? 0} tone={s === "failed" && stats.failed ? "red" : undefined} /></Link>
+          <Link key={s} href={link("status", s)} className="rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"><Stat label={s} value={stats[s] ?? 0} tone={s === "failed" && stats.failed ? "red" : undefined} /></Link>
         ))}
       </div>
       <Card>
         <div className="mb-3 flex gap-2 text-sm">
-          <Link className="text-brand-700 hover:underline" href="?">All</Link>
-          {(["whatsapp", "sms", "email"] as const).map((c) => <Link key={c} className="capitalize text-brand-700 hover:underline" href={link("channel", c)}>{c}</Link>)}
+          <Link className="text-ink hover:underline" href="?">All</Link>
+          {(["whatsapp", "sms", "email"] as const).map((c) => <Link key={c} className="capitalize text-ink hover:underline" href={link("channel", c)}>{c}</Link>)}
         </div>
         {rows.length === 0 ? <Empty>No messages.</Empty> : (
           <table className="data">
@@ -51,7 +51,7 @@ export default async function Messages({ searchParams }: { searchParams: Promise
                   <div className="text-xs text-gray-500">{m.attempts ? `${m.attempts} attempt(s)` : ""}{m.lastError ? ` · ${m.lastError}` : ""}</div>
                   {m.sentAt && <div className="text-xs text-gray-500">sent {m.sentAt.toLocaleString("en-IN")}</div>}</td>
                 <td className="whitespace-nowrap">
-                  {(m.status === "failed" || m.status === "cancelled") && <form action={retry.bind(null, m.id)}><button className="text-xs text-brand-700 hover:underline">Retry</button></form>}
+                  {(m.status === "failed" || m.status === "cancelled") && <form action={retry.bind(null, m.id)}><button className="text-xs text-ink hover:underline">Retry</button></form>}
                   {m.status === "queued" && <form action={cancel.bind(null, m.id)}><button className="text-xs text-red-600 hover:underline">Cancel</button></form>}
                 </td>
               </tr>

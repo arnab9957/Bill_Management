@@ -2,7 +2,7 @@
 
 Offline-first fee billing for a school, built from *School Billing Management System — Architecture & Implementation Plan*.
 Everything (admissions, bills, fee collection, receipts, reports) works with the internet switched off.
-SMS, WhatsApp and email reminders wait in a local outbox and are sent when a connection is available.
+SMS and email reminders wait in a local outbox and are sent when a connection is available. WhatsApp can either open a ready-to-send chat in the device's logged-in WhatsApp, or use Meta Cloud API.
 
 ## Easiest way: double-click `start.cmd`
 
@@ -56,7 +56,7 @@ apps/worker         pg-boss cron jobs: bill run, late fees, reminders, outbox di
 packages/db         Drizzle schema (single source of types), migrations and seed
 packages/core       All business logic as pure TypeScript with no React or Next. Web, worker and tests share it
 packages/validation Zod schemas shared by the browser, Server Actions, Excel import and jobs
-packages/notifications  Channel adapters: SMTP, WhatsApp Cloud API, SMS over HTTP (DLT), SMS through an Android gateway on the LAN (offline), and console
+packages/notifications  Channel adapters: Brevo API and SMTP email, WhatsApp device links (wa.me) / Cloud API, SMS over HTTP (DLT), SMS through an Android gateway on the LAN (offline), and console
 scripts/            instance.mjs/new-institute.mjs plus NSSM, backup, restore and update scripts
 instances/<code>/   one private installation per institute: .env, profile, storage, backups and logs
 ```
@@ -116,7 +116,7 @@ instances/<code>/   one private installation per institute: .env, profile, stora
   - Installment plans
   - Encrypted cloud backup copy
   - Multi-branch support and a parent portal
-- **Before go-live**, start the WhatsApp Business verification and SMS DLT registration early. Then enter the approved template IDs under *Messages → Templates*.
+- **Before go-live**, choose a WhatsApp mode under *Settings → Message providers*: **Device WhatsApp** opens chats on the school computer without verification, while **Meta Cloud API** needs WhatsApp Business verification and approved template IDs under *Messages → Templates*. Start SMS DLT registration early if using an internet SMS provider.
 
 ## Production on the school server
 
@@ -127,7 +127,7 @@ instances/<code>/   one private installation per institute: .env, profile, stora
 5. Under *Settings*, set:
    - the school details and UPI ID
    - a backup folder on a second disk
-   - the providers (SMTP, WhatsApp, SMS)
+   - the providers (Brevo or SMTP, WhatsApp, SMS)
    - one user per staff member
 
 ## Setting up institutes

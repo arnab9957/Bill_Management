@@ -20,10 +20,10 @@ export default async function DayBook({ searchParams }: { searchParams: Promise<
   return (
     <div className="space-y-4">
       <PageHeader title="Day book" subtitle={`${date} · everything collected that day`} actions={<>
-        <form className="flex gap-2"><input type="date" name="date" defaultValue={date} />{user.role !== "CASHIER" && <label className="flex items-center gap-1"><input type="checkbox" name="mine" value="1" defaultChecked={sp.mine === "1"} />Mine only</label>}<button className="rounded-md border border-gray-300 bg-white px-3 text-sm">Show</button></form>
+        <form className="toolbar"><input type="date" name="date" defaultValue={date} />{user.role !== "CASHIER" && <label className="flex items-center gap-2 pb-2"><input type="checkbox" name="mine" value="1" defaultChecked={sp.mine === "1"} />Mine only</label>}<button className="filter-button">Show</button></form>
         {can(user.role, "reports") && <LinkButton href={`/api/export/daybook?date=${date}`}>Export</LinkButton>}
       </>} />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
         <Stat label="Total collected" value={formatINR(book.total)} sub={`${book.rows.length - book.cancelled} receipts`} />
         {Object.entries(book.byMode).map(([m, v]) => <Stat key={m} label={m.replace("_", " ")} value={formatINR(v)} />)}
         {book.cancelled > 0 && <Stat label="Cancelled" value={book.cancelled} tone="red" />}
@@ -32,14 +32,14 @@ export default async function DayBook({ searchParams }: { searchParams: Promise<
         <table className="data">
           <thead><tr><th>Receipt</th><th>Student</th><th>Mode</th><th>Cashier</th><th>Status</th><th className="num">Amount</th></tr></thead>
           <tbody>{book.rows.map((r) => (
-            <tr key={r.p.id}><td><Link className="text-brand-700 hover:underline" href={`/receipts/${r.p.id}`}>{r.p.receiptNo}</Link></td>
+            <tr key={r.p.id}><td><Link className="text-ink hover:underline" href={`/receipts/${r.p.id}`}>{r.p.receiptNo}</Link></td>
               <td>{r.studentName} <span className="text-xs text-gray-500">{r.admissionNo}</span></td><td className="capitalize">{r.p.mode.replace("_", " ")}</td>
               <td>{r.cashier}</td><td><Badge>{r.p.status}</Badge></td><td className="num"><Money p={r.p.amount} /></td></tr>
           ))}</tbody>
         </table>
       </Card>
       {closing && (
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2">
         <Card title="Close my counter">
           {myClose ? (
             <p className="text-sm">Closed at {myClose.c.closedAt.toLocaleTimeString("en-IN")}. System cash <Money p={myClose.c.systemCash} />, counted <Money p={myClose.c.countedCash} />, difference <b><Money p={myClose.c.difference} /></b>. Entries for this day are locked.</p>

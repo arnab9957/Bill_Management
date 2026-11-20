@@ -1,30 +1,65 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", "Nirmala UI", sans-serif;
-  --color-brand-50: #eef6ff;
-  --color-brand-100: #d9eaff;
-  --color-brand-600: #1d5fd1;
-  --color-brand-700: #184ea9;
-  --color-brand-900: #10294f;
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", "Nirmala UI", sans-serif;
+  --color-canvas: #f5f4f0;
+  --color-surface: #ffffff;
+  --color-sidebar: #0b1f33;
+  --color-navy: #0b1f33;
+  --color-navy-soft: #132c46;
+  --color-ink: #0b0b0b;
+  --color-accent: #b8873f;
+  --color-accent-ink: #8a6420;
+  --color-accent-soft: #f6f0e5;
+  --color-gray-50: #fafafa;
+  --color-gray-100: #f5f5f5;
+  --color-gray-200: #e7e5e4;
+  --color-gray-300: #d6d3d1;
+  --color-gray-400: #a8a29e;
+  --color-gray-500: #78716c;
+  --color-gray-600: #57534e;
+  --color-gray-700: #44403c;
+  --color-gray-800: #292524;
+  --color-gray-900: #1c1917;
+  --color-gray-950: #0c0a09;
+  --color-brand-50: #ecfdf5;
+  --color-brand-100: #d1fae5;
+  --color-brand-200: #a7f3d0;
+  --color-brand-300: #6ee7b7;
+  --color-brand-600: #059669;
+  --color-brand-700: #047857;
+  --color-brand-800: #065f46;
+  --color-brand-900: #064e3b;
 }
 
-html, body { background: #f6f7f9; color: #1b1f24; }
+:root { color-scheme: light; }
+html, body { background: var(--color-canvas); color: var(--color-ink); }
+body { font-feature-settings: "cv02", "cv03", "cv04", "cv11"; }
+::selection { background: var(--color-ink); color: #ffffff; }
 input, select, textarea {
-  @apply max-w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-base outline-none sm:text-sm focus:border-brand-600 focus:ring-2 focus:ring-brand-100;
+  @apply max-w-full rounded-lg border border-gray-300 bg-surface px-3 py-2 text-base text-ink outline-none transition sm:text-sm placeholder:text-gray-400 focus:border-ink focus:ring-4 focus:ring-ink/10;
 }
-input[type="checkbox"] { @apply h-4 w-4 p-0; }
-label { @apply text-sm text-gray-700; }
+input[type="checkbox"] { @apply h-4 w-4 rounded border-gray-300 p-0 accent-ink; }
+label { @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600; }
+label:has(input[type="checkbox"]), label:has(input[type="radio"]) { @apply text-sm font-medium normal-case tracking-normal text-gray-700; }
+.page-stack { @apply space-y-6; }
+.section-stack { @apply space-y-4; }
+.field-stack { @apply flex flex-col gap-2; }
+.form-actions { @apply mt-6 flex flex-wrap gap-3; }
+.stat-grid { @apply grid grid-cols-2 gap-5 lg:grid-cols-4; }
+.eyebrow { @apply text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500; }
+.hint { @apply mt-1 text-xs leading-relaxed text-gray-500; }
+.toolbar { @apply flex flex-wrap items-end gap-3; }
+.filter-button { @apply inline-flex items-center justify-center rounded-lg border border-gray-300 bg-surface px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:border-ink hover:bg-gray-50 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20; }
 table.data { @apply w-full text-sm; }
-table.data th { @apply border-b border-gray-200 bg-gray-50 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500; }
-table.data th { @apply whitespace-nowrap; }
+table.data th { @apply whitespace-nowrap border-b border-gray-200 bg-gray-50 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600; }
 @media (max-width: 639px) {
-  table.data th, table.data td { @apply px-2 py-1.5; }
+  table.data th, table.data td { @apply px-3 py-2; }
   form.flex > input:not([type="checkbox"]):not([type="radio"]), form.flex > select { @apply min-w-0 flex-1 basis-40; }
 }
-table.data td { @apply whitespace-nowrap border-b border-gray-100 px-3 py-2 align-top; }
+table.data td { @apply whitespace-nowrap border-b border-gray-100 px-4 py-3 align-top; }
 table.data td.wrap { @apply min-w-48 whitespace-normal; }
-table.data tr:hover td { @apply bg-brand-50/40; }
+table.data tr:hover td { @apply bg-gray-50; }
 .num { @apply text-right tabular-nums; }
 @keyframes navbar { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
 

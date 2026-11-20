@@ -27,13 +27,13 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
   return (
     <div className="space-y-5">
       <PageHeader title="Reports" subtitle={`${formatDate(from)} – ${formatDate(to)}`} actions={<>
-        <form className="flex gap-2"><input type="date" name="from" defaultValue={from} /><input type="date" name="to" defaultValue={to} /><button className="rounded-md border border-gray-300 bg-white px-3 text-sm">Apply</button></form>
+        <form className="toolbar"><input type="date" name="from" defaultValue={from} /><input type="date" name="to" defaultValue={to} /><button className="filter-button">Apply</button></form>
         <LinkButton href={`/reports?from=${addDays(today(), -6)}&to=${today()}`}>Last 7 days</LinkButton>
         {can(user.role, "dayClose") && <LinkButton href="/daybook">Day book</LinkButton>}
         {can(user.role, "receiptsCancel") && <LinkButton href="/cheques">Cheques</LinkButton>}
         <LinkButton variant="primary" href="/reports/defaulters">Defaulters</LinkButton>
       </>} />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
         <Stat label="Collected" value={<Money p={col.total} />} />
         <Stat label="Refunded" value={<Money p={col.refunded} />} />
         <Stat label="Late fee charged / collected" value={<><Money p={late.charged} /> / <Money p={late.collected} /></>} />
@@ -44,7 +44,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
         <LinkButton href={`/api/export/outstanding`}>Export outstanding (Excel)</LinkButton>
         <LinkButton href={`/api/export/tally?${q}`}>Tally vouchers (CSV)</LinkButton>
       </div>
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-5 lg:grid-cols-3">
         <Breakdown title="By mode" rows={col.byMode} />
         <Breakdown title="By cashier" rows={col.byCashier} />
         <Breakdown title="By fee head" rows={col.byHead} />
@@ -65,7 +65,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
       {cancelled.length > 0 && (
         <Card title="Cancelled receipts">
           <table className="data"><thead><tr><th>Receipt</th><th>Date</th><th>Student</th><th>Cashier</th><th>Reason</th><th className="num">Amount</th></tr></thead>
-            <tbody>{cancelled.map((c) => <tr key={c.p.id}><td><Link className="text-brand-700 hover:underline" href={`/receipts/${c.p.id}`}>{c.p.receiptNo}</Link></td><td>{formatDate(c.p.date)}</td><td>{c.studentName}</td><td>{c.cashier}</td><td className="wrap">{c.p.cancelReason}</td><td className="num"><Money p={c.p.amount} /></td></tr>)}</tbody></table>
+            <tbody>{cancelled.map((c) => <tr key={c.p.id}><td><Link className="text-ink hover:underline" href={`/receipts/${c.p.id}`}>{c.p.receiptNo}</Link></td><td>{formatDate(c.p.date)}</td><td>{c.studentName}</td><td>{c.cashier}</td><td className="wrap">{c.p.cancelReason}</td><td className="num"><Money p={c.p.amount} /></td></tr>)}</tbody></table>
         </Card>
       )}
     </div>

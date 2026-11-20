@@ -56,7 +56,7 @@ export default async function Health() {
           <p className="mt-3 text-xs text-gray-500">Nightly backups run at 23:00 (30 daily + 12 monthly kept). Integrity check recomputes balances and checks bill/receipt numbers have no gaps.</p>
         </Card>
         <Card title="Integrity issues">
-          {h.issues?.length ? <ul className="list-disc space-y-1 pl-5 text-sm text-red-800">{h.issues.map((i) => <li key={i.id}>{i.detail}</li>)}</ul> : <p className="text-sm text-green-700">No open issues.</p>}
+          {h.issues?.length ? <ul className="list-disc space-y-1 pl-5 text-sm text-red-800">{h.issues.map((i) => <li key={i.id}>{i.detail}</li>)}</ul> : <p className="text-sm text-ink">No open issues.</p>}
         </Card>
       </div>
       <Card title="Backups">
