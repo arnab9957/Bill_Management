@@ -126,3 +126,128 @@ describe("status", () => {
     expect(deriveStatus({ ...inv, paid: 1000, balance: 0 }, "2026-07-11")).toBe("paid");
   });
 });
+
+describe("guardian & student validation", async () => {
+  const { guardianSchema, importRowSchema } = await import("@sb/validation");
+
+  const validBase = {
+    name: "John Doe",
+    relation: "Father",
+    mobile: "9876543210",
+  };
+
+  it("passes when whatsappNo is provided without email", () => {
+    const res = guardianSchema.safeParse({ ...validBase, whatsappNo: "9876543210" });
+    expect(res.success).toBe(true);
+  });
+
+  it("passes when email is provided without whatsappNo", () => {
+    const res = guardianSchema.safeParse({ ...validBase, email: "parent@example.com" });
+    expect(res.success).toBe(true);
+  });
+
+  it("passes when both whatsappNo and email are provided", () => {
+    const res = guardianSchema.safeParse({
+      ...validBase,
+      whatsappNo: "9876543210",
+      email: "parent@example.com",
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it("fails when neither whatsappNo nor email is provided", () => {
+    const res = guardianSchema.safeParse(validBase);
+    expect(res.success).toBe(false);
+    if (!res.success) {
+      const msgs = res.error.issues.map((i) => i.message);
+      expect(msgs).toContain("Either WhatsApp number or Email is required");
+    }
+  });
+
+  it("fails when whatsappNo and email are blank strings", () => {
+    const res = guardianSchema.safeParse({ ...validBase, whatsappNo: "  ", email: "" });
+    expect(res.success).toBe(false);
+    if (!res.success) {
+      const msgs = res.error.issues.map((i) => i.message);
+      expect(msgs).toContain("Either WhatsApp number or Email is required");
+    }
+  });
+
+  it("importRowSchema enforces at least one of guardianWhatsapp or guardianEmail", () => {
+    const rowBase = {
+      admissionNo: "ADM001",
+      name: "Student One",
+      className: "Class 1",
+      admissionDate: "2026-04-01",
+      guardianName: "Parent One",
+      guardianMobile: "9876543210",
+    };
+    expect(importRowSchema.safeParse({ ...rowBase, guardianWhatsapp: "9876543210" }).success).toBe(true);
+    expect(importRowSchema.safeParse({ ...rowBase, guardianEmail: "p@example.com" }).success).toBe(true);
+    expect(importRowSchema.safeParse(rowBase).success).toBe(false);
+  });
+});
+
+describe("admission & roll auto-generation sequence", async () => {
+  const { computeNextAdmissionNo, computeNextRollNumber } = await import("../src/students");
+
+  it("computes next admission number correctly across different school prefixes and padding", () => {
+    expect(computeNextAdmissionNo([])).toBe("1001");
+    expect(computeNextAdmissionNo(["A1001", "A1002"])).toBe("A1003");
+    expect(computeNextAdmissionNo(["S2001", "S2025"])).toBe("S2026");
+    expect(computeNextAdmissionNo(["2026/001", "2026/002"])).toBe("2026/003");
+    expect(computeNextAdmissionNo(["105"])).toBe("106");
+    expect(computeNextAdmissionNo(["ADM099"])).toBe("ADM100");
+  });
+
+  it("skips already existing admission numbers to guarantee uniqueness", () => {
+    // If A1003 already exists in list, should jump to A1004
+    expect(computeNextAdmissionNo(["A1002", "A1003", "A1001"])).toBe("A1004");
+  });
+
+  it("computes next roll number correctly in class & section", () => {
+    expect(computeNextRollNumber(undefined)).toBe("1");
+    expect(computeNextRollNumber([])).toBe("1");
+    expect(computeNextRollNumber(["1", "2", "3"])).toBe("4");
+    expect(computeNextRollNumber(["01", "02"])).toBe("03");
+    expect(computeNextRollNumber(["1", "3", "5"])).toBe("6");
+  });
+
+  it("skips occupied roll numbers to ensure uniqueness", () => {
+    expect(computeNextRollNumber(["1", "2", "3", "4"])).toBe("5");
+  });
+
+  it("follows configured admission format settings", () => {
+    const year = { name: "2026-27", startDate: "2026-04-01" };
+
+    // Format: ADM/2026/0001
+    const admCfg1 = { prefix: "ADM", includeYear: "year" as const, separator: "/", digits: 4, startNumber: 1 };
+    expect(computeNextAdmissionNo([], admCfg1, year)).toBe("ADM/2026/0001");
+    expect(computeNextAdmissionNo(["ADM/2026/0001", "ADM/2026/0002"], admCfg1, year)).toBe("ADM/2026/0003");
+
+    // Format: SCH-2026-27-001
+    const admCfg2 = { prefix: "SCH", includeYear: "session" as const, separator: "-", digits: 3, startNumber: 1 };
+    expect(computeNextAdmissionNo([], admCfg2, year)).toBe("SCH-2026-27-001");
+
+    // Format: A1001
+    const admCfg3 = { prefix: "A", includeYear: "none" as const, separator: "", digits: 4, startNumber: 1001 };
+    expect(computeNextAdmissionNo([], admCfg3, year)).toBe("A1001");
+    expect(computeNextAdmissionNo(["A1001"], admCfg3, year)).toBe("A1002");
+  });
+
+  it("follows configured roll number format settings", () => {
+    // 2 digits, no section prefix
+    const rollCfg1 = { digits: 2, prefixSection: false, startNumber: 1 };
+    expect(computeNextRollNumber([], rollCfg1)).toBe("01");
+    expect(computeNextRollNumber(["01", "02"], rollCfg1)).toBe("03");
+
+    // Section prefix: A-01, A-02
+    const rollCfg2 = { digits: 2, prefixSection: true, startNumber: 1 };
+    expect(computeNextRollNumber([], rollCfg2, "A")).toBe("A-01");
+    expect(computeNextRollNumber(["A-01"], rollCfg2, "A")).toBe("A-02");
+
+    // 1 digit with section prefix: B-1, B-2
+    const rollCfg3 = { digits: 1, prefixSection: true, startNumber: 1 };
+    expect(computeNextRollNumber(["B-1", "B-2"], rollCfg3, "B")).toBe("B-3");
+  });
+});

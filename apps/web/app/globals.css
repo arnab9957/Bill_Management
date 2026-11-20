@@ -2,26 +2,26 @@
 
 @theme {
   --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", "Nirmala UI", sans-serif;
-  --color-canvas: #f5f4f0;
+  --color-canvas: #f0f4f9;
   --color-surface: #ffffff;
-  --color-sidebar: #0b1f33;
-  --color-navy: #0b1f33;
-  --color-navy-soft: #132c46;
-  --color-ink: #0b0b0b;
-  --color-accent: #b8873f;
-  --color-accent-ink: #8a6420;
-  --color-accent-soft: #f6f0e5;
-  --color-gray-50: #fafafa;
-  --color-gray-100: #f5f5f5;
-  --color-gray-200: #e7e5e4;
-  --color-gray-300: #d6d3d1;
-  --color-gray-400: #a8a29e;
-  --color-gray-500: #78716c;
-  --color-gray-600: #57534e;
-  --color-gray-700: #44403c;
-  --color-gray-800: #292524;
-  --color-gray-900: #1c1917;
-  --color-gray-950: #0c0a09;
+  --color-sidebar: #ffffff;
+  --color-navy: #0f172a;
+  --color-navy-soft: #1e293b;
+  --color-ink: #0f172a;
+  --color-accent: #2563eb;
+  --color-accent-ink: #1d4ed8;
+  --color-accent-soft: #eff6ff;
+  --color-gray-50: #f8fafc;
+  --color-gray-100: #f1f5f9;
+  --color-gray-200: #e2e8f0;
+  --color-gray-300: #cbd5e1;
+  --color-gray-400: #94a3b8;
+  --color-gray-500: #64748b;
+  --color-gray-600: #475569;
+  --color-gray-700: #334155;
+  --color-gray-800: #1e293b;
+  --color-gray-900: #0f172a;
+  --color-gray-950: #020617;
   --color-brand-50: #ecfdf5;
   --color-brand-100: #d1fae5;
   --color-brand-200: #a7f3d0;
@@ -35,14 +35,14 @@
 :root { color-scheme: light; }
 html, body { background: var(--color-canvas); color: var(--color-ink); }
 body { font-feature-settings: "cv02", "cv03", "cv04", "cv11"; }
-::selection { background: var(--color-ink); color: #ffffff; }
+::selection { background: #dbeafe; color: #1e40af; }
 input, select, textarea {
-  @apply max-w-full rounded-lg border border-gray-300 bg-surface px-3 py-2 text-base text-ink outline-none transition sm:text-sm placeholder:text-gray-400 focus:border-ink focus:ring-4 focus:ring-ink/10;
+  @apply max-w-full rounded-lg border border-gray-300 bg-surface px-3 py-2 text-base text-ink outline-none transition sm:text-sm placeholder:text-gray-400 focus:border-accent focus:ring-4 focus:ring-accent/15;
 }
 input:disabled, select:disabled, textarea:disabled {
   @apply cursor-not-allowed border-gray-200 bg-gray-100 text-gray-600 shadow-none;
 }
-input[type="checkbox"] { @apply h-4 w-4 rounded border-gray-300 p-0 accent-ink; }
+input[type="checkbox"] { @apply h-4 w-4 rounded border-gray-300 p-0 accent-accent; }
 input[type="checkbox"]:disabled { @apply cursor-not-allowed opacity-40; }
 label { @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600; }
 label:has(input[type="checkbox"]), label:has(input[type="radio"]) { @apply text-sm font-medium normal-case tracking-normal text-gray-700; }
@@ -54,7 +54,7 @@ label:has(input[type="checkbox"]), label:has(input[type="radio"]) { @apply text-
 .eyebrow { @apply text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500; }
 .hint { @apply mt-1 text-xs leading-relaxed text-gray-500; }
 .toolbar { @apply flex flex-wrap items-end gap-3; }
-.filter-button { @apply inline-flex items-center justify-center rounded-lg border border-gray-300 bg-surface px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:border-ink hover:bg-gray-50 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20; }
+.filter-button { @apply inline-flex items-center justify-center rounded-lg border border-gray-300 bg-surface px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:border-accent hover:bg-accent-soft hover:text-accent-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20; }
 table.data { @apply w-full text-sm; }
 table.data th { @apply whitespace-nowrap border-b border-gray-200 bg-gray-50 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600; }
 @media (max-width: 639px) {

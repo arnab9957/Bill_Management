@@ -31,7 +31,7 @@ export default async function EditStudent({ params, searchParams }: { params: Pr
   const sel = history.find((h) => h.e.academicYearId === wantYear) ?? latest;
   const g = p.guardians.find((x) => x.isPrimary)?.g ?? p.guardians[0]?.g;
   return (
-    <div className="max-w-4xl space-y-4">
+    <div className="w-full space-y-4">
       <PageHeader title={`Edit ${p.s.name}`} subtitle="Personal and parent details apply to every year. Class, section and roll are saved for the selected academic year only."
         actions={<LinkButton href={`/students/${id}`}>Back to profile</LinkButton>} />
       {history.length > 1 && (
