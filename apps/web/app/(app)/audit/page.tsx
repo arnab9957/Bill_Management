@@ -25,7 +25,7 @@ export default async function Audit({ searchParams }: { searchParams: Promise<{ 
                 <div className="text-sm">{auditSummary(a.tableName, a.action, a.oldValues, a.newValues)}</div>
                 <div className="text-[11px] text-gray-400">{actionName(a.action)} · {RECORD_NAMES[a.tableName] ?? a.tableName}{a.recordId ? ` #${a.recordId}` : ""}</div>
               </td>
-              <td className="wrap w-[28rem] max-w-md">
+              <td className="wrap w-md max-w-md">
                 <details><summary className="cursor-pointer text-xs text-ink">Details</summary>
                   <AuditChange oldV={a.oldValues} newV={a.newValues} />
                 </details>
