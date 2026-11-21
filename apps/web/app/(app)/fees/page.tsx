@@ -1,18 +1,48 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { fees, getSettings, toRupeeString } from "@sb/core";
 import { requireRole } from "@/lib/auth";
 import { getWorkingYear } from "@/lib/year";
-import { STANDARD_CLASSES, classOrder } from "@/lib/classes";
 import { formObject, run, type ActionState } from "@/lib/action";
 import { ActionForm, FieldError, Submit } from "@/components/action-form";
-import { Card, Money, PageHeader } from "@/components/ui";
+import { Card, LinkButton, Money, PageHeader } from "@/components/ui";
+import { ReceiptRowsManager } from "./receipt-rows-manager";
+import { AddFeeHeadSection } from "./add-fee-head";
 
 async function addHead(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
   const u = await requireRole("fees");
-  const r = await run(() => fees.createFeeHead(u, formObject(fd)), "Fee head added");
+  const isCustom = fd.get("preset") === "__custom__";
+  const name = String(isCustom ? fd.get("customName") : fd.get("name") ?? "").trim();
+  if (!name) return { ok: false, message: "Enter a fee head name", errors: { name: "Required" } };
+
+  let code = String(isCustom ? (fd.get("customCode") || name) : fd.get("code") ?? "").trim().toUpperCase();
+  code = code.replace(/[^A-Z0-9_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+  if (!code) code = "FEE_" + Date.now().toString(36).toUpperCase();
+
+  const type = String(fd.get("type") || fd.get("customType") || "recurring") as "recurring" | "one_time" | "optional";
+  const isRefundable = fd.has("isRefundable");
+  const printOnReceipt = fd.has("printOnReceipt") || !fd.has("preset");
+  const receiptLabel = String(fd.get("receiptLabel") ?? "").trim() || null;
+
+  const r = await run(async () => {
+    const h = await fees.createFeeHead(u, { code, name, type, isRefundable });
+    if (printOnReceipt && h?.id) {
+      const m = await fees.masters();
+      const maxOrder = Math.max(0, ...m.heads.map((x) => x.receiptOrder ?? 0));
+      const existingRows = m.heads.map((x) => ({
+        id: x.id,
+        show: x.receiptOrder != null,
+        order: x.receiptOrder,
+        label: x.receiptLabel,
+      }));
+      await fees.saveReceiptRows(u, [
+        ...existingRows,
+        { id: h.id, show: true, order: maxOrder + 1, label: receiptLabel }
+      ]);
+    }
+    return h;
+  }, printOnReceipt ? `Fee head "${name}" added & scheduled on receipts` : `Fee head "${name}" added`);
   revalidatePath("/fees");
   return r;
 }
@@ -28,7 +58,12 @@ async function saveRows(_: ActionState, fd: FormData): Promise<ActionState> {
   const u = await requireRole("fees");
   const rows = fd.getAll("ids").map(Number).map((id) => {
     const n = Number(String(fd.get(`order_${id}`) ?? "").trim());
-    return { id, show: fd.get(`show_${id}`) === "on", order: Number.isInteger(n) && n >= 1 ? n : null, label: String(fd.get(`label_${id}`) ?? "").trim() || null };
+    return {
+      id,
+      show: fd.get(`show_${id}`) === "on" || fd.get(`show_${id}`) === "true",
+      order: Number.isInteger(n) && n >= 1 ? n : null,
+      label: String(fd.get(`label_${id}`) ?? "").trim() || null
+    };
   });
   // A head that is ticked but has no number goes after the last numbered one.
   let next = Math.max(0, ...rows.filter((x) => x.show && x.order).map((x) => x.order!)) + 1;
@@ -43,23 +78,6 @@ async function saveLate(_: ActionState, fd: FormData): Promise<ActionState> {
   const r = await run(() => fees.saveLateFeeRule(u, formObject(fd)), "Late-fee rule saved");
   revalidatePath("/fees");
   return r;
-}
-async function addClassAndSetup(_: ActionState, fd: FormData): Promise<ActionState> {
-  "use server";
-  const u = await requireRole("fees");
-  const yearId = Number(fd.get("yearId"));
-  const sections = String(fd.get("sections") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
-  let classId: number;
-  try {
-    const name = String(fd.get("name") ?? "");
-    const c = await fees.createClass(u, name, classOrder(name));
-    classId = c.id;
-    for (const s of sections) await fees.createSection(u, classId, s).catch(() => undefined);
-  } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : "Could not add the class", errors: { name: "Enter a class name" } };
-  }
-  revalidatePath("/fees");
-  redirect(`/fees/structure/${yearId}/${classId}`);
 }
 async function copy(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
@@ -82,24 +100,34 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
       <PageHeader title="Fee setup" actions={
         <form className="toolbar"><select name="year" defaultValue={yearId}>{m.years.map((y) => <option key={y.id} value={y.id}>{y.name}{y.isCurrent ? " (current)" : ""}</option>)}</select><button className="filter-button">Go</button></form>
       } />
-      <Card title={`Fee structures ${year?.name ?? ""}`}>
+      <Card
+        title={`Fee structures ${year?.name ?? ""}`}
+        actions={<LinkButton variant="secondary" size="sm" href="/settings?open=classes-sections#classes-sections">Manage classes</LinkButton>}
+      >
         <table className="data">
-          <thead><tr><th>Class</th><th className="num">Heads</th><th className="num">Monthly</th><th className="num">Yearly total</th><th /></tr></thead>
+          <thead>
+            <tr>
+              <th>Class</th>
+              <th className="text-center">Heads</th>
+              <th className="text-center">Monthly</th>
+              <th className="text-center">Yearly total</th>
+              <th className="text-center" />
+            </tr>
+          </thead>
           <tbody>{structs.map((s) => (
-            <tr key={s.classId}><td>{s.className}</td><td className="num">{s.items}</td><td className="num"><Money p={s.monthly} /></td><td className="num"><Money p={s.annualTotal} /></td>
-              <td className="text-right"><Link className="text-ink hover:underline" href={`/fees/structure/${yearId}/${s.classId}`}>{s.items ? "Edit" : "Set up"}</Link></td></tr>
+            <tr key={s.classId}>
+              <td>{s.className}</td>
+              <td className="text-center tabular-nums">{s.items}</td>
+              <td className="text-center"><Money p={s.monthly} /></td>
+              <td className="text-center"><Money p={s.annualTotal} /></td>
+              <td className="text-center">
+                <Link className="text-ink hover:underline" href={`/fees/structure/${yearId}/${s.classId}`}>
+                  {s.items ? "Edit" : "Set up"}
+                </Link>
+              </td>
+            </tr>
           ))}</tbody>
         </table>
-        <ActionForm action={addClassAndSetup} className="mt-4 flex flex-wrap items-end gap-2 border-t border-gray-100 pt-4">
-          <input type="hidden" name="yearId" value={yearId} />
-          <span className="text-sm font-medium">Add a class</span>
-          <select name="name" required defaultValue="">
-            <option value="" disabled>Choose class…</option>
-            {STANDARD_CLASSES.filter((c) => !m.classes.some((x) => x.name.toLowerCase() === c.toLowerCase())).map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <input name="sections" placeholder="Sections (e.g. A, B)" className="w-40" />
-          <Submit>Add class &amp; set up fees</Submit><FieldError name="name" />
-        </ActionForm>
         <ActionForm action={copy} className="mt-4 flex flex-wrap items-end gap-2 border-t border-gray-100 pt-4">
           <span className="text-sm">Copy all structures from</span>
           <select name="from">{m.years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}</select>
@@ -111,15 +139,8 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
       </Card>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <Card title="Fee heads">
-          <table className="data"><thead><tr><th>Code</th><th>Name</th><th>Type</th></tr></thead>
-            <tbody>{m.heads.map((h) => <tr key={h.id}><td className="font-mono text-xs">{h.code}</td><td>{h.name}{h.isRefundable ? " (refundable)" : ""}</td><td>{h.type.replace("_", " ")}</td></tr>)}</tbody></table>
-          <ActionForm action={addHead} className="mt-3 flex flex-wrap gap-2" resetOnSuccess>
-            <input name="code" placeholder="CODE" className="w-28" required /><input name="name" placeholder="Name" required />
-            <select name="type"><option value="recurring">Recurring</option><option value="one_time">One-time</option><option value="optional">Optional</option></select>
-            <label className="flex items-center gap-1"><input type="checkbox" name="isRefundable" />Refundable</label>
-            <Submit variant="secondary">Add</Submit><FieldError name="code" />
-          </ActionForm>
+        <Card title="Add Fee Heads">
+          <AddFeeHeadSection existingHeads={m.heads} action={addHead} />
         </Card>
 
         {concessionsOn && (
@@ -151,24 +172,7 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
       </div>
 
       <Card title="Rows printed on receipts and bills">
-        <p className="mb-3 text-sm text-gray-600">
-          Receipts and bills list these fee heads as fixed rows, in this order, with 0 for any head not paid — like your paper receipt book.
-          A head that is not ticked is still printed (as an extra row at the end) whenever a payment or bill includes it, so no amount is ever hidden.
-        </p>
-        <ActionForm action={saveRows}>
-          <table className="data">
-            <thead><tr><th>Fee head</th><th>Print a row</th><th>Row no.</th><th>Printed as</th></tr></thead>
-            <tbody>{m.heads.slice().sort((a, b) => (a.receiptOrder ?? 1e6) - (b.receiptOrder ?? 1e6) || a.sortOrder - b.sortOrder).map((h) => (
-              <tr key={h.id}>
-                <td>{h.name} <span className="font-mono text-xs text-gray-400">{h.code}</span><input type="hidden" name="ids" value={h.id} /></td>
-                <td><input type="checkbox" name={`show_${h.id}`} defaultChecked={h.receiptOrder != null} /></td>
-                <td><input name={`order_${h.id}`} type="number" min={1} max={999} defaultValue={h.receiptOrder ?? ""} className="w-20" /></td>
-                <td><input name={`label_${h.id}`} defaultValue={h.receiptLabel ?? ""} placeholder={h.name} className="w-56" /></td>
-              </tr>
-            ))}</tbody>
-          </table>
-          <div className="mt-3"><Submit>Save rows</Submit></div>
-        </ActionForm>
+        <ReceiptRowsManager initialHeads={m.heads} saveRowsAction={saveRows} />
       </Card>
     </div>
   );
