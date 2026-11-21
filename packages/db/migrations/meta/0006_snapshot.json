@@ -1,5 +1,5 @@
 {
-  "id": "6bfb3a4d-d752-41cc-a183-9be5a20ace23",
+  "id": "145f29fb-4993-4f1f-8fe5-45d04af081ef",
   "prevId": "4ee0016b-6168-4498-86a0-4ad6d9a7c8ea",
   "version": "7",
   "dialect": "postgresql",
@@ -343,103 +343,6 @@
       },
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.class_session": {
-      "name": "class_session",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "academic_year_id": {
-          "name": "academic_year_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "class_id": {
-          "name": "class_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "start_date": {
-          "name": "start_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "end_date": {
-          "name": "end_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "class_session_year_class": {
-          "name": "class_session_year_class",
-          "columns": [
-            {
-              "expression": "academic_year_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "class_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "class_session_academic_year_id_academic_year_id_fk": {
-          "name": "class_session_academic_year_id_academic_year_id_fk",
-          "tableFrom": "class_session",
-          "tableTo": "academic_year",
-          "columnsFrom": [
-            "academic_year_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "class_session_class_id_class_id_fk": {
-          "name": "class_session_class_id_class_id_fk",
-          "tableFrom": "class_session",
-          "tableTo": "class",
-          "columnsFrom": [
-            "class_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "class_session_dates": {
-          "name": "class_session_dates",
-          "value": "\"class_session\".\"end_date\" > \"class_session\".\"start_date\""
-        }
-      },
       "isRLSEnabled": false
     },
     "public.class": {
@@ -2602,6 +2505,62 @@
           "primaryKey": false,
           "notNull": true,
           "default": 6
+        },
+        "admission_prefix": {
+          "name": "admission_prefix",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "admission_include_year": {
+          "name": "admission_include_year",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'none'"
+        },
+        "admission_separator": {
+          "name": "admission_separator",
+          "type": "varchar(8)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'/'"
+        },
+        "admission_digits": {
+          "name": "admission_digits",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 4
+        },
+        "admission_start_number": {
+          "name": "admission_start_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "roll_digits": {
+          "name": "roll_digits",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "roll_prefix_section": {
+          "name": "roll_prefix_section",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "roll_start_number": {
+          "name": "roll_start_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
         }
       },
       "indexes": {},

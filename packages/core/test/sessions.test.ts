@@ -26,7 +26,7 @@ describe.skipIf(!run)("class sessions and promotion", () => {
     const sec = section ? m.sections.find((x) => x.classId === c.id && x.name === section)?.id : undefined;
     const s = await core.students.admitStudent(admin, {
       admissionNo: adm, name: `Student ${adm}`, classId: c.id, sectionId: sec, rollNo: roll, admissionDate: "2025-01-01", academicYearId: y1,
-      guardian: { name: "Parent", mobile: String(++phone), messagingConsent: "on" },
+      guardian: { name: "Parent", mobile: String(++phone), whatsappNo: String(phone), messagingConsent: "on" },
     });
     st[adm] = s.id;
   }
@@ -185,7 +185,7 @@ describe.skipIf(!run)("class sessions and promotion", () => {
     // N2 (repeat) has carried dues → refused
     await expect(core.students.undoPromotion(admin, st.N2!, y2)).rejects.toThrow(/carried into/);
     // A student with no dues and no new bills can be undone.
-    await admit("V2", "V", "2");
+    await admit("V2", "V", "9");
     await core.students.promoteStudents(admin, { fromYearId: y1, toYearId: y2, classId: cls.V!, toClassId: cls.VI!, rollMode: "keep", decisions: [{ studentId: st.V2!, action: "promote" }] });
     expect((await core.students.enrollmentFor(st.V2!, y2))?.classId).toBe(cls.VI);
     await core.students.undoPromotion(admin, st.V2!, y2);

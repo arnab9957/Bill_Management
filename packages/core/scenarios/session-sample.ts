@@ -89,7 +89,7 @@ export async function loadSessionSample(log: (s: string) => void = () => {}) {
     const st = await core.students.admitStudent(admin, {
       admissionNo: s.adm, name: s.name, classId: cls(s.cls), sectionId: m.sections.find((x) => x.classId === cls(s.cls) && x.name === "A")?.id,
       rollNo: s.adm.slice(1), admissionDate: s.joined, academicYearId: year(yn).id,
-      guardian: { name: `Parent of ${s.name.split(" ")[0]}`, mobile: String(++phone), messagingConsent: "on" },
+      guardian: { name: `Parent of ${s.name.split(" ")[0]}`, mobile: String(++phone), whatsappNo: String(phone), messagingConsent: "on" },
     });
     ids[s.adm] = st.id;
     log(`  ${s.joined}: admitted ${s.adm} ${s.name} into ${s.cls} (${yn})`);

@@ -47,7 +47,7 @@ describe.skipIf(!run)("auto promotion", () => {
       const secId = m.sections.find((s) => s.classId === cls[c] && s.name === sec)?.id;
       const s = await core.students.admitStudent(admin, {
         admissionNo: adm, name: `Student ${adm}`, classId: cls[c]!, sectionId: secId, rollNo: roll, admissionDate: "2025-06-01", academicYearId: y1,
-        guardian: { name: "Parent", mobile: String(++phone), messagingConsent: "on" },
+        guardian: { name: "Parent", mobile: String(++phone), whatsappNo: String(phone), messagingConsent: "on" },
       });
       st[adm] = s.id;
     }

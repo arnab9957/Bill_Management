@@ -1,7 +1,7 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import {
   getDb, academicYears, classes, concessionTypes, feeHeads, feeStructureItems, feeStructures, lateFeeRules, sections,
-  studentConcessions, transportRoutes, students,
+  studentConcessions, studentEnrollments, transportRoutes, students,
 } from "@sb/db";
 import {
   concessionTypeSchema, feeHeadSchema, lateFeeRuleSchema, receiptRowsSchema, structureItemSchema, studentConcessionSchema, isoDate, z,
@@ -57,10 +57,148 @@ export async function createClass(actor: Actor, name: string, sortOrder: number)
 }
 export async function createSection(actor: Actor, classId: number, name: string) {
   const db = getDb();
-  const [s] = await db.insert(sections).values({ classId, name: z.string().trim().min(1).parse(name).toUpperCase() }).onConflictDoNothing().returning();
+  const [s] = await db.insert(sections).values({ classId, name: z.string().trim().min(1).parse(name) }).onConflictDoNothing().returning();
   if (!s) throw new AppError("Section already exists");
   await audit(db, actor, "create", "section", s.id, null, { classId, name });
   return s;
+}
+
+export async function addClassWithSection(actor: Actor, className: string, sortOrder: number, sectionName: string, studentIds: number[] = [], classId?: number) {
+  const db = getDb();
+  const name = z.string().trim().max(32).parse(className);
+  const section = z.string().trim().max(16).parse(sectionName);
+  const ids = [...new Set(studentIds.map(Number).filter(Number.isFinite))];
+  return db.transaction(async (tx) => {
+    const [found] = classId
+      ? await tx.select().from(classes).where(eq(classes.id, classId)).limit(1)
+      : name ? await tx.select().from(classes).where(sql`lower(${classes.name}) = lower(${name})`).limit(1) : [];
+    let cls = found;
+    let created = false;
+    if (!cls) {
+      if (!name) throw new AppError("Class not found");
+      const [inserted] = await tx.insert(classes).values({ name, sortOrder }).returning();
+      cls = inserted!;
+      created = true;
+      await audit(tx, actor, "create", "class", cls.id, null, { name, sortOrder });
+    }
+    let sectionAdded = false;
+    let moved = 0;
+    if (section) {
+      const [duplicate] = await tx.select({ id: sections.id }).from(sections)
+        .where(and(eq(sections.classId, cls.id), sql`lower(${sections.name}) = lower(${section})`)).limit(1);
+      if (duplicate) throw new AppError("That section already exists in this class");
+      const [s] = await tx.insert(sections).values({ classId: cls.id, name: section }).onConflictDoNothing().returning();
+      if (!s) throw new AppError("That section already exists in this class");
+      sectionAdded = true;
+      await audit(tx, actor, "create", "section", s.id, null, { classId: cls.id, name: section });
+      if (ids.length) {
+        const affected = await tx.update(students).set({ sectionId: s.id })
+          .where(and(eq(students.classId, cls.id), inArray(students.id, ids))).returning({ id: students.id });
+        if (affected.length !== ids.length) throw new AppError("Some selected students do not belong to this class");
+        await tx.update(studentEnrollments).set({ sectionId: s.id })
+          .where(and(eq(studentEnrollments.classId, cls.id), inArray(studentEnrollments.studentId, ids)));
+        moved = affected.length;
+        if (moved) await audit(tx, actor, "assign_section", "section", s.id, null, { classId: cls.id, name: section, students: moved });
+      }
+    } else if (!created) {
+      throw new AppError("Class already exists. Enter a section to add to it.");
+    }
+    return { cls, created, sectionAdded, moved };
+  });
+}
+
+export async function renameClass(actor: Actor, classId: number, name: string) {
+  const db = getDb();
+  const clean = z.string().trim().min(1).max(32).parse(name);
+  const [old] = await db.select().from(classes).where(eq(classes.id, classId));
+  if (!old) throw new AppError("Class not found");
+  const [duplicate] = await db.select({ id: classes.id }).from(classes)
+    .where(and(ne(classes.id, classId), sql`lower(${classes.name}) = lower(${clean})`)).limit(1);
+  if (duplicate) throw new AppError("A class with this name already exists");
+  const [updated] = await db.update(classes).set({ name: clean }).where(eq(classes.id, classId)).returning();
+  await audit(db, actor, "update", "class", classId, old, updated);
+  return updated!;
+}
+
+export async function renameSection(actor: Actor, sectionId: number, name: string) {
+  const db = getDb();
+  const clean = z.string().trim().min(1).max(16).parse(name);
+  const [old] = await db.select().from(sections).where(eq(sections.id, sectionId));
+  if (!old) throw new AppError("Section not found");
+  const [duplicate] = await db.select({ id: sections.id }).from(sections)
+    .where(and(ne(sections.id, sectionId), eq(sections.classId, old.classId), sql`lower(${sections.name}) = lower(${clean})`)).limit(1);
+  if (duplicate) throw new AppError("A section with this name already exists in this class");
+  const [updated] = await db.update(sections).set({ name: clean }).where(eq(sections.id, sectionId)).returning();
+  await audit(db, actor, "update", "section", sectionId, old, updated);
+  return updated!;
+}
+
+/** Classes and sections with at least one student now or in past enrolments. */
+export async function classSectionUsage() {
+  const db = getDb();
+  const [studentClasses, studentSections, enrolmentClasses, enrolmentSections, sectionless] = await Promise.all([
+    db.selectDistinct({ id: students.classId }).from(students),
+    db.selectDistinct({ id: students.sectionId }).from(students).where(isNotNull(students.sectionId)),
+    db.selectDistinct({ id: studentEnrollments.classId }).from(studentEnrollments),
+    db.selectDistinct({ id: studentEnrollments.sectionId }).from(studentEnrollments).where(isNotNull(studentEnrollments.sectionId)),
+    db.select({ id: students.classId, n: count() }).from(students).where(isNull(students.sectionId)).groupBy(students.classId),
+  ]);
+  const ids = (rows: { id: number | null }[]) => new Set(rows.map((r) => r.id).filter((id): id is number => id != null));
+  return {
+    usedClassIds: new Set([...ids(studentClasses), ...ids(enrolmentClasses)]),
+    usedSectionIds: new Set([...ids(studentSections), ...ids(enrolmentSections)]),
+    sectionlessCounts: new Map(sectionless.map((r) => [r.id, Number(r.n)])),
+  };
+}
+
+/** Current students of every class, with their current section name, for section-assignment checklists. */
+export async function classStudentLists() {
+  const rows = await getDb().select({ id: students.id, name: students.name, classId: students.classId, sectionName: sections.name })
+    .from(students).leftJoin(sections, eq(sections.id, students.sectionId)).orderBy(asc(students.name));
+  const map = new Map<number, { id: number; name: string; section: string | null }[]>();
+  for (const r of rows) {
+    const list = map.get(r.classId) ?? [];
+    list.push({ id: r.id, name: r.name, section: r.sectionName });
+    map.set(r.classId, list);
+  }
+  return map;
+}
+
+export async function removeSection(actor: Actor, sectionId: number) {
+  const db = getDb();
+  const [section] = await db.select().from(sections).where(eq(sections.id, sectionId));
+  if (!section) throw new AppError("Section not found");
+  const [student] = await db.select({ id: students.id }).from(students).where(eq(students.sectionId, sectionId)).limit(1);
+  const [enrolment] = await db.select({ id: studentEnrollments.id }).from(studentEnrollments).where(eq(studentEnrollments.sectionId, sectionId)).limit(1);
+  if (student || enrolment) throw new AppError(`Section ${section.name} has students, so it cannot be removed`);
+  await db.delete(sections).where(eq(sections.id, sectionId));
+  await audit(db, actor, "delete", "section", sectionId, section, null);
+  return section;
+}
+
+export async function removeClass(actor: Actor, classId: number) {
+  const db = getDb();
+  const [cls] = await db.select().from(classes).where(eq(classes.id, classId));
+  if (!cls) throw new AppError("Class not found");
+  const [student] = await db.select({ id: students.id }).from(students).where(eq(students.classId, classId)).limit(1);
+  const [enrolment] = await db.select({ id: studentEnrollments.id }).from(studentEnrollments).where(eq(studentEnrollments.classId, classId)).limit(1);
+  if (student || enrolment) throw new AppError(`Class ${cls.name} has students, so it cannot be removed`);
+  return db.transaction(async (tx) => {
+    const ownSections = await tx.select({ id: sections.id }).from(sections).where(eq(sections.classId, classId));
+    if (ownSections.length) {
+      const ids = ownSections.map((s) => s.id);
+      const [sectionStudent] = await tx.select({ id: students.id }).from(students).where(inArray(students.sectionId, ids)).limit(1);
+      const [sectionEnrolment] = await tx.select({ id: studentEnrollments.id }).from(studentEnrollments).where(inArray(studentEnrollments.sectionId, ids)).limit(1);
+      if (sectionStudent || sectionEnrolment) throw new AppError(`Class ${cls.name} has students, so it cannot be removed`);
+    }
+    const structures = await tx.select({ id: feeStructures.id }).from(feeStructures).where(eq(feeStructures.classId, classId));
+    for (const s of structures) await tx.delete(feeStructureItems).where(eq(feeStructureItems.structureId, s.id));
+    await tx.delete(feeStructures).where(eq(feeStructures.classId, classId));
+    await tx.delete(sections).where(eq(sections.classId, classId));
+    await tx.delete(classes).where(eq(classes.id, classId));
+    await audit(tx, actor, "delete", "class", classId, cls, null);
+    return cls;
+  });
 }
 export async function saveRoute(actor: Actor, input: { id?: number; name: string; stops: string; monthlyFee: number; isActive: boolean }) {
   const db = getDb();

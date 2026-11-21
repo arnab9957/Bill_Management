@@ -62,6 +62,15 @@ export const schoolSettings = pgTable("school_settings", {
   receiptIncludeYear: boolean("receipt_include_year").notNull().default(true),
   /** Zero-padding of the number (1 = none, 6 = 000123). */
   receiptDigits: integer("receipt_digits").notNull().default(6),
+  // ---- admission and roll numbering format
+  admissionPrefix: text("admission_prefix").notNull().default(""),
+  admissionIncludeYear: varchar("admission_include_year", { length: 16 }).notNull().default("none"),
+  admissionSeparator: varchar("admission_separator", { length: 8 }).notNull().default("/"),
+  admissionDigits: integer("admission_digits").notNull().default(4),
+  admissionStartNumber: integer("admission_start_number").notNull().default(1),
+  rollDigits: integer("roll_digits").notNull().default(1),
+  rollPrefixSection: boolean("roll_prefix_section").notNull().default(false),
+  rollStartNumber: integer("roll_start_number").notNull().default(1),
 }, (t) => [check("single_row", sql`${t.id} = 1`)]);
 
 export const users = pgTable("app_user", {

@@ -27,7 +27,7 @@ describe("date checks", () => {
   });
 
   it("admission: date of birth must be before the admission date", () => {
-    const base = { admissionNo: "X1", name: "A", classId: 1, admissionDate: "2026-04-01", guardian: { name: "P", mobile: "9876500001" } };
+    const base = { admissionNo: "X1", name: "A", classId: 1, admissionDate: "2026-04-01", guardian: { name: "P", mobile: "9876500001", whatsappNo: "9876500001" } };
     expect(ok(admissionSchema, { ...base, dob: "2019-05-01" })).toBe(true);
     expect(ok(admissionSchema, { ...base, admissionDate: "2018-04-01", dob: "2019-05-01" })).toBe(false);
   });

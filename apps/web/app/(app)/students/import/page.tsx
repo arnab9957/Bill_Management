@@ -31,7 +31,10 @@ export default async function ImportPage() {
   await requireRole("studentsEdit");
   return (
     <div className="max-w-5xl space-y-4">
-      <PageHeader title="Import students from Excel" actions={<LinkButton href="/api/students/template">Download template</LinkButton>} />
+      <PageHeader title="Import students from Excel" actions={<>
+        <LinkButton href="/api/students/template">Download template</LinkButton>
+        <LinkButton href="/students">Back</LinkButton>
+      </>} />
       <Notice>Step 1: check the file — nothing is saved. Step 2: import. The import is all-or-nothing: if any row has an error, nothing is saved. Siblings are linked automatically by the guardian mobile number. An Opening Balance creates an opening bill for old dues.</Notice>
       <Card title="1. Check file">
         <ActionForm action={preview}>

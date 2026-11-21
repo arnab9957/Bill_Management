@@ -12,7 +12,15 @@ export function useActionResult() {
 }
 /** Field error for `name` from the nearest ActionForm. */
 export function useFieldError(name: string) {
-  return useContext(ErrCtx)[name];
+  const errs = useContext(ErrCtx);
+  if (errs[name]) return errs[name];
+  if (name.includes(".")) {
+    const short = name.split(".").pop()!;
+    if (errs[short]) return errs[short];
+  } else {
+    if (errs[`guardian.${name}`]) return errs[`guardian.${name}`];
+  }
+  return undefined;
 }
 export function FieldError({ name }: { name: string }) {
   const e = useFieldError(name);

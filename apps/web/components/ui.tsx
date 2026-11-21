@@ -6,7 +6,7 @@ export function cx(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(" ");
 }
 
-export const panelClass = "min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.04)]";
+export const panelClass = "min-w-0 overflow-hidden rounded-xl border border-gray-200/90 bg-surface shadow-[0_1px_2px_rgba(16,24,40,0.04),0_10px_30px_-24px_rgba(16,24,40,0.28)]";
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
@@ -28,7 +28,7 @@ export function Card({ title, children, className, actions }: { title?: ReactNod
   return (
     <section className={cx(panelClass, className)}>
       {title && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 bg-gray-50/60 px-5 py-4 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200/70 bg-subtle/70 px-5 py-4 sm:px-6">
           <h2 className="text-sm font-semibold tracking-tight text-ink">{title}</h2>
           {actions}
         </div>
@@ -42,13 +42,13 @@ type Variant = "primary" | "secondary" | "danger" | "ghost";
 type Size = "md" | "sm";
 
 const buttonVariants: Record<Variant, string> = {
-  primary: "bg-ink text-white shadow-sm hover:bg-gray-800",
-  secondary: "border border-gray-300 bg-surface text-gray-800 hover:border-ink hover:bg-gray-50 hover:text-ink",
-  danger: "bg-red-700 text-white shadow-sm hover:bg-red-800",
-  ghost: "text-ink hover:bg-gray-100",
+  primary: "bg-accent text-white shadow-sm hover:bg-accent-ink hover:shadow-md",
+  secondary: "border border-gray-300 bg-surface text-gray-700 hover:border-accent/50 hover:bg-tint/60 hover:text-accent-ink",
+  danger: "bg-red-600 text-white shadow-sm hover:bg-red-700",
+  ghost: "text-accent-ink hover:bg-tint hover:text-accent",
 };
 const buttonSizes: Record<Size, string> = { md: "px-4 py-2.5 text-sm", sm: "px-3 py-1.5 text-sm" };
-const buttonBase = "inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20 disabled:cursor-not-allowed disabled:opacity-50";
+const buttonBase = "inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-50 active:translate-y-px";
 
 export function buttonClass(variant: Variant = "primary", size: Size = "md") {
   return cx(buttonBase, buttonSizes[size], buttonVariants[variant]);
@@ -80,10 +80,10 @@ const badgeColors: Record<string, string> = {
   partial: "border-amber-200 bg-amber-50 text-amber-900", queued: "border-amber-200 bg-amber-50 text-amber-900", pending: "border-amber-200 bg-amber-50 text-amber-900", sending: "border-amber-200 bg-amber-50 text-amber-900",
   overdue: "border-red-200 bg-red-50 text-red-800", failed: "border-red-200 bg-red-50 text-red-800", bounced: "border-red-200 bg-red-50 text-red-800",
   cancelled: "border-gray-200 bg-gray-100 text-gray-600", left: "border-gray-200 bg-gray-100 text-gray-600", alumni: "border-gray-200 bg-gray-100 text-gray-600",
-  issued: "border-ink bg-ink text-white",
+  issued: "border-blue-200 bg-blue-50 text-blue-800",
 };
 export function Badge({ children }: { children: string }) {
-  return <span className={cx("inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em]", badgeColors[children] ?? "border-gray-200 bg-gray-100 text-gray-700")}>{children.replace(/_/g, " ")}</span>;
+  return <span className={cx("badge inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em]", badgeColors[children] ?? "border-gray-200 bg-gray-100 text-gray-700")}>{children.replace(/_/g, " ")}</span>;
 }
 
 export function Stat({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: "red" | "green" }) {
@@ -97,7 +97,7 @@ export function Stat({ label, value, sub, tone }: { label: string; value: ReactN
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/60 p-10 text-center text-sm leading-relaxed text-gray-500">{children}</div>;
+  return <div className="rounded-xl border border-dashed border-gray-300 bg-subtle/70 p-10 text-center text-sm leading-relaxed text-gray-500">{children}</div>;
 }
 
 export function TableEmpty({ colSpan, children }: { colSpan: number; children: ReactNode }) {
@@ -105,6 +105,6 @@ export function TableEmpty({ colSpan, children }: { colSpan: number; children: R
 }
 
 export function Notice({ tone = "info", className, role, children }: { tone?: "info" | "warn" | "error" | "ok"; className?: string; role?: "status" | "alert"; children: ReactNode }) {
-  const c = { info: "border-gray-200 bg-surface text-gray-700", warn: "border-amber-200 bg-amber-50 text-amber-900", error: "border-red-200 bg-red-50 text-red-900", ok: "border-brand-200 bg-brand-50 text-brand-900" }[tone];
+  const c = { info: "border-accent/20 bg-tint/70 text-accent-ink", warn: "border-amber-200 bg-amber-50 text-amber-900", error: "border-red-200 bg-red-50 text-red-900", ok: "border-brand-200 bg-brand-50 text-brand-900" }[tone];
   return <div role={role} className={cx("rounded-lg border px-4 py-3 text-sm leading-relaxed shadow-sm", c, className)}>{children}</div>;
 }
