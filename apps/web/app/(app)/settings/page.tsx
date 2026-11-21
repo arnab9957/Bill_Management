@@ -3,9 +3,11 @@ import { fees, getSettings, receiptNumberPreview, removeSchoolLogo, setNextRecei
 import { setNextReceiptNumberSchema } from "@sb/validation";
 import { requireRole } from "@/lib/auth";
 import { formObject, run, type ActionState } from "@/lib/action";
-import { STANDARD_CLASSES, classOrder } from "@/lib/classes";
+import { classOrder } from "@/lib/classes";
 import { ActionForm, FieldError, Submit } from "@/components/action-form";
-import { Card, LinkButton, PageHeader } from "@/components/ui";
+import { LinkButton } from "@/components/ui";
+import { ClassesSectionsManager } from "./classes-sections";
+import { CollapsibleSection, SectionCollapseProvider } from "./section-collapse";
 import { ProfileSection } from "./profile-section";
 import { NumberingFormatFields } from "./numbering-format-fields";
 import { SchoolLogoField } from "./school-logo-field";
@@ -91,38 +93,94 @@ async function makeCurrent(id: number) {
   await fees.setCurrentYear(u, id);
   revalidatePath("/settings");
 }
-async function addClass(_: ActionState, fd: FormData): Promise<ActionState> {
+async function addClassSection(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
   const u = await requireRole("settings");
-  const name = String(fd.get("name") ?? "");
-  const r = await run(() => fees.createClass(u, name, classOrder(name)), "Class added");
+  const mode = String(fd.get("mode") ?? "create");
+  const renamed = "Renamed. Students stay in the same class/section; lists and reports show the new name.";
+  if (mode === "class") {
+    const r = await run(() => fees.renameClass(u, Number(fd.get("id")), String(fd.get("className") ?? "")), renamed);
+    revalidatePath("/", "layout");
+    return r;
+  }
+  if (mode === "section") {
+    const r = await run(() => fees.renameSection(u, Number(fd.get("id")), String(fd.get("section") ?? "")), renamed);
+    revalidatePath("/", "layout");
+    return r;
+  }
+  const className = String(fd.get("className") ?? "");
+  const section = String(fd.get("section") ?? "");
+  if (!className.trim()) return { ok: false, message: "Enter a class name", errors: { className: "Required" } };
+  if (mode === "createSection" && !section.trim()) return { ok: false, message: "Enter a section name", errors: { section: "Required" } };
+  const targetClassId = mode === "createSection" ? Number(fd.get("classId")) : undefined;
+  const studentIds = fd.getAll("studentIds").map(Number);
+  const r = await run(() => fees.addClassWithSection(u, className, classOrder(className), section, studentIds, targetClassId), (res) =>
+    !res.sectionAdded ? "Class created" : res.moved
+      ? `Section ${section.trim()} created and ${res.moved} students moved into it`
+      : res.created ? "Class and section created" : "Section added");
   revalidatePath("/settings");
   return r;
 }
-async function addSection(_: ActionState, fd: FormData): Promise<ActionState> {
+async function removeClassAction(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
   const u = await requireRole("settings");
-  const r = await run(() => fees.createSection(u, Number(fd.get("classId")), String(fd.get("name"))), "Section added");
+  const id = Number(fd.get("id"));
+  const r = await run(() => fees.removeClass(u, id), "Class removed");
   revalidatePath("/settings");
   return r;
 }
-
+async function removeSectionAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  "use server";
+  const u = await requireRole("settings");
+  const id = Number(fd.get("id"));
+  const r = await run(() => fees.removeSection(u, id), "Section removed");
+  revalidatePath("/settings");
+  return r;
+}
 const field = "field-stack";
 const hint = "hint";
 
 export default async function SettingsPage() {
   await requireRole("settings");
-  const [s, m, num] = await Promise.all([getSettings(), fees.masters(), receiptNumberPreview()]);
+  const [s, m, num, usage, studentLists] = await Promise.all([getSettings(), fees.masters(), receiptNumberPreview(), fees.classSectionUsage(), fees.classStudentLists()]);
+  const classItems = m.classes.map((c) => ({
+    id: c.id,
+    name: c.name,
+    used: usage.usedClassIds.has(c.id),
+    students: studentLists.get(c.id) ?? [],
+    sections: m.sections.filter((sec) => sec.classId === c.id).map((sec) => ({ id: sec.id, name: sec.name, used: usage.usedSectionIds.has(sec.id) })),
+  }));
+  const currentYear = m.years.find((y) => y.isCurrent) ?? m.years[0];
+  const totalStudents = classItems.reduce((n, c) => n + c.students.length, 0);
+  const totalSections = classItems.reduce((n, c) => n + c.sections.length, 0);
   return (
     <div className="page-stack">
-      <PageHeader title="School Settings" actions={<>
-        <LinkButton href="/settings/users">Users</LinkButton>
-        <LinkButton href="/settings/providers">SMS / WhatsApp / Email</LinkButton>
-        <LinkButton href="/settings/health">Backups & health</LinkButton>
-        <LinkButton href="/settings/promotion">Year-end promotion</LinkButton>
-      </>} />
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-surface shadow-[0_1px_2px_rgba(16,24,40,0.06)]">
+        <div className="border-b border-gray-200/70 bg-tint/70 px-6 py-6 sm:px-8">
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <div className="min-w-0">
+              <div className="inline-flex rounded-full bg-highlight-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-ink">Administration</div>
+              <h1 className="mt-2 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-[32px]">School Settings</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-600">Manage your school identity, billing defaults, classes and academic sessions from one place.</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className="rounded-full border border-teal/20 bg-teal/5 px-3 py-1.5 text-xs font-medium text-teal">{currentYear ? `Current session · ${currentYear.name}` : "No current session"}</span>
+                <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700">{classItems.length} classes</span>
+                <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700">{totalSections} sections</span>
+                <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700">{totalStudents} students</span>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <LinkButton href="/settings/users">Users</LinkButton>
+              <LinkButton href="/settings/providers">SMS / WhatsApp / Email</LinkButton>
+              <LinkButton href="/settings/health">Backups & health</LinkButton>
+              <LinkButton href="/settings/promotion">Year-end promotion</LinkButton>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      <ProfileSection title="School identity" action={saveIdentity} saveLabel="Save school identity">
+      <SectionCollapseProvider>
+      <ProfileSection id="school-identity" title="School identity" subtitle="Name, address, logo and registration lines printed on receipts." action={saveIdentity} saveLabel="Save school identity">
         <label className={field}>
           <span className="flex items-baseline gap-1.5">
             School name <span className="text-xs font-normal text-gray-500">(printed in capitals on bills and receipts)</span>
@@ -146,7 +204,14 @@ export default async function SettingsPage() {
         <SchoolLogoField hasLogo={!!s.logoPath} version={s.logoPath ?? ""} />
       </ProfileSection>
 
-      <ProfileSection title="Contact & payment" action={saveContact} saveLabel="Save contact & payment">
+      <ClassesSectionsManager
+        classes={classItems}
+        add={addClassSection}
+        removeClass={removeClassAction}
+        removeSection={removeSectionAction}
+      />
+
+      <ProfileSection id="contact-payment" title="Contact & payment" subtitle="Phone, email and UPI details shown on bills." action={saveContact} saveLabel="Save contact & payment">
         <label className={field}>Phone<input name="phone" defaultValue={s.phone} /></label>
         <label className={field}>Email<input name="email" defaultValue={s.email} /><FieldError name="email" /></label>
         <label className={field}>
@@ -157,7 +222,7 @@ export default async function SettingsPage() {
         </label>
       </ProfileSection>
 
-      <ProfileSection title="Bills & receipts" action={saveBilling} saveLabel="Save bills & receipts">
+      <ProfileSection id="bills-receipts" title="Bills & receipts" subtitle="Prefixes, numbering and receipt format defaults." action={saveBilling} saveLabel="Save bills & receipts">
         <label className={field}>Bill prefix<input name="invoicePrefix" defaultValue={s.invoicePrefix} /></label>
         <label className={field}>Receipt prefix<input name="receiptPrefix" defaultValue={s.receiptPrefix} /><FieldError name="receiptPrefix" /></label>
         <label className={field}>Receipt numbering
@@ -174,18 +239,18 @@ export default async function SettingsPage() {
         </label>
       </ProfileSection>
 
-      <ProfileSection title="Admission & roll numbering" action={saveNumbering} saveLabel="Save numbering formats">
-        <NumberingFormatFields s={s} currentYear={m.years.find((y) => y.isCurrent) ?? m.years[0]} />
+      <ProfileSection id="admission-numbering" title="Admission & roll numbering" subtitle="How admission numbers and roll numbers are generated." action={saveNumbering} saveLabel="Save numbering formats">
+        <NumberingFormatFields s={s} currentYear={currentYear} />
       </ProfileSection>
 
-      <ProfileSection title="Reminder timing" action={saveReminders} saveLabel="Save reminder timing">
+      <ProfileSection id="reminder-timing" title="Reminder timing" subtitle="Quiet hours and the overdue reminder schedule." action={saveReminders} saveLabel="Save reminder timing">
         <label className={field}>Send messages from<input name="quietStart" defaultValue={s.quietStart} /><FieldError name="quietStart" /></label>
         <label className={field}>…until<input name="quietEnd" defaultValue={s.quietEnd} /><FieldError name="quietEnd" /></label>
         <label className={field}>Reminder days before due<input name="reminderDaysBefore" type="number" defaultValue={s.reminderDaysBefore} /></label>
         <label className={field}>Overdue reminders after (days)<input name="overdueSteps" defaultValue={s.overdueSteps.join(", ")} /></label>
       </ProfileSection>
 
-      <ProfileSection title="Features & backup" action={saveFeatures} saveLabel="Save features & backup">
+      <ProfileSection id="features-backup" title="Features & backup" subtitle="Optional modules and the backup location." action={saveFeatures} saveLabel="Save features & backup">
         <label className={`${field} sm:col-span-2`}>
           <span className="flex items-baseline gap-1.5">
             Backup folder <span className="text-xs font-normal text-gray-500">(second disk recommended)</span>
@@ -199,7 +264,7 @@ export default async function SettingsPage() {
       </ProfileSection>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="Receipt numbers">
+        <CollapsibleSection id="receipt-numbers" title="Receipt numbers" subtitle="Set the starting number for the current paper series.">
           {num ? (<>
             <p className="text-sm">The next receipt will be numbered <b className="font-mono text-base">{num.text}</b>
               <span className="ml-2 text-gray-500">(series {num.series}, {num.issued} issued so far)</span></p>
@@ -214,9 +279,9 @@ export default async function SettingsPage() {
             )}
             <p className="mt-2 text-xs text-gray-500">Do this before the first receipt is printed (if the paper book is at 6434, type 6435).</p>
           </>) : <p className="text-sm text-gray-500">Set a current academic year first.</p>}
-        </Card>
+        </CollapsibleSection>
 
-        <Card title="Academic sessions">
+        <CollapsibleSection id="academic-sessions" title="Academic sessions" subtitle="Create sessions and choose the active one.">
           <ul className="space-y-1 text-sm">{m.years.map((y) => (
             <li key={y.id} className="flex justify-between items-center py-1">
               <span><b>{y.name}</b> <span className="text-gray-500">({y.startDate} → {y.endDate})</span></span>
@@ -240,23 +305,9 @@ export default async function SettingsPage() {
             <FieldError name="name" />
             <FieldError name="endDate" />
           </ActionForm>
-        </Card>
-
-        <Card title="Classes & sections">
-          <div className="flex flex-wrap gap-2 text-sm">{m.classes.map((c) => (
-            <span key={c.id} className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs">{c.name}: {m.sections.filter((x) => x.classId === c.id).map((x) => x.name).join(", ") || "—"}</span>
-          ))}</div>
-          <ActionForm action={addClass} className="mt-3 flex flex-wrap gap-2" resetOnSuccess>
-            <select name="name" required defaultValue="">
-              <option value="" disabled>Choose class…</option>
-              {STANDARD_CLASSES.filter((c) => !m.classes.some((x) => x.name.toLowerCase() === c.toLowerCase())).map((c) => <option key={c} value={c}>{c}</option>)}
-            </select><Submit variant="secondary">Add class</Submit>
-          </ActionForm>
-          <ActionForm action={addSection} className="mt-2 flex flex-wrap gap-2" resetOnSuccess>
-            <select name="classId">{m.classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select><input name="name" placeholder="Section" className="w-20" required /><Submit variant="secondary">Add section</Submit>
-          </ActionForm>
-        </Card>
+        </CollapsibleSection>
       </div>
+      </SectionCollapseProvider>
     </div>
   );
 }

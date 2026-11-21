@@ -77,7 +77,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         ))}
         <form className="toolbar">
           <input type="month" name="m" defaultValue={selMonth ?? thisMonth} min={periodOf(year.startDate)} max={periodOf(year.endDate)}
-            className={cx("w-40", view === "pick" && "border-ink ring-4 ring-ink/10")} aria-label="Pick a month" />
+            className={cx("w-40", view === "pick" && "border-accent ring-4 ring-accent/10")} aria-label="Pick a month" />
           <button className="filter-button">Show month</button>
         </form>
       </div>
@@ -106,14 +106,14 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <Card title={`Month by month · ${year.name}`} actions={<span className="flex items-center gap-3 text-xs text-gray-500"><span className="inline-flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-ink" />Collected</span><span className="inline-flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-gray-300" />Billed</span></span>}>
+        <Card title={`Month by month · ${year.name}`} actions={<span className="flex items-center gap-3 text-xs text-gray-500"><span className="inline-flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-accent" />Collected</span><span className="inline-flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-gray-300" />Billed</span></span>}>
           <div className="flex h-48 items-end gap-1 sm:gap-2">
             {d.months.map((m) => (
               <Link key={m.month} href={`/?m=${m.month}`} title={`${periodLabel(m.month)}: collected ${formatINR(m.collected)}, billed ${formatINR(m.billed)}`}
-                className={cx("group flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1 rounded px-0.5", selMonth === m.month && "bg-gray-50")}>
+                className={cx("group flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1 rounded px-0.5", selMonth === m.month && "bg-tint/60")}>
                 <div className="flex h-36 w-full items-end justify-center gap-0.5">
                   <div className="w-1/2 rounded-t bg-gray-300 group-hover:bg-gray-400" style={{ height: `${m.billed ? Math.max(3, (m.billed / maxMonth) * 100) : 0}%` }} />
-                  <div className="w-1/2 rounded-t bg-ink group-hover:bg-gray-800" style={{ height: `${m.collected ? Math.max(3, (m.collected / maxMonth) * 100) : 0}%` }} />
+                  <div className="w-1/2 rounded-t bg-accent group-hover:bg-accent-ink" style={{ height: `${m.collected ? Math.max(3, (m.collected / maxMonth) * 100) : 0}%` }} />
                 </div>
                 <div className={cx("truncate text-[10px] sm:text-xs", selMonth === m.month ? "font-semibold text-ink" : "text-gray-600")}>{periodLabel(m.month).split(" ")[0]}</div>
               </Link>
@@ -133,8 +133,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             <>
               <div className="flex h-40 items-end gap-0.5 border-b border-gray-200">
                 {days.map((x) => (
-                  <div key={x.day} title={`${formatDate(x.day)}: ${formatINR(x.v)}`} className="flex h-full min-w-0 flex-1 flex-col justify-end hover:bg-gray-50">
-                    {x.v > 0 && <div className="rounded-t bg-ink" style={{ height: `${Math.max(4, (x.v / maxDay) * 100)}%` }} />}
+                  <div key={x.day} title={`${formatDate(x.day)}: ${formatINR(x.v)}`} className="flex h-full min-w-0 flex-1 flex-col justify-end hover:bg-subtle">
+                    {x.v > 0 && <div className="rounded-t bg-accent" style={{ height: `${Math.max(4, (x.v / maxDay) * 100)}%` }} />}
                   </div>
                 ))}
               </div>

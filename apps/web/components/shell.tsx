@@ -44,8 +44,8 @@ function schoolInitials(school: string) {
 function SchoolMark({ school, logo }: { school: string; logo?: { hasLogo: boolean; version: string } }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [logo?.version]);
-  const tile = "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-200/80 bg-blue-50/80 text-xs font-bold tracking-wide text-blue-900 shadow-2xs";
-  const imageTile = "h-9 w-9 shrink-0 rounded-lg border border-gray-200 bg-white object-contain p-1 shadow-2xs";
+  const tile = "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-accent/20 bg-accent-soft text-[11px] font-bold tracking-wide text-accent-ink";
+  const imageTile = "h-9 w-9 shrink-0 rounded-lg border border-gray-200 bg-surface object-contain p-1";
   if (logo?.hasLogo && !failed) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
@@ -53,26 +53,6 @@ function SchoolMark({ school, logo }: { school: string; logo?: { hasLogo: boolea
     );
   }
   return <div role="img" aria-label={`${school} logo`} title={`${school} logo`} className={tile}>{schoolInitials(school)}</div>;
-}
-
-function CalendarIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-      <line x1="16" y1="2" x2="16" y2="6" />
-      <line x1="8" y1="2" x2="8" y2="6" />
-      <line x1="3" y1="10" x2="21" y2="10" />
-    </svg>
-  );
-}
-
-function ClockIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <circle cx="12" cy="12" r="9" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
 }
 
 function LiveClock() {
@@ -88,19 +68,27 @@ function LiveClock() {
 
   if (!mounted || !now) {
     return (
-      <div className="hidden md:flex flex-col justify-center border-l border-gray-200/80 pl-4 py-0.5 opacity-0 pointer-events-none" aria-hidden>
-        <span className="text-xs font-semibold uppercase tracking-[0.14em]">&nbsp;</span>
-        <span className="text-sm font-semibold">&nbsp;</span>
+      <div className="invisible hidden md:flex items-center gap-4" aria-hidden>
+        <span className="flex flex-col items-center gap-1">
+          <span className="h-2 w-6 rounded bg-gray-200/70" />
+          <span className="h-7 w-8 rounded bg-gray-200/70" />
+        </span>
+        <span className="h-10 w-px bg-gray-200" />
+        <span className="flex flex-col gap-1.5">
+          <span className="h-2.5 w-28 rounded bg-gray-200/70" />
+          <span className="flex items-center gap-2">
+            <span className="h-6 w-24 rounded bg-gray-200/70" />
+            <span className="h-2.5 w-8 rounded bg-gray-200/70" />
+          </span>
+        </span>
       </div>
     );
   }
 
-  const dayDate = now.toLocaleDateString("en-IN", {
-    weekday: "long",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const weekday = now.toLocaleDateString("en-IN", { weekday: "long" });
+  const day = String(now.getDate()).padStart(2, "0");
+  const month = now.toLocaleDateString("en-IN", { month: "short" });
+  const year = now.toLocaleDateString("en-IN", { year: "numeric" });
 
   let hours = now.getHours();
   const ampm = hours >= 12 ? "PM" : "AM";
@@ -109,17 +97,24 @@ function LiveClock() {
   const hStr = String(hours).padStart(2, "0");
   const mStr = String(now.getMinutes()).padStart(2, "0");
   const sStr = String(now.getSeconds()).padStart(2, "0");
-  const timeFormatted = `${hStr}:${mStr}:${sStr} ${ampm}`;
 
   return (
-    <div className="hidden md:flex flex-col justify-center gap-0.5 border-l border-gray-200/90 pl-4 sm:pl-5 py-0.5" title="Current date and time">
-      <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 whitespace-nowrap">
-        <CalendarIcon className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-        <span>{dayDate}</span>
+    <div className="hidden md:flex items-center gap-4" title="Current date and time">
+      <div className="flex flex-col items-center leading-none">
+        <span className="font-sans text-[9px] font-bold uppercase tracking-[0.2em] text-accent-ink">{month}</span>
+        <span className="mt-1 font-sans text-[26px] font-semibold leading-none tracking-[-0.05em] tabular-nums text-ink">{day}</span>
       </div>
-      <div className="flex items-center gap-1.5 text-sm sm:text-[15px] font-bold tracking-tight text-gray-850 whitespace-nowrap">
-        <ClockIcon className="h-3.5 w-3.5 text-accent-ink shrink-0" />
-        <span className="font-mono text-gray-900">{timeFormatted}</span>
+      <span className="h-10 w-px bg-gray-200" />
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+          <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500">{weekday}, {year}</span>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="font-sans text-[20px] font-semibold leading-none tracking-[-0.03em] tabular-nums text-ink">{hStr}<span className="mx-0.5 text-gray-300">:</span>{mStr}</span>
+          <span className="font-sans text-[10px] font-bold tracking-[0.12em] text-accent-ink">{ampm}</span>
+          <span className="font-mono text-[10px] font-medium leading-none text-gray-400">:{sStr}</span>
+        </div>
       </div>
     </div>
   );
@@ -135,9 +130,9 @@ function YearPicker({ year, switchYear }: { year: YearInfo; switchYear: (fd: For
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
         aria-label="Academic session"
         title="Academic session"
-        className={`h-9 w-full cursor-pointer rounded-lg border border-gray-200 bg-gray-50/80 px-2.5 py-1.5 text-xs sm:text-[13px] font-semibold shadow-2xs outline-none transition hover:bg-gray-100/70 hover:border-gray-300 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 ${year.isCurrent ? "text-gray-900" : "text-amber-800 bg-amber-50/70 border-amber-200 font-bold"}`}
+        className={`h-9 w-full cursor-pointer rounded-lg border border-chrome-line bg-chrome-soft/70 px-2.5 py-1.5 text-xs sm:text-[13px] font-semibold text-white outline-none transition hover:border-chrome-muted/50 hover:bg-chrome-soft focus:border-chrome-accent focus:bg-chrome focus:ring-2 focus:ring-chrome-accent/25 ${year.isCurrent ? "" : "border-amber-300/30 bg-amber-300/10 font-bold text-amber-200"}`}
       >
-        <option value="" disabled className="text-gray-400 font-medium">
+        <option value="" disabled className="bg-chrome text-chrome-muted font-medium">
           Academic Sessions
         </option>
         {year.options.map((o) => (
@@ -172,36 +167,36 @@ export function Shell({ nav, user, school, logo, children, logout, year, switchY
 
   return (
     <div className="min-h-screen bg-canvas">
-      <header className="no-print sticky top-0 z-50 flex h-20 items-stretch border-b border-gray-200/80 bg-white text-gray-900 shadow-[0_1px_3px_0_rgba(0,0,0,0.03)]">
-        <div className="flex w-60 shrink-0 items-center gap-2 border-r border-gray-200/80 px-3 sm:px-4 bg-white">
+      <header className="no-print sticky top-0 z-40 flex h-20 items-stretch border-b border-gray-200 bg-surface text-ink shadow-[0_1px_2px_rgba(16,24,40,0.04)] lg:ml-60">
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-3 px-5 sm:px-8 lg:px-10">
           <button type="button" aria-label="Open menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}
-            className="-ml-1 rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 lg:hidden">
+            className="-ml-2 shrink-0 rounded-lg p-2 text-gray-500 hover:bg-gray-200/70 hover:text-ink lg:hidden">
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
           </button>
-          <div className="min-w-0 flex-1">
-            <YearPicker year={year} switchYear={switchYear} />
-          </div>
-        </div>
-        <div className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3 sm:px-6">
           <LiveClock />
-          <div className="flex min-w-0 items-center gap-3 ml-auto">
+          <div className="ml-auto flex min-w-0 items-center gap-2.5">
             <div className="min-w-0 text-right">
-              <div className="truncate text-sm sm:text-[15px] font-bold tracking-tight text-gray-900">{school}</div>
-              <div className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-400">Fees Management</div>
+              <div className="truncate text-[14px] font-semibold leading-none tracking-[-0.01em] text-ink">{school}</div>
+              <div className="mt-1 truncate text-[9px] font-bold uppercase leading-none tracking-[0.18em] text-accent-ink">Fees Management</div>
             </div>
             <SchoolMark school={school} logo={logo} />
           </div>
         </div>
       </header>
-      {menuOpen && <div className="no-print fixed inset-x-0 bottom-0 top-20 z-40 bg-gray-900/20 backdrop-blur-xs lg:hidden" onClick={() => setMenuOpen(false)} aria-hidden />}
-      <div className="flex">
-        <aside aria-label="Main navigation" className={`no-print fixed bottom-0 left-0 top-20 z-50 flex w-60 shrink-0 flex-col border-r border-gray-200/80 bg-white text-gray-800 shadow-xl transition-transform duration-200 lg:sticky lg:top-20 lg:z-auto lg:h-[calc(100vh-5rem)] lg:translate-x-0 lg:shadow-none ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      {menuOpen && <div className="no-print fixed inset-x-0 bottom-0 top-20 z-40 bg-chrome/30 backdrop-blur-xs lg:hidden" onClick={() => setMenuOpen(false)} aria-hidden />}
+      <div className="flex lg:pl-60">
+        <aside aria-label="Main navigation" className={`no-print fixed bottom-0 left-0 top-0 z-50 flex w-60 shrink-0 flex-col border-r border-chrome-line bg-chrome text-chrome-muted shadow-xl transition-transform duration-200 lg:translate-x-0 lg:shadow-none ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}>
+          <div className="flex h-20 shrink-0 items-center gap-2 border-b border-chrome-line bg-chrome-deep/60 px-3 sm:px-4">
+            <button type="button" aria-label="Close menu" onClick={() => setMenuOpen(false)} className="-ml-1 rounded-md p-1 text-chrome-muted hover:bg-white/10 hover:text-white lg:hidden">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            </button>
+            <div className="min-w-0 flex-1">
+              <YearPicker year={year} switchYear={switchYear} />
+            </div>
+          </div>
           <nav className="flex-1 overflow-y-auto px-2.5 py-4">
-            <div className="flex items-center justify-between px-3 pb-2.5">
-              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400">Workspace</div>
-              <button type="button" aria-label="Close menu" onClick={() => setMenuOpen(false)} className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 lg:hidden">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
-              </button>
+            <div className="px-3 pb-2.5">
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-chrome-muted">Workspace</div>
             </div>
             {nav.map((n, i) => {
               const target = pendingHref ?? path;
@@ -209,41 +204,41 @@ export function Shell({ nav, user, school, logo, children, logout, year, switchY
               const showDivider = i > 0 && ADMIN_HREFS.includes(n.href) && !ADMIN_HREFS.includes(nav[i - 1]?.href ?? "");
               return (
                 <div key={n.href}>
-                  {showDivider && <div className="mx-2 my-2.5 border-t border-gray-100" />}
+                  {showDivider && <div className="mx-2 my-2.5 border-t border-chrome-line" />}
                   <Link href={n.href} aria-current={active ? "page" : undefined} title={n.key ? `Alt+${n.key.toUpperCase()}` : undefined}
                     onClick={(e) => { if (!e.ctrlKey && !e.metaKey && !e.shiftKey) go(n.href); }}
-                    className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-all duration-150 ${active ? "bg-blue-50/80 font-semibold text-blue-900 shadow-2xs ring-1 ring-blue-100" : "font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"}`}>
-                    {active && <span className="absolute bottom-1.5 left-0 top-1.5 w-1 rounded-r-full bg-blue-600" />}
-                    <span className={active ? "text-blue-600" : "text-gray-400 group-hover:text-gray-600 transition-colors"}><NavIcon href={n.href} /></span>
+                    className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-all duration-150 ${active ? "bg-chrome-soft font-semibold text-white ring-1 ring-white/10" : "font-medium text-chrome-muted hover:bg-white/5 hover:text-white"}`}>
+                    {active && <span className="absolute bottom-1.5 left-0 top-1.5 w-1 rounded-r-full bg-chrome-accent" />}
+                    <span className={active ? "text-chrome-accent" : "text-chrome-muted group-hover:text-white transition-colors"}><NavIcon href={n.href} /></span>
                     <span className="truncate">{n.label}</span>
                   </Link>
                 </div>
               );
             })}
           </nav>
-          <div className="border-t border-gray-200/80 bg-gray-50/70 px-3.5 py-3.5">
-            <div className="px-1 pb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400">Signed in as</div>
+          <div className="border-t border-chrome-line bg-chrome-deep/60 px-3.5 py-3.5">
+            <div className="px-1 pb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-chrome-muted">Signed in as</div>
             <div className="flex items-center gap-2.5 px-1 py-1">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-blue-200/80 bg-blue-50/70 text-blue-700 shadow-2xs"><UserIcon /></div>
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-chrome-accent/30 bg-chrome-accent/10 text-chrome-accent"><UserIcon /></div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-xs font-bold text-gray-900">{user.fullName}</div>
-                <div className="truncate text-[11px] capitalize text-gray-500 font-medium">{user.role}</div>
+                <div className="truncate text-xs font-bold text-white">{user.fullName}</div>
+                <div className="truncate text-[11px] capitalize text-chrome-muted font-medium">{user.role}</div>
               </div>
             </div>
             <div className="mt-1 flex items-center justify-between px-1 text-[11px]">
-              <Link href="/account/password" className="text-gray-500 underline-offset-4 hover:text-gray-800 hover:underline transition-colors">Password</Link>
-              <form action={logout}><button className="text-gray-500 underline-offset-4 hover:text-gray-800 hover:underline transition-colors">Sign out</button></form>
+              <Link href="/account/password" className="text-chrome-muted underline-offset-4 hover:text-white hover:underline transition-colors">Password</Link>
+              <form action={logout}><button className="text-chrome-muted underline-offset-4 hover:text-white hover:underline transition-colors">Sign out</button></form>
             </div>
           </div>
         </aside>
         <main className={`mx-auto min-h-[calc(100vh-5rem)] w-full max-w-[1600px] min-w-0 flex-1 bg-canvas p-5 transition-opacity sm:p-8 lg:p-10 ${pendingHref ? "pointer-events-none opacity-50" : ""}`} aria-busy={!!pendingHref}>
           {!year.isCurrent && (
-            <div className="no-print mb-6"><Notice tone="warn">You are viewing academic year <b>{year.name}</b>. The current year is {year.currentName}. Change it in the top bar.</Notice></div>
+            <div className="no-print mb-6"><Notice tone="warn">You are viewing academic year <b>{year.name}</b>. The current year is {year.currentName}. Change it in the sidebar.</Notice></div>
           )}
           {children}
         </main>
       </div>
-      {pendingHref && <div className="no-print fixed inset-x-0 top-20 z-50 h-0.5 overflow-hidden bg-blue-100"><div className="h-full w-1/3 animate-[navbar_1s_ease-in-out_infinite] bg-blue-600" /></div>}
+      {pendingHref && <div className="no-print fixed right-0 top-20 z-50 h-0.5 overflow-hidden bg-chrome-line lg:left-60"><div className="h-full w-1/3 animate-[navbar_1s_ease-in-out_infinite] bg-chrome-accent" /></div>}
     </div>
   );
 }
