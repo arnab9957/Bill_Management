@@ -48,7 +48,7 @@ const buttonVariants: Record<Variant, string> = {
   ghost: "text-accent-ink hover:bg-tint hover:text-accent",
 };
 const buttonSizes: Record<Size, string> = { md: "px-4 py-2.5 text-sm", sm: "px-3 py-1.5 text-sm" };
-const buttonBase = "inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-50 active:translate-y-px";
+const buttonBase = "inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-50 active:translate-y-px cursor-pointer";
 
 export function buttonClass(variant: Variant = "primary", size: Size = "md") {
   return cx(buttonBase, buttonSizes[size], buttonVariants[variant]);

@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/auth";
 import { getWorkingYear } from "@/lib/year";
 import { Badge, Card, Empty, LinkButton, Money, PageHeader } from "@/components/ui";
 import { StudentFilters } from "./student-filters";
+import { DraftAdmissionsList, DraftAdmissionsTrigger } from "./draft-admissions";
 
 export default async function StudentsPage({ searchParams }: { searchParams: Promise<{ q?: string; classId?: string; section?: string; sectionId?: string; status?: string }> }) {
   const user = await requireRole("students");
@@ -23,8 +24,10 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
       <PageHeader title="Students" subtitle={`${list.length} enrolled in ${year.name}`} actions={<>
         <LinkButton href={`/api/export/students?${qs}`}>Export Excel</LinkButton>
         {can(user.role, "studentsEdit") && <LinkButton href="/students/import">Import Excel</LinkButton>}
+        {can(user.role, "studentsEdit") && <DraftAdmissionsTrigger />}
         {can(user.role, "studentsEdit") && <LinkButton variant="primary" href="/students/new">New admission</LinkButton>}
       </>} />
+      {can(user.role, "studentsEdit") && <DraftAdmissionsList classes={classes} sections={sections} />}
       <Card>
         <StudentFilters
           classes={classes}

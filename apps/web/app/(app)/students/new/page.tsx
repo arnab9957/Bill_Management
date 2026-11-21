@@ -7,6 +7,7 @@ import { formObject, run, type ActionState } from "@/lib/action";
 import { ActionForm, Submit } from "@/components/action-form";
 import { Card, LinkButton, PageHeader } from "@/components/ui";
 import { StudentFields } from "../student-form";
+import { DraftStatusBanner, SaveDraftButton } from "./admission-draft-controls";
 
 async function admit(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
@@ -36,11 +37,13 @@ export default async function NewStudent({ searchParams }: { searchParams: Promi
         actions={<LinkButton href={backHref}>Back</LinkButton>}
       />
       <Card>
-        <ActionForm action={admit}>
+        <DraftStatusBanner />
+        <ActionForm id="admission-form" action={admit}>
           {g && <input type="hidden" name="existingGuardianId" value={g.id} />}
           <StudentFields withGuardian={!g} yearId={year.id} />
-          <div className="mt-6 flex items-center gap-3">
+          <div className="mt-6 flex flex-wrap items-center gap-3">
             <Submit>Save admission</Submit>
+            <SaveDraftButton />
             <LinkButton variant="secondary" href={backHref}>Cancel</LinkButton>
           </div>
         </ActionForm>

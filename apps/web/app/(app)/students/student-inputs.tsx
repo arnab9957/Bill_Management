@@ -1,6 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  extractAdmissionFormData,
+  getAdmissionDraft,
+  getAdmissionFormElement,
+  saveAdmissionDraft,
+  type AdmissionDraft,
+} from "@/lib/admission-drafts";
 import { FieldError } from "@/components/action-form";
 import type { Student, Guardian } from "@sb/db";
 
@@ -218,6 +226,8 @@ export function StudentInputs({
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const isNew = !s;
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const getSectionName = (secId: number | "") =>
     secId ? m.sections.find((section) => section.id === secId)?.name : null;
@@ -238,13 +248,13 @@ export function StudentInputs({
     roll ??
     (isNew
       ? computeNextRoll(
-          rollsByClassSection,
-          defaultClass,
-          defaultSection,
-          undefined,
-          rollFormat,
-          getSectionName(defaultSection),
-        )
+        rollsByClassSection,
+        defaultClass,
+        defaultSection,
+        undefined,
+        rollFormat,
+        getSectionName(defaultSection),
+      )
       : "");
   const [rollVal, setRollVal] = useState<string>(initialRoll);
   const [rollCustomized, setRollCustomized] = useState(false);
@@ -256,6 +266,57 @@ export function StudentInputs({
   const [admissionVal, setAdmissionVal] = useState<string>(initialAdmission);
   const [admissionError, setAdmissionError] = useState("");
   const admissionRef = useRef<HTMLInputElement>(null);
+
+  // Restore draft into controlled states if active or triggered (only class & section; admissionNo & rollNo are never drafted)
+  useEffect(() => {
+    const applyDraft = (draft: AdmissionDraft) => {
+      const cId = draft.classId || draft.data.classId;
+      const sId = draft.sectionId || draft.data.sectionId;
+      const parsedClassId = cId ? Number(cId) : "";
+      const parsedSectionId = sId ? Number(sId) : "";
+
+      if (parsedClassId) {
+        setSelectedClassId(parsedClassId);
+        const classSecs = m.sections.filter((sec) => sec.classId === parsedClassId);
+        const validSection =
+          parsedSectionId && classSecs.some((sec) => sec.id === parsedSectionId)
+            ? parsedSectionId
+            : (classSecs[0]?.id ?? "");
+        setSelectedSectionId(validSection);
+
+        // Auto compute next roll dynamically for this class and section
+        if (isNew || !rollCustomized) {
+          const autoRoll = computeNextRoll(
+            rollsByClassSection,
+            parsedClassId,
+            validSection,
+            s?.rollNo,
+            rollFormat,
+            getSectionName(validSection)
+          );
+          setRollVal(autoRoll);
+          setRollError("");
+          rollRef.current?.setCustomValidity("");
+        }
+      }
+    };
+
+    const draftId = searchParams?.get("draftId");
+    if (draftId) {
+      const draft = getAdmissionDraft(draftId);
+      if (draft) applyDraft(draft);
+    }
+
+    const onRestored = (e: Event) => {
+      const custom = e as CustomEvent<{ draft: AdmissionDraft }>;
+      if (custom.detail?.draft) {
+        applyDraft(custom.detail.draft);
+      }
+    };
+
+    window.addEventListener("admission-draft-restored", onRestored);
+    return () => window.removeEventListener("admission-draft-restored", onRestored);
+  }, [searchParams, m.sections, rollsByClassSection, rollFormat, isNew, s]);
 
   // Validate admission number uniqueness in real-time
   const validateAdmission = (val: string) => {
@@ -303,15 +364,58 @@ export function StudentInputs({
     }
   };
 
+  const draftAndRedirectToSettings = (formEl: HTMLFormElement | null) => {
+    const form = formEl ?? getAdmissionFormElement();
+    if (form) {
+      const data = extractAdmissionFormData(form);
+      delete data.admissionNo;
+      delete data.rollNo;
+      const clsObj = m.classes.find((c) => String(c.id) === String(data.classId));
+      const secObj = m.sections.find((s) => String(s.id) === String(data.sectionId));
+      const activeDraftId = searchParams?.get("draftId") || undefined;
+      saveAdmissionDraft({
+        id: activeDraftId,
+        data,
+        studentName: data.name,
+        classId: data.classId,
+        sectionId: data.sectionId,
+        className: clsObj?.name,
+        sectionName: secObj?.name,
+        reason: "redirect",
+      });
+    }
+    router.push("/settings?open=classes-sections#classes-sections");
+  };
+
+  const handleManageClassesClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    draftAndRedirectToSettings((e.currentTarget as HTMLElement).closest("form"));
+  };
+
+  const handleManageSectionsClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    draftAndRedirectToSettings((e.currentTarget as HTMLElement).closest("form"));
+  };
+
   const handleClassChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (e.target.value === "__manage_class__") {
+      e.target.value = String(selectedClassId);
+      draftAndRedirectToSettings(e.target.closest("form"));
+      return;
+    }
     const newClassId = e.target.value ? Number(e.target.value) : "";
     setSelectedClassId(newClassId);
 
     const newSections = newClassId
       ? m.sections.filter((sec) => sec.classId === newClassId)
       : [];
-    const newSectionId = newSections[0] ? newSections[0].id : "";
-    setSelectedSectionId(newSectionId);
+    let newSectionId: number | "" = "";
+    if (newSections.some((sec) => sec.id === selectedSectionId)) {
+      newSectionId = selectedSectionId;
+    } else {
+      newSectionId = newSections[0] ? newSections[0].id : "";
+      setSelectedSectionId(newSectionId);
+    }
 
     if (isNew || !rollCustomized) {
       const autoRoll = computeNextRoll(
@@ -331,6 +435,11 @@ export function StudentInputs({
   };
 
   const handleSectionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (e.target.value === "__manage_section__") {
+      e.target.value = String(selectedSectionId);
+      draftAndRedirectToSettings(e.target.closest("form"));
+      return;
+    }
     const newSectionId = e.target.value ? Number(e.target.value) : "";
     setSelectedSectionId(newSectionId);
 
@@ -389,21 +498,32 @@ export function StudentInputs({
           )}
         </L>
 
-        <L label="Admission no. *" name="admissionNo">
-          <input
-            ref={admissionRef}
-            id="admissionNo"
-            name="admissionNo"
-            value={admissionVal}
-            required
-            maxLength={32}
-            placeholder="e.g. 2026/001"
-            autoComplete="off"
-            onKeyDown={handleAdmissionNoKeyDown}
-            onInput={handleAdmissionChange}
-            onChange={handleAdmissionChange}
-          />
-          {admissionError && <p className="text-xs font-medium text-red-700">{admissionError}</p>}
+        <L label={s ? "Admission no." : "Admission no. *"} name="admissionNo">
+          {s ? (
+            <>
+              <input type="hidden" name="admissionNo" value={admissionVal} />
+              <div className="rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700">
+                {admissionVal}
+              </div>
+            </>
+          ) : (
+            <>
+              <input
+                ref={admissionRef}
+                id="admissionNo"
+                name="admissionNo"
+                value={admissionVal}
+                required
+                maxLength={32}
+                placeholder="e.g. 2026/001"
+                autoComplete="off"
+                onKeyDown={handleAdmissionNoKeyDown}
+                onInput={handleAdmissionChange}
+                onChange={handleAdmissionChange}
+              />
+              {admissionError && <p className="text-xs font-medium text-red-700">{admissionError}</p>}
+            </>
+          )}
         </L>
 
         <L label="Full name *" name="name">
@@ -423,9 +543,19 @@ export function StudentInputs({
 
         {/* Row 2: Class, Section, Roll No */}
         <div className="flex flex-col gap-2">
-          <label htmlFor="classId">
-            Class <span className="font-semibold text-red-600">*</span>
-          </label>
+          <div className="flex items-center justify-between">
+            <label htmlFor="classId">
+              Class <span className="font-semibold text-red-600">*</span>
+            </label>
+            <button
+              type="button"
+              onClick={handleManageClassesClick}
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-accent-ink transition hover:bg-accent-soft cursor-pointer"
+              title="Add or manage classes in settings"
+            >
+              Manage Classes
+            </button>
+          </div>
           <select
             id="classId"
             name="classId"
@@ -439,25 +569,58 @@ export function StudentInputs({
                 {c.name}
               </option>
             ))}
+            <optgroup label="Actions">
+              <option
+                value="__manage_class__"
+                className="bg-indigo-100 font-semibold text-indigo-900"
+                style={{ backgroundColor: "#e0e7ff", color: "#3730a3", fontWeight: 600 }}
+              >
+                Manage Classes
+              </option>
+            </optgroup>
           </select>
           <FieldError name="classId" />
         </div>
 
         <div className="flex flex-col gap-2">
-          <label htmlFor="sectionId">Section</label>
+          <div className="flex items-center justify-between">
+            <label htmlFor="sectionId">Section</label>
+            <button
+              type="button"
+              onClick={handleManageSectionsClick}
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-accent-ink transition hover:bg-accent-soft cursor-pointer"
+              title="Add or manage sections in settings"
+            >
+              Manage Sections
+            </button>
+          </div>
           <select
             id="sectionId"
             name="sectionId"
             value={selectedSectionId}
             onChange={handleSectionChange}
-            disabled={!selectedClassId || availableSections.length === 0}
           >
-            <option value="">{availableSections.length === 0 ? "No sections" : "Select section"}</option>
+            <option value="">
+              {!selectedClassId
+                ? "Select class first"
+                : availableSections.length === 0
+                  ? "No sections"
+                  : "Select section"}
+            </option>
             {availableSections.map((sec) => (
               <option key={sec.id} value={sec.id}>
                 {sec.name}
               </option>
             ))}
+            <optgroup label="Actions">
+              <option
+                value="__manage_section__"
+                className="bg-indigo-100 font-semibold text-indigo-900"
+                style={{ backgroundColor: "#e0e7ff", color: "#3730a3", fontWeight: 600 }}
+              >
+                Manage Sections
+              </option>
+            </optgroup>
           </select>
           <FieldError name="sectionId" />
         </div>
@@ -524,10 +687,44 @@ export function StudentInputs({
 
 export function GuardianInputs({ g, prefix = "" }: { g?: Guardian; prefix?: string }) {
   const n = (k: string) => `${prefix}${k}`;
+  const searchParams = useSearchParams();
+  const mobileRef = useRef<HTMLInputElement>(null);
   const whatsappRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
-  const [whatsapp, setWhatsapp] = useState(g?.whatsappNo ?? "");
-  const [email, setEmail] = useState(g?.email ?? "");
+
+  const initialMobile = g?.mobile ?? "";
+  const initialWhatsapp = g?.whatsappNo ?? "";
+  const initialEmail = g?.email ?? "";
+  const [mobile, setMobile] = useState(initialMobile);
+  const [whatsapp, setWhatsapp] = useState(initialWhatsapp);
+  const [email, setEmail] = useState(initialEmail);
+  const [sameAsMobile, setSameAsMobile] = useState(
+    Boolean(initialMobile && initialWhatsapp && initialMobile === initialWhatsapp)
+  );
+
+  // Input validity checks (determines whether related checkbox is editable)
+  const hasMobile = Boolean(mobile && mobile.trim().length === 10);
+  const hasWhatsapp = Boolean(whatsapp && whatsapp.trim().length === 10);
+  const hasEmail = Boolean(email && email.trim().length > 3 && email.includes("@"));
+
+  // Initial checkbox states based on input values from the beginning
+  const [notifySms, setNotifySms] = useState(
+    g ? Boolean(hasMobile && (g.notifySms ?? true)) : false
+  );
+  const [notifyWhatsapp, setNotifyWhatsapp] = useState(
+    g ? Boolean(hasWhatsapp && (g.notifyWhatsapp ?? true)) : false
+  );
+  const [notifyEmail, setNotifyEmail] = useState(
+    g ? Boolean(hasEmail && (g.notifyEmail ?? true)) : false
+  );
+  const [messagingConsent, setMessagingConsent] = useState(
+    g ? Boolean(g.messagingConsent) : false
+  );
+
+  // Track if user explicitly unchecked a channel while input still has a valid value
+  const smsManuallyUnchecked = useRef(false);
+  const whatsappManuallyUnchecked = useRef(false);
+  const emailManuallyUnchecked = useRef(false);
 
   useEffect(() => {
     const hasEither = Boolean(whatsapp.trim() || email.trim());
@@ -536,14 +733,233 @@ export function GuardianInputs({ g, prefix = "" }: { g?: Guardian; prefix?: stri
     emailRef.current?.setCustomValidity(errorMsg);
   }, [whatsapp, email]);
 
+  useEffect(() => {
+    const applyDraft = (draft: AdmissionDraft) => {
+      const mVal = draft.data[n("mobile")] ?? "";
+      const wVal = draft.data[n("whatsappNo")] ?? "";
+      const eVal = draft.data[n("email")] ?? "";
+      if (mVal) setMobile(mVal);
+      if (wVal) setWhatsapp(wVal);
+      if (eVal) setEmail(eVal);
+      if (mVal && wVal && mVal === wVal) {
+        setSameAsMobile(true);
+      } else {
+        setSameAsMobile(false);
+      }
+      const mOk = mVal.trim().length === 10;
+      const wOk = wVal.trim().length === 10;
+      const eOk = eVal.trim().length > 3 && eVal.includes("@");
+
+      if (draft.data[n("notifySms")] !== undefined) {
+        setNotifySms(mOk && draft.data[n("notifySms")] === "true");
+      } else if (mOk) {
+        setNotifySms(true);
+      }
+      if (draft.data[n("notifyWhatsapp")] !== undefined) {
+        setNotifyWhatsapp(wOk && draft.data[n("notifyWhatsapp")] === "true");
+      } else if (wOk) {
+        setNotifyWhatsapp(true);
+      }
+      if (draft.data[n("notifyEmail")] !== undefined) {
+        setNotifyEmail(eOk && draft.data[n("notifyEmail")] === "true");
+      } else if (eOk) {
+        setNotifyEmail(true);
+      }
+      if (draft.data[n("messagingConsent")] !== undefined) {
+        setMessagingConsent(draft.data[n("messagingConsent")] === "true");
+      } else if (mOk || wOk || eOk) {
+        setMessagingConsent(true);
+      }
+    };
+
+    const draftId = searchParams?.get("draftId");
+    if (draftId) {
+      const draft = getAdmissionDraft(draftId);
+      if (draft) applyDraft(draft);
+    }
+
+    const onRestored = (e: Event) => {
+      const custom = e as CustomEvent<{ draft: AdmissionDraft }>;
+      if (custom.detail?.draft) applyDraft(custom.detail.draft);
+    };
+
+    window.addEventListener("admission-draft-restored", onRestored);
+    return () => window.removeEventListener("admission-draft-restored", onRestored);
+  }, [searchParams, prefix]);
+
+  const onMobileInput = (e: React.FormEvent<HTMLInputElement>) => {
+    handleMobileInput(e);
+    const val = e.currentTarget.value;
+    setMobile(val);
+    if (sameAsMobile) {
+      setWhatsapp(val);
+    }
+
+    if (val.trim().length === 10) {
+      if (!smsManuallyUnchecked.current) {
+        setNotifySms(true);
+        setMessagingConsent(true);
+      }
+      if (sameAsMobile && !whatsappManuallyUnchecked.current) {
+        setNotifyWhatsapp(true);
+        setMessagingConsent(true);
+      }
+    } else {
+      // Incomplete or empty: uncheck SMS
+      setNotifySms(false);
+      smsManuallyUnchecked.current = false;
+      if (sameAsMobile) {
+        setNotifyWhatsapp(false);
+        whatsappManuallyUnchecked.current = false;
+      }
+      const otherActive = (email.trim().length > 3 && email.includes("@")) || (!sameAsMobile && whatsapp.trim().length === 10);
+      if (!otherActive) {
+        setMessagingConsent(false);
+      }
+    }
+  };
+
+  const handleSameAsMobileToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    setSameAsMobile(checked);
+    if (checked) {
+      setWhatsapp(mobile);
+      if (mobile.trim().length === 10) {
+        setNotifyWhatsapp(true);
+        whatsappManuallyUnchecked.current = false;
+        setMessagingConsent(true);
+      } else {
+        setNotifyWhatsapp(false);
+      }
+    } else {
+      // Unchecked: clear WhatsApp field, uncheck & disable its notification channel
+      setWhatsapp("");
+      setNotifyWhatsapp(false);
+      whatsappManuallyUnchecked.current = false;
+      const otherActive = (mobile.trim().length === 10) || (email.trim().length > 3 && email.includes("@"));
+      if (!otherActive) {
+        setMessagingConsent(false);
+      }
+      setTimeout(() => whatsappRef.current?.focus(), 0);
+    }
+  };
+
   const onWhatsAppInput = (e: React.FormEvent<HTMLInputElement>) => {
     handleMobileInput(e);
-    setWhatsapp(e.currentTarget.value);
+    const val = e.currentTarget.value;
+    setWhatsapp(val);
+    if (sameAsMobile && val !== mobile) {
+      setSameAsMobile(false);
+    }
+
+    if (val.trim().length === 10) {
+      if (!whatsappManuallyUnchecked.current) {
+        setNotifyWhatsapp(true);
+        setMessagingConsent(true);
+      }
+    } else {
+      // Incomplete or empty: uncheck WhatsApp
+      setNotifyWhatsapp(false);
+      whatsappManuallyUnchecked.current = false;
+      const otherActive = (mobile.trim().length === 10) || (email.trim().length > 3 && email.includes("@"));
+      if (!otherActive) {
+        setMessagingConsent(false);
+      }
+    }
   };
 
   const onEmailInput = (e: React.FormEvent<HTMLInputElement>) => {
     handleEmailInput(e);
-    setEmail(e.currentTarget.value);
+    const val = e.currentTarget.value;
+    setEmail(val);
+
+    if (val.trim().length > 3 && val.includes("@")) {
+      if (!emailManuallyUnchecked.current) {
+        setNotifyEmail(true);
+        setMessagingConsent(true);
+      }
+    } else {
+      // Incomplete or empty: uncheck Email
+      setNotifyEmail(false);
+      emailManuallyUnchecked.current = false;
+      const otherActive = (mobile.trim().length === 10) || (whatsapp.trim().length === 10);
+      if (!otherActive) {
+        setMessagingConsent(false);
+      }
+    }
+  };
+
+  const handleToggleSms = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!hasMobile) return;
+    const next = e.target.checked;
+    setNotifySms(next);
+    smsManuallyUnchecked.current = !next;
+    if (next) {
+      setMessagingConsent(true);
+    } else {
+      if (!notifyWhatsapp && !notifyEmail) {
+        setMessagingConsent(false);
+      }
+    }
+  };
+
+  const handleToggleWhatsapp = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!hasWhatsapp) return;
+    const next = e.target.checked;
+    setNotifyWhatsapp(next);
+    whatsappManuallyUnchecked.current = !next;
+    if (next) {
+      setMessagingConsent(true);
+    } else {
+      if (!notifySms && !notifyEmail) {
+        setMessagingConsent(false);
+      }
+    }
+  };
+
+  const handleToggleEmail = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!hasEmail) return;
+    const next = e.target.checked;
+    setNotifyEmail(next);
+    emailManuallyUnchecked.current = !next;
+    if (next) {
+      setMessagingConsent(true);
+    } else {
+      if (!notifySms && !notifyWhatsapp) {
+        setMessagingConsent(false);
+      }
+    }
+  };
+
+  const handleToggleConsent = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = e.target.checked;
+    setMessagingConsent(next);
+    if (!next) {
+      // Parent refused consent: turn off messaging channels
+      setNotifySms(false);
+      setNotifyWhatsapp(false);
+      setNotifyEmail(false);
+      smsManuallyUnchecked.current = true;
+      whatsappManuallyUnchecked.current = true;
+      emailManuallyUnchecked.current = true;
+    } else {
+      // Consent granted: enable all channels that have valid values
+      if (hasMobile) {
+        setNotifySms(true);
+        smsManuallyUnchecked.current = false;
+      }
+      if (hasWhatsapp) {
+        setNotifyWhatsapp(true);
+        whatsappManuallyUnchecked.current = false;
+      }
+      if (hasEmail) {
+        setNotifyEmail(true);
+        emailManuallyUnchecked.current = false;
+      }
+      if (!hasMobile && !hasWhatsapp && !hasEmail) {
+        mobileRef.current?.focus();
+      }
+    }
   };
 
   return (
@@ -578,10 +994,11 @@ export function GuardianInputs({ g, prefix = "" }: { g?: Guardian; prefix?: stri
 
         <L label="Mobile * (10 digits)" name={n("mobile")}>
           <input
+            ref={mobileRef}
             id={n("mobile")}
             type="tel"
             name={n("mobile")}
-            defaultValue={g?.mobile}
+            value={mobile}
             required
             inputMode="numeric"
             maxLength={10}
@@ -591,25 +1008,33 @@ export function GuardianInputs({ g, prefix = "" }: { g?: Guardian; prefix?: stri
             title="10-digit Indian mobile number starting with 6, 7, 8, or 9"
             autoComplete="tel"
             onKeyDown={handleMobileKeyDown}
-            onInput={handleMobileInput}
+            onInput={onMobileInput}
+            onChange={onMobileInput}
           />
         </L>
 
-        <L
-          label={
-            <span>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor={n("whatsappNo")}>
               WhatsApp no. <span className="font-semibold text-red-600">*</span>{" "}
               <span className="text-xs font-normal text-gray-500">(or Email)</span>
-            </span>
-          }
-          name={n("whatsappNo")}
-        >
+            </label>
+            <label className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-700 hover:text-ink cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={sameAsMobile}
+                onChange={handleSameAsMobileToggle}
+                className="h-3.5 w-3.5 rounded border-gray-300 text-accent focus:ring-accent"
+              />
+              Same as Mobile No.
+            </label>
+          </div>
           <input
             ref={whatsappRef}
             id={n("whatsappNo")}
             type="tel"
             name={n("whatsappNo")}
-            defaultValue={g?.whatsappNo ?? ""}
+            value={whatsapp}
             inputMode="numeric"
             maxLength={10}
             pattern="[6-9][0-9]{9}"
@@ -619,7 +1044,8 @@ export function GuardianInputs({ g, prefix = "" }: { g?: Guardian; prefix?: stri
             onInput={onWhatsAppInput}
             onChange={onWhatsAppInput}
           />
-        </L>
+          <FieldError name={n("whatsappNo")} />
+        </div>
 
         <L
           label={
@@ -635,7 +1061,7 @@ export function GuardianInputs({ g, prefix = "" }: { g?: Guardian; prefix?: stri
             id={n("email")}
             type="email"
             name={n("email")}
-            defaultValue={g?.email ?? ""}
+            value={email}
             maxLength={128}
             placeholder="parent@example.com"
             autoComplete="email"
@@ -653,23 +1079,133 @@ export function GuardianInputs({ g, prefix = "" }: { g?: Guardian; prefix?: stri
           </select>
         </L>
 
-        <div className="flex flex-wrap items-center gap-4 sm:col-span-3">
-          <label className="flex items-center gap-2">
-            <input type="checkbox" name={n("notifySms")} defaultChecked={g?.notifySms ?? true} />
-            SMS
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" name={n("notifyWhatsapp")} defaultChecked={g?.notifyWhatsapp ?? true} />
-            WhatsApp
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" name={n("notifyEmail")} defaultChecked={g?.notifyEmail ?? true} />
-            Email
-          </label>
-          <label className="flex items-center gap-2 font-medium">
-            <input type="checkbox" name={n("messagingConsent")} defaultChecked={g?.messagingConsent ?? false} />
-            Parent consented to fee messages (admission form)
-          </label>
+        <div className="sm:col-span-3 rounded-lg border border-gray-200 bg-gray-50/60 p-3.5 space-y-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Fee Messages & Notifications
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                <label
+                  onClick={(e) => {
+                    if (!hasMobile) {
+                      e.preventDefault();
+                      mobileRef.current?.focus();
+                    }
+                  }}
+                  className={`inline-flex items-center gap-2 select-none transition-colors ${
+                    hasMobile
+                      ? "cursor-pointer text-gray-900 font-medium"
+                      : "cursor-not-allowed text-gray-400 opacity-60"
+                  }`}
+                  title={hasMobile ? "Toggle SMS fee messages" : "Enter a 10-digit mobile number to enable SMS"}
+                >
+                  <input
+                    type="checkbox"
+                    name={n("notifySms")}
+                    checked={hasMobile && notifySms}
+                    disabled={!hasMobile}
+                    onChange={handleToggleSms}
+                    className={`h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent ${
+                      hasMobile ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+                    }`}
+                  />
+                  <span>
+                    SMS
+                    {!hasMobile && (
+                      <span className="ml-1 text-xs font-normal text-gray-400">
+                        {!mobile.trim() ? "(no mobile)" : "(needs 10 digits)"}
+                      </span>
+                    )}
+                  </span>
+                </label>
+
+                <label
+                  onClick={(e) => {
+                    if (!hasWhatsapp) {
+                      e.preventDefault();
+                      whatsappRef.current?.focus();
+                    }
+                  }}
+                  className={`inline-flex items-center gap-2 select-none transition-colors ${
+                    hasWhatsapp
+                      ? "cursor-pointer text-gray-900 font-medium"
+                      : "cursor-not-allowed text-gray-400 opacity-60"
+                  }`}
+                  title={hasWhatsapp ? "Toggle WhatsApp fee messages" : "Enter a 10-digit WhatsApp number to enable WhatsApp"}
+                >
+                  <input
+                    type="checkbox"
+                    name={n("notifyWhatsapp")}
+                    checked={hasWhatsapp && notifyWhatsapp}
+                    disabled={!hasWhatsapp}
+                    onChange={handleToggleWhatsapp}
+                    className={`h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent ${
+                      hasWhatsapp ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+                    }`}
+                  />
+                  <span>
+                    WhatsApp
+                    {!hasWhatsapp && (
+                      <span className="ml-1 text-xs font-normal text-gray-400">
+                        {!whatsapp.trim() ? "(no WhatsApp)" : "(needs 10 digits)"}
+                      </span>
+                    )}
+                  </span>
+                </label>
+
+                <label
+                  onClick={(e) => {
+                    if (!hasEmail) {
+                      e.preventDefault();
+                      emailRef.current?.focus();
+                    }
+                  }}
+                  className={`inline-flex items-center gap-2 select-none transition-colors ${
+                    hasEmail
+                      ? "cursor-pointer text-gray-900 font-medium"
+                      : "cursor-not-allowed text-gray-400 opacity-60"
+                  }`}
+                  title={hasEmail ? "Toggle Email fee notifications" : "Enter a valid email address to enable Email"}
+                >
+                  <input
+                    type="checkbox"
+                    name={n("notifyEmail")}
+                    checked={hasEmail && notifyEmail}
+                    disabled={!hasEmail}
+                    onChange={handleToggleEmail}
+                    className={`h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent ${
+                      hasEmail ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+                    }`}
+                  />
+                  <span>
+                    Email
+                    {!hasEmail && (
+                      <span className="ml-1 text-xs font-normal text-gray-400">
+                        {!email.trim() ? "(no email)" : "(valid email required)"}
+                      </span>
+                    )}
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="pt-2 sm:pt-0 sm:border-l sm:border-gray-200 sm:pl-5">
+              <label
+                className="inline-flex items-center gap-2 text-sm font-medium text-gray-800 cursor-pointer select-none"
+                title="Confirmation that parent consented to receive fee messages on the admission form"
+              >
+                <input
+                  type="checkbox"
+                  name={n("messagingConsent")}
+                  checked={messagingConsent}
+                  onChange={handleToggleConsent}
+                  className="h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent cursor-pointer"
+                />
+                <span>Parent consented to fee messages (admission form)</span>
+              </label>
+            </div>
+          </div>
         </div>
       </fieldset>
     </div>

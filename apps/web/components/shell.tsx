@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { Notice } from "./ui";
+import { GlobalScrollHandler } from "./global-scroll-handler";
 
 export interface NavItem { href: string; label: string; key?: string }
 export interface YearInfo { id: number; name: string; isCurrent: boolean; currentName: string; options: { id: number; name: string; isCurrent: boolean }[] }
@@ -231,7 +232,8 @@ export function Shell({ nav, user, school, logo, children, logout, year, switchY
             </div>
           </div>
         </aside>
-        <main className={`mx-auto min-h-[calc(100vh-5rem)] w-full max-w-[1600px] min-w-0 flex-1 bg-canvas p-5 transition-opacity sm:p-8 lg:p-10 ${pendingHref ? "pointer-events-none opacity-50" : ""}`} aria-busy={!!pendingHref}>
+        <main className="mx-auto min-h-[calc(100vh-5rem)] w-full max-w-[1600px] min-w-0 flex-1 bg-canvas p-5 sm:p-8 lg:p-10" aria-busy={!!pendingHref}>
+          <GlobalScrollHandler />
           {!year.isCurrent && (
             <div className="no-print mb-6"><Notice tone="warn">You are viewing academic year <b>{year.name}</b>. The current year is {year.currentName}. Change it in the sidebar.</Notice></div>
           )}
