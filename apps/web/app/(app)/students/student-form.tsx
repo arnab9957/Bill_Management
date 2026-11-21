@@ -33,9 +33,9 @@ export async function StudentFields({ s, withGuardian, guardian, yearId, enrollm
           <select name="sectionId" defaultValue={sec ?? ""}><option value="" />{m.sections.map((x) => <option key={x.id} value={x.id}>{m.classes.find((c) => c.id === x.classId)?.name}-{x.name}</option>)}</select>
         </L>
         <L label="Roll no." name="rollNo"><input name="rollNo" defaultValue={roll ?? ""} /></L>
-        <L label="Date of birth" name="dob"><input type="date" name="dob" defaultValue={s?.dob ?? ""} /></L>
+        <L label="Date of birth" name="dob"><input type="date" name="dob" defaultValue={s?.dob ?? ""} data-dob /></L>
         <L label="Gender" name="gender"><select name="gender" defaultValue={s?.gender ?? ""}><option value="" /><option value="F">Female</option><option value="M">Male</option><option value="O">Other</option></select></L>
-        <L label="Admission date *" name="admissionDate"><input type="date" name="admissionDate" defaultValue={s?.admissionDate ?? new Date().toISOString().slice(0, 10)} required /></L>
+        <L label="Admission date *" name="admissionDate"><input type="date" name="admissionDate" defaultValue={s?.admissionDate ?? new Date().toISOString().slice(0, 10)} data-ahead="365" required /></L>
         <L label="Transport route" name="transportRouteId">
           <select name="transportRouteId" defaultValue={s?.transportRouteId ?? ""}><option value="">None</option>{m.routes.filter((r) => r.isActive).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
         </L>

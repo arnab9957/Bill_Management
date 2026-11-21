@@ -142,8 +142,8 @@ export default async function StudentProfile({ params, searchParams }: { params:
           {can(user.role, "fees") && (
             <ActionForm action={grant.bind(null, id)} className="mt-3 flex flex-wrap items-end gap-2 border-t border-gray-100 pt-3">
               <select name="concessionTypeId" required>{conc.map(({ t }) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-              <input type="date" name="validFrom" defaultValue={today()} required />
-              <input type="date" name="validTo" title="Valid to (optional)" />
+              <input type="date" name="validFrom" defaultValue={today()} aria-label="Valid from" required />
+              <input type="date" name="validTo" title="Valid to (optional)" data-title="Valid to (optional)" data-after="validFrom" />
               <Submit variant="secondary">Approve</Submit>
             </ActionForm>
           )}
@@ -269,7 +269,7 @@ export default async function StudentProfile({ params, searchParams }: { params:
           <Card title="Status">
             <ActionForm action={setStatus.bind(null, id)} className="grid gap-2">
               <select name="status" defaultValue={p.s.status}><option value="active">Active</option><option value="left">Left school (stops billing)</option><option value="alumni">Alumni</option></select>
-              <input type="date" name="leavingDate" defaultValue={p.s.leavingDate ?? today()} />
+              <input type="date" name="leavingDate" defaultValue={p.s.leavingDate ?? today()} data-past />
               {outstanding > 0 && <p className="text-xs text-amber-700">Dues of <Money p={outstanding} /> are pending — no-dues not possible yet.</p>}
               <Submit variant="secondary">Update status</Submit>
             </ActionForm>

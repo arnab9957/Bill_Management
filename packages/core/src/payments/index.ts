@@ -7,6 +7,7 @@ import {
   cancelReceiptSchema, chequeBounceSchema, collectPaymentSchema, dayCloseSchema, refundSchema, type CollectPaymentInput,
 } from "@sb/validation";
 import { AppError, audit, formatDocNo, formatReceiptNo, getSettings, nextNumber, receiptSeriesKey, yearForDate, type Actor } from "../common";
+import { studentYearOn } from "../sessions";
 import { buildPrintRows } from "../printing";
 import { formatDate, today, type ISODate } from "../dates";
 import { formatINR } from "../money";
@@ -47,7 +48,7 @@ export async function collectPayment(input: CollectPaymentInput, actor: Actor) {
     } catch (e) {
       throw new AppError(e instanceof Error ? e.message : "Invalid allocation");
     }
-    const year = await yearForDate(tx, d.date);
+    const year = await studentYearOn(tx, d.studentId, d.date);
     const settings = await getSettings(tx);
     // Number from the school's own series (e.g. "C/6434"); the counter row is locked until this transaction ends.
     const receiptSeries = receiptSeriesKey(settings, year.name);
@@ -123,7 +124,7 @@ export async function chequeBounced(actor: Actor, input: unknown) {
     const p = await reversePayment(tx, actor, c.paymentId, `Cheque ${c.chequeNo} bounced`);
     await tx.update(cheques).set({ status: "bounced", bounceCharge: d.bounceCharge, updatedAt: new Date() }).where(eq(cheques.id, c.id));
     if (d.bounceCharge > 0) {
-      const year = await yearForDate(tx, today());
+      const year = await studentYearOn(tx, p.studentId, today());
       const s = await getSettings(tx);
       const [head] = await tx.select().from(feeHeads).where(eq(feeHeads.code, "BOUNCE"));
       const invoiceNo = formatDocNo(s.invoicePrefix, year.name, await nextNumber(tx, `INVOICE:${year.name}`));

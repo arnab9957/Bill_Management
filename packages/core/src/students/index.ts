@@ -14,6 +14,7 @@ import { recalcWallet } from "../payments/wallet";
 import { carryForwardDues, promoteStudent, upsertEnrollment } from "./enrollment";
 
 export * from "./enrollment";
+export * from "./promotion";
 
 export async function admitStudent(actor: Actor, input: unknown) {
   const d = admissionSchema.parse(input);
@@ -87,6 +88,11 @@ export async function setStudentStatus(actor: Actor, studentId: number, status: 
   const db = getDb();
   const [old] = await db.select().from(students).where(eq(students.id, studentId));
   if (!old) throw new AppError("Student not found");
+  if (status !== "active" && leavingDate) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(leavingDate) || Number.isNaN(Date.parse(leavingDate))) throw new AppError("Leaving date is not a real date", { leavingDate: "Invalid" });
+    if (leavingDate < old.admissionDate) throw new AppError(`Leaving date can't be before the admission date (${old.admissionDate})`, { leavingDate: "Before admission" });
+    if (leavingDate > today()) throw new AppError("Leaving date can't be in the future", { leavingDate: "In the future" });
+  }
   await db.update(students).set({ status, leavingDate: status === "active" ? null : leavingDate ?? today() }).where(eq(students.id, studentId));
   const [latest] = await db.select({ id: studentEnrollments.id }).from(studentEnrollments)
     .innerJoin(academicYears, eq(academicYears.id, studentEnrollments.academicYearId))

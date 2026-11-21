@@ -20,7 +20,7 @@ export default async function DayBook({ searchParams }: { searchParams: Promise<
   return (
     <div className="space-y-4">
       <PageHeader title="Day book" subtitle={`${date} · everything collected that day`} actions={<>
-        <form className="toolbar"><input type="date" name="date" defaultValue={date} />{user.role !== "CASHIER" && <label className="flex items-center gap-2 pb-2"><input type="checkbox" name="mine" value="1" defaultChecked={sp.mine === "1"} />Mine only</label>}<button className="filter-button">Show</button></form>
+        <form className="toolbar"><input type="date" name="date" defaultValue={date} data-past />{user.role !== "CASHIER" && <label className="flex items-center gap-2 pb-2"><input type="checkbox" name="mine" value="1" defaultChecked={sp.mine === "1"} />Mine only</label>}<button className="filter-button">Show</button></form>
         {can(user.role, "reports") && <LinkButton href={`/api/export/daybook?date=${date}`}>Export</LinkButton>}
       </>} />
       <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">

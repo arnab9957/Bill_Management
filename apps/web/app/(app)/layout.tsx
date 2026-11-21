@@ -16,6 +16,7 @@ const NAV: (NavItem & { perm: Permission })[] = [
   { href: "/invoices", label: "Bills", perm: "billing", key: "b" },
   { href: "/fees", label: "Fee setup", perm: "fees", key: "f" },
   { href: "/reports", label: "Reports", perm: "reports", key: "r" },
+  { href: "/promotion", label: "Promotion", perm: "settings" },
   { href: "/notifications", label: "Messages", perm: "notifications", key: "m" },
   { href: "/settings", label: "School Settings", perm: "settings" },
   { href: "/audit", label: "Audit log", perm: "audit" },

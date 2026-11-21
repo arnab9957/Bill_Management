@@ -17,7 +17,23 @@ export const mobile = z.string().trim().regex(/^[6-9]\d{9}$/, "Enter a valid 10-
 const blank = (v: unknown) => (v === "" || v == null ? undefined : v);
 const optionalMobile = z.preprocess(blank, mobile.optional());
 const optionalEmail = z.preprocess(blank, z.string().trim().email("Invalid email").optional());
-export const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+/** A real calendar date (no 31 February), YYYY-MM-DD. */
+export const isRealDate = (v: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (!m) return false;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return d.getFullYear() === Number(m[1]) && d.getMonth() === Number(m[2]) - 1 && d.getDate() === Number(m[3]);
+};
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+/** Any date the school works with: real, and between 2000 and 2099 (catches typos like 20226 or 1926). */
+export const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
+  .refine(isRealDate, "Not a real date")
+  .refine((v) => v >= "2000-01-01" && v <= "2099-12-31", "Date must be between 2000 and 2099");
+/** Date of birth: real, in the past, and not more than 30 years ago (a school student). */
+export const dobDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
+  .refine(isRealDate, "Not a real date")
+  .refine((v) => v < todayISO(), "Date of birth must be in the past")
+  .refine((v) => v >= `${Number(todayISO().slice(0, 4)) - 30}${todayISO().slice(4)}`, "Date of birth is more than 30 years ago. Check the year");
 const optionalDate = z.preprocess(blank, isoDate.optional());
 const id = z.coerce.number().int().positive();
 const optionalId = z.preprocess(blank, id.optional());
@@ -54,7 +70,7 @@ export const guardianSchema = z.object({
 export const studentSchema = z.object({
   admissionNo: z.string().trim().min(1, "Admission no. required").max(32),
   name: z.string().trim().min(1, "Name required"),
-  dob: optionalDate,
+  dob: z.preprocess(blank, dobDate.optional()),
   gender: z.preprocess(blank, z.enum(["M", "F", "O"]).optional()),
   classId: id,
   sectionId: optionalId,
@@ -62,15 +78,18 @@ export const studentSchema = z.object({
   admissionDate: isoDate,
   transportRouteId: optionalId,
 });
+const dobBeforeAdmission = (d: { dob?: string; admissionDate: string }) => !d.dob || d.dob < d.admissionDate;
+const dobMsg = { message: "Date of birth must be before the admission date", path: ["dob"] };
 /** Personal details + the class for one academic year (edit page). */
-export const studentEditSchema = studentSchema.extend({ academicYearId: optionalId });
+export const studentEditSchema = studentSchema.extend({ academicYearId: optionalId }).refine(dobBeforeAdmission, dobMsg);
 export const admissionSchema = studentSchema.extend({
   /** Academic year the student joins in. Defaults to the current year. */
   academicYearId: optionalId,
   guardian: guardianSchema.optional(),
   /** link to an existing guardian (siblings) instead of creating one */
   existingGuardianId: optionalId,
-}).refine((d) => d.guardian || d.existingGuardianId, { message: "Guardian details required", path: ["guardian.name"] });
+}).refine((d) => d.guardian || d.existingGuardianId, { message: "Guardian details required", path: ["guardian.name"] })
+  .refine(dobBeforeAdmission, dobMsg);
 export type AdmissionInput = z.infer<typeof admissionSchema>;
 
 /** Promote one student into another academic year. */
@@ -91,7 +110,7 @@ export const importRowSchema = z.object({
   className: z.preprocess(str, z.string().min(1, "Class required")),
   section: z.preprocess(str, z.string().optional()),
   rollNo: z.preprocess(str, z.string().optional()),
-  dob: z.preprocess(str, isoDate.optional()),
+  dob: z.preprocess(str, dobDate.optional()),
   gender: z.preprocess(str, z.enum(["M", "F", "O"]).optional()),
   admissionDate: z.preprocess(str, isoDate),
   guardianName: z.preprocess(str, z.string().min(1, "Guardian name required")),
@@ -150,7 +169,7 @@ export const studentConcessionSchema = z.object({
   concessionTypeId: id,
   validFrom: isoDate,
   validTo: optionalDate,
-});
+}).refine((d) => !d.validTo || d.validTo >= d.validFrom, { message: "‘Valid to’ must be on or after ‘valid from’", path: ["validTo"] });
 export const lateFeeRuleSchema = z
   .object({
     academicYearId: id,
