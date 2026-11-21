@@ -109,7 +109,7 @@ export default async function SettingsPage() {
               <LinkButton href="/settings/users">Users</LinkButton>
               <LinkButton href="/settings/providers">SMS / WhatsApp / Email</LinkButton>
               <LinkButton href="/settings/health">Backups & health</LinkButton>
-              <LinkButton href="/promotion">Promotion</LinkButton>
+              <LinkButton href="/promotion">Sessions &amp; promotion</LinkButton>
             </div>
           </div>
         </div>
@@ -136,7 +136,7 @@ export default async function SettingsPage() {
         ))}</ul>
         <ActionForm action={addYear} className="mt-4 border-t border-gray-100 pt-3" resetOnSuccess>
           <div className="overflow-x-auto">
-            <div className="grid grid-cols-[1.1fr_1.2fr_1.2fr_auto] items-center gap-x-2.5 gap-y-1.5 min-w-[380px]">
+            <div className="grid grid-cols-[1.1fr_1.2fr_1.2fr_auto] items-center gap-x-2.5 gap-y-1.5 min-w-95">
               <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600">Academic session</span>
               <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600">Start date</span>
               <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600">End date</span>

@@ -6,7 +6,7 @@ import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import {
   getDb, academicYears, classes, feeStructureItems, feeStructures, invoices, payments, sections, studentEnrollments, students, type Executor,
 } from "@sb/db";
-import { AppError, audit, type Actor } from "../common";
+import { AppError, audit, SYSTEM, type Actor } from "../common";
 import { today } from "../dates";
 import { allSessions, saveClassSession } from "../sessions";
 import { copyStructures, createYear } from "../fees";
@@ -293,4 +293,28 @@ export async function changePromotion(actor: Actor, args: { studentId: number; f
     await audit(tx, actor, "update", "student_enrollment", rec.id, { classId: rec.classId }, { classId, action: args.action });
     return { name: s.name, now: `Class ${cls.find((c) => c.id === classId)!.name}` };
   });
+}
+
+/**
+ * The daily job: for every academic year (oldest first) promote each class whose session has ended.
+ * Creates the next year from the previous one when needed. Safe to run many times a day.
+ */
+export async function autoPromoteAll(onDate: string = today(), actor: Actor = SYSTEM) {
+  const db = getDb();
+  const years = await db.select().from(academicYears).orderBy(asc(academicYears.startDate));
+  const out: { from: string; to: string; done: { className: string; toName: string; students: number }[] }[] = [];
+  for (const y of years) {
+    const ready = await autoPromoteReady(y.id, onDate);
+    if (!ready.students) continue;
+    const r = await autoPromote(actor, y.id, onDate);
+    if (r.done.length) out.push({ from: y.name, to: r.toYear.name, done: r.done });
+  }
+  return out;
+}
+
+/** Quick check for the daily job: is any class in any year waiting with its session over? */
+export async function anyClassReadyToPromote(onDate: string = today()) {
+  const years = await getDb().select({ id: academicYears.id }).from(academicYears);
+  for (const y of years) if ((await autoPromoteReady(y.id, onDate)).students) return true;
+  return false;
 }

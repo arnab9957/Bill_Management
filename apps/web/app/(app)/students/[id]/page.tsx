@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { billing, can, fees, formatDate, notifications, payments, periodLabel, students, today, getSettings } from "@sb/core";
+import { billing, can, fees, formatDate, notifications, payments, periodLabel, sessions, students, today, getSettings } from "@sb/core";
 import { requireRole } from "@/lib/auth";
-import { getWorkingYear, nextYear } from "@/lib/year";
+import { getWorkingYear } from "@/lib/year";
 import { formObject, run, type ActionState } from "@/lib/action";
 import { ActionForm, FieldError, Submit } from "@/components/action-form";
 import { Badge, Card, LinkButton, Money, Notice, PageHeader } from "@/components/ui";
@@ -47,14 +47,13 @@ async function doRefund(id: number, _: ActionState, fd: FormData): Promise<Actio
   revalidatePath(path(id));
   return r;
 }
-async function promote(id: number, _: ActionState, fd: FormData): Promise<ActionState> {
+async function changeAction(id: number, fromYearId: number, toYearId: number, action: "promote" | "repeat" | "leave", _: ActionState): Promise<ActionState> {
   "use server";
   const u = await requireRole("studentsEdit");
-  const r = await run(() => students.promoteStudent(u, { ...formObject(fd), studentId: id }));
-  if (!r?.ok) return r;
-  const x = r.data as { yearName: string; carried: number };
+  const r = await run(() => students.changePromotion(u, { studentId: id, fromYearId, toYearId, action }), (x) => `${x.name}: now ${x.now}`);
+  revalidatePath(path(id));
   revalidatePath("/students");
-  redirect(`/students/${id}?promoted=${encodeURIComponent(x.yearName)}&carried=${x.carried}`);
+  return r;
 }
 
 export default async function StudentProfile({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string; saved?: string; promoted?: string; carried?: string }> }) {
@@ -67,9 +66,6 @@ export default async function StudentProfile({ params, searchParams }: { params:
   const concessionsOn = (await getSettings()).concessionsEnabled;
   const inYear = history.find((h) => h.e.academicYearId === wy.year.id);
   const latest = history.at(-1);
-  const promoteYear = latest ? nextYear(m.years, latest.e.academicYearId) : undefined;
-  const latestClass = m.classes.find((c) => c.id === latest?.e.classId);
-  const nextClass = latestClass ? m.classes.filter((c) => c.sortOrder > latestClass.sortOrder).sort((a, b) => a.sortOrder - b.sortOrder)[0] : undefined;
   // Fee records grouped by academic year, newest year first.
   const yearIds = [...new Set([...history.map((h) => h.e.academicYearId), ...ledger.invoices.map((i) => i.academicYearId), ...ledger.payments.map((x) => x.academicYearId).filter((y): y is number => y != null)])];
   const byYear = m.years.filter((y) => yearIds.includes(y.id)).sort((a, b) => b.startDate.localeCompare(a.startDate)).map((y) => {
@@ -78,6 +74,12 @@ export default async function StudentProfile({ params, searchParams }: { params:
     const live = bills.filter((i) => i.status !== "cancelled");
     return { y, bills, pays, enr: history.find((h) => h.e.academicYearId === y.id),
       billed: live.reduce((a, i) => a + i.net, 0), paid: pays.filter((x) => x.status === "valid").reduce((a, x) => a + x.amount, 0), balance: live.reduce((a, i) => a + i.balance, 0) };
+  });
+  const sess = await sessions.allSessions(undefined, history.map((h) => h.e.academicYearId));
+  const sessionsView = byYear.map((v) => {
+    const h = history.find((x) => x.e.academicYearId === v.y.id);
+    const i = h ? history.indexOf(h) : -1;
+    return { ...v, h, prev: i > 0 ? history[i - 1] : undefined, ses: h ? sess.get(`${v.y.id}:${h.e.classId}`) : undefined, isLatest: !!h && h === latest };
   });
   const unassignedPays = ledger.payments.filter((x) => x.academicYearId == null);
   const outstanding = ledger.invoices.filter((i) => i.status !== "cancelled").reduce((a, i) => a + i.balance, 0);
@@ -151,81 +153,83 @@ export default async function StudentProfile({ params, searchParams }: { params:
         )}
       </div>
 
-      <Card title="Academic history">
-        <table className="data">
-          <thead><tr><th>Academic year</th><th>Class</th><th>Section</th><th>Roll</th><th>Status</th><th className="num">Billed</th><th className="num">Paid</th><th className="num">Balance</th><th /></tr></thead>
-          <tbody>
-            {history.length === 0 && <tr><td colSpan={9} className="text-gray-500">No academic year records.</td></tr>}
-            {history.slice().reverse().map((h) => {
-              const t = byYear.find((x) => x.y.id === h.e.academicYearId);
-              return (
-                <tr key={h.e.id} className={h.e.academicYearId === wy.year.id ? "bg-gray-50" : ""}>
-                  <td className="font-medium">{h.yearName}{h.isCurrent ? <span className="ml-1 text-xs text-ink">(current)</span> : null}</td>
-                  <td>{h.className}</td><td>{h.sectionName ?? "—"}</td><td>{h.e.rollNo ?? "—"}</td><td><Badge>{h.e.status.replace("_", " ")}</Badge></td>
-                  <td className="num"><Money p={t?.billed ?? 0} /></td><td className="num"><Money p={t?.paid ?? 0} /></td><td className="num"><Money p={t?.balance ?? 0} className={t?.balance ? "text-red-700" : ""} /></td>
-                  <td>{edit && <Link className="text-xs text-ink hover:underline" href={`/students/${id}/edit?year=${h.e.academicYearId}`}>Edit</Link>}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {edit && p.s.status !== "alumni" && (
-          <div className="mt-4 border-t border-gray-100 pt-4">
-            <h3 className="mb-1 text-sm font-semibold text-gray-800">Promote to the next academic year</h3>
-            {!promoteYear ? (
-              <p className="text-sm text-gray-500">There is no academic year after {latest?.yearName ?? "the current one"} yet. Add it under <Link className="text-ink underline" href="/settings">Settings → Academic years</Link>.</p>
-            ) : (
-              <ActionForm action={promote.bind(null, id)} className="grid gap-3 sm:grid-cols-5">
-                <label className="flex flex-col gap-1">Into year<select name="toYearId" defaultValue={promoteYear.id}>{m.years.filter((y) => !history.some((h) => h.e.academicYearId === y.id)).map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}</select></label>
-                <label className="flex flex-col gap-1">Class<select name="classId" defaultValue={nextClass?.id ?? latest?.e.classId}>{m.classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-                <label className="flex flex-col gap-1">Section<select name="sectionId" defaultValue=""><option value="">—</option>{m.sections.map((x) => <option key={x.id} value={x.id}>{m.classes.find((c) => c.id === x.classId)?.name}-{x.name}</option>)}</select></label>
-                <label className="flex flex-col gap-1">Roll no.<input name="rollNo" defaultValue={latest?.e.rollNo ?? ""} /></label>
-                <label className="flex items-end gap-2 pb-2"><input type="checkbox" name="carryDues" defaultChecked />Carry unpaid dues</label>
-                <div className="flex flex-wrap items-center gap-3 sm:col-span-5">
-                  <Submit confirm="Promote this student? Their current-year record stays as history.">Promote</Submit>
-                  <span className="text-xs text-gray-500">Personal and parent details carry over. To change them, use <Link className="underline" href={`/students/${id}/edit`}>Edit</Link> after promoting.</span>
-                </div>
-              </ActionForm>
-            )}
-          </div>
-        )}
-      </Card>
+      <div className="space-y-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-lg font-semibold text-ink">Sessions</h2>
+          <span className="text-xs text-gray-500">Newest first. When a class&apos;s session ends, the student moves up to the next class automatically.</span>
+        </div>
+        {sessionsView.length === 0 && <Notice tone="warn">No academic year records yet.</Notice>}
+        {sessionsView.map(({ y, h, ses, prev, bills, pays, billed, paid, balance, isLatest }) => (
+          <Card key={y.id}
+            title={<span className="flex flex-wrap items-center gap-2">
+              <span>{y.name}</span>
+              {h && <span className="font-normal text-gray-600">· Class {h.className}{h.sectionName ? "-" + h.sectionName : ""}{h.e.rollNo ? ` · Roll ${h.e.rollNo}` : ""}</span>}
+              {h && <Badge>{h.e.status.replace("_", " ")}</Badge>}
+              {y.isCurrent && <span className="text-xs font-normal text-ink">(current year)</span>}
+            </span>}
+            actions={<span className="text-xs text-gray-600">Billed <Money p={billed} /> · Paid <Money p={paid} /> · Balance <Money p={balance} className={balance ? "font-semibold text-red-700" : ""} /></span>}>
+            <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
+              {ses && <span>Session {formatDate(ses.startDate)} – {formatDate(ses.endDate)}</span>}
+              {h && prev && <span>{prev.e.classId === h.e.classId ? `Repeating Class ${h.className} (from ${prev.yearName})` : `Promoted from Class ${prev.className} (${prev.yearName})`}</span>}
+              {h && !prev && <span>Admitted {formatDate(p.s.admissionDate)}</span>}
+              {edit && h && <Link className="text-ink hover:underline" href={`/students/${id}/edit?year=${y.id}`}>Edit class / section / roll</Link>}
+            </div>
 
-      {byYear.map(({ y, bills, pays, enr, billed, paid, balance }) => (
-        <Card key={y.id} title={<>Fee records · {y.name}{enr ? ` · Class ${enr.className}${enr.sectionName ? "-" + enr.sectionName : ""}` : ""}</>}
-          actions={<span className="text-xs text-gray-600">Billed <Money p={billed} /> · Paid <Money p={paid} /> · Balance <Money p={balance} className={balance ? "font-semibold text-red-700" : ""} /></span>}>
-          <div className="grid gap-5 2xl:grid-cols-2">
-            <div className="min-w-0">
-              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Bills</h3>
-              {bills.length === 0 ? <p className="text-sm text-gray-500">No bills in {y.name}.</p> : (
-                <div className="overflow-x-auto"><table className="data">
-                  <thead><tr><th>Bill no.</th><th>Period</th><th>Due</th><th>Status</th><th className="num">Net</th><th className="num">Balance</th><th /></tr></thead>
-                  <tbody>{bills.map((i) => (
-                    <tr key={i.id}>
-                      <td><Link className="text-ink hover:underline" href={`/invoices/${i.id}`}>{i.invoiceNo}</Link></td>
-                      <td>{periodLabel(i.period)}</td><td>{formatDate(i.dueDate)}</td><td><Badge>{i.status}</Badge></td>
-                      <td className="num"><Money p={i.net} /></td><td className="num"><Money p={i.balance} /></td>
-                      <td><a className="text-xs text-ink hover:underline" target="_blank" href={`/invoices/${i.id}/print?auto=1`}>Print</a></td>
-                    </tr>
-                  ))}</tbody>
-                </table></div>
-              )}
+            {edit && isLatest && h && prev && (h.e.status === "studying" || h.e.status === "left") && (
+              <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                <span className="text-sm text-amber-900">Not right?</span>
+                {(h.e.classId !== prev.e.classId || h.e.status === "left") && (
+                  <ActionForm action={changeAction.bind(null, id, prev.e.academicYearId, y.id, "repeat")}>
+                    <Submit variant="secondary" confirm={`${p.s.name} failed: keep in Class ${prev.className} for ${y.name}?`}>Failed: repeat Class {prev.className}</Submit>
+                  </ActionForm>
+                )}
+                {(h.e.classId === prev.e.classId || h.e.status === "left") && (
+                  <ActionForm action={changeAction.bind(null, id, prev.e.academicYearId, y.id, "promote")}>
+                    <Submit variant="secondary">Promote to next class</Submit>
+                  </ActionForm>
+                )}
+                {h.e.status !== "left" && (
+                  <ActionForm action={changeAction.bind(null, id, prev.e.academicYearId, y.id, "leave")}>
+                    <Submit variant="danger" confirm={`Mark ${p.s.name} as left school? No more bills will be made.`}>Left school</Submit>
+                  </ActionForm>
+                )}
+                <span className="text-xs text-amber-800">Works until the first monthly bill of {y.name} is made.</span>
+              </div>
+            )}
+
+            <div className="grid gap-5 2xl:grid-cols-2">
+              <div className="min-w-0">
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Bills</h3>
+                {bills.length === 0 ? <p className="text-sm text-gray-500">No bills in {y.name}.</p> : (
+                  <div className="overflow-x-auto"><table className="data">
+                    <thead><tr><th>Bill no.</th><th>Period</th><th>Due</th><th>Status</th><th className="num">Net</th><th className="num">Balance</th><th /></tr></thead>
+                    <tbody>{bills.map((i) => (
+                      <tr key={i.id}>
+                        <td><Link className="text-ink hover:underline" href={`/invoices/${i.id}`}>{i.invoiceNo}</Link></td>
+                        <td>{periodLabel(i.period)}</td><td>{formatDate(i.dueDate)}</td><td><Badge>{i.status}</Badge></td>
+                        <td className="num"><Money p={i.net} /></td><td className="num"><Money p={i.balance} /></td>
+                        <td><a className="text-xs text-ink hover:underline" target="_blank" href={`/invoices/${i.id}/print?auto=1`}>Print</a></td>
+                      </tr>
+                    ))}</tbody>
+                  </table></div>
+                )}
+              </div>
+              <div className="min-w-0">
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Payments</h3>
+                {pays.length === 0 ? <p className="text-sm text-gray-500">No payments in {y.name}.</p> : (
+                  <div className="overflow-x-auto"><table className="data">
+                    <thead><tr><th>Receipt</th><th>Date</th><th>Mode</th><th className="num">Amount</th><th>Status</th></tr></thead>
+                    <tbody>{pays.map((x) => (
+                      <tr key={x.id}><td><Link className="text-ink hover:underline" href={`/receipts/${x.id}`}>{x.receiptNo}</Link></td><td>{formatDate(x.date)}</td>
+                        <td className="capitalize">{x.mode.replace("_", " ")}</td><td className="num"><Money p={x.amount} /></td><td><Badge>{x.status}</Badge></td></tr>
+                    ))}</tbody>
+                  </table></div>
+                )}
+              </div>
             </div>
-            <div className="min-w-0">
-              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Payments</h3>
-              {pays.length === 0 ? <p className="text-sm text-gray-500">No payments in {y.name}.</p> : (
-                <div className="overflow-x-auto"><table className="data">
-                  <thead><tr><th>Receipt</th><th>Date</th><th>Mode</th><th className="num">Amount</th><th>Status</th></tr></thead>
-                  <tbody>{pays.map((x) => (
-                    <tr key={x.id}><td><Link className="text-ink hover:underline" href={`/receipts/${x.id}`}>{x.receiptNo}</Link></td><td>{formatDate(x.date)}</td>
-                      <td className="capitalize">{x.mode.replace("_", " ")}</td><td className="num"><Money p={x.amount} /></td><td><Badge>{x.status}</Badge></td></tr>
-                  ))}</tbody>
-                </table></div>
-              )}
-            </div>
-          </div>
-        </Card>
-      ))}
+          </Card>
+        ))}
+      </div>
       {unassignedPays.length > 0 && <Notice tone="warn">{unassignedPays.length} payment(s) fall outside every academic year&apos;s dates. Check Settings → Academic years.</Notice>}
 
       <div className="grid gap-5">

@@ -110,4 +110,18 @@ describe.skipIf(!run)("auto promotion", () => {
     await expect(core.students.changePromotion(admin, { studentId: st.V1!, fromYearId: y1, toYearId: y2, action: "repeat" })).rejects.toThrow(/monthly bill/);
     expect((await core.ops.integrityCheck()).problems).toEqual([]);
   });
+
+  it("the daily job promotes on its own when sessions end, year after year, and does nothing in between", async () => {
+    expect(await core.students.anyClassReadyToPromote("2027-11-20")).toBe(false);
+    expect(await core.students.autoPromoteAll("2027-11-20")).toEqual([]);
+    // In April 2028 the 2027-28 Apr-Mar classes end: everyone studying there moves up, and 2028-29 is created.
+    expect(await core.students.anyClassReadyToPromote("2028-04-02")).toBe(true);
+    const r = await core.students.autoPromoteAll("2028-04-02");
+    expect(r.map((x) => `${x.from}→${x.to}`)).toEqual(["2027-28→2028-29"]);
+    expect(await now("N1", "2028-29")).toBe("UKG:studying");
+    expect(await now("V1", "2028-29")).toBe("VII:studying");
+    expect(await core.students.autoPromoteAll("2028-04-02")).toEqual([]); // second run: nothing
+    // Passed-out and left students are never picked up again.
+    expect((await core.students.listEnrollments(st.X1!)).map((e) => e.yearName)).toEqual(["2026-27"]);
+  });
 });

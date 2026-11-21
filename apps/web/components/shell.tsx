@@ -104,7 +104,7 @@ function LiveClock() {
     <div className="hidden md:flex items-center gap-4" title="Current date and time">
       <div className="flex flex-col items-center leading-none">
         <span className="font-sans text-[9px] font-bold uppercase tracking-[0.2em] text-accent-ink">{month}</span>
-        <span className="mt-1 font-sans text-[26px] font-semibold leading-none tracking-[-0.05em] tabular-nums text-ink">{day}</span>
+        <span className="mt-1 font-sans text-[26px] font-semibold leading-none tracking-tighter tabular-nums text-ink">{day}</span>
       </div>
       <span className="h-10 w-px bg-gray-200" />
       <div className="flex flex-col gap-1">
