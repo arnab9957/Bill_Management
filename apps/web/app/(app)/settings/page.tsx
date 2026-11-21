@@ -1,11 +1,12 @@
 import { revalidatePath } from "next/cache";
-import { fees, getSettings, receiptNumberPreview, removeSchoolLogo, setNextReceiptNumber, setSchoolLogo, updateSchoolSettings } from "@sb/core";
+import { fees, formatDate, sessions, getSettings, receiptNumberPreview, removeSchoolLogo, setNextReceiptNumber, setSchoolLogo, updateSchoolSettings } from "@sb/core";
 import { setNextReceiptNumberSchema } from "@sb/validation";
 import { requireRole } from "@/lib/auth";
 import { formObject, run, type ActionState } from "@/lib/action";
 import { classOrder } from "@/lib/classes";
 import { ActionForm, FieldError, Submit } from "@/components/action-form";
 import { LinkButton } from "@/components/ui";
+import Link from "next/link";
 import { ClassesSectionsManager } from "./classes-sections";
 import { CollapsibleSection, SectionCollapseProvider } from "./section-collapse";
 import { ProfileSection } from "./profile-section";
@@ -94,6 +95,17 @@ async function addYear(_: ActionState, fd: FormData): Promise<ActionState> {
   return r;
 }
 
+async function saveSession(_: ActionState, fd: FormData): Promise<ActionState> {
+  "use server";
+  const u = await requireRole("settings");
+  const reset = fd.get("reset") === "1";
+  const r = await run(() => sessions.saveClassSession(u, {
+    yearId: Number(fd.get("yearId")), classId: Number(fd.get("classId")),
+    startDate: reset ? null : String(fd.get("startDate") || "") || null, endDate: reset ? null : String(fd.get("endDate") || "") || null,
+  }), (x) => `Class ${x.className}, ${x.yearName}: ${formatDate(x.startDate)} – ${formatDate(x.endDate)}`);
+  revalidatePath("/settings");
+  return r;
+}
 async function makeCurrent(id: number) {
   "use server";
   const u = await requireRole("settings");
@@ -153,7 +165,8 @@ async function removeSectionAction(_: ActionState, fd: FormData): Promise<Action
 const field = "field-stack";
 const hint = "hint";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ sy?: string }> }) {
+  const { sy: syParam } = await searchParams;
   await requireRole("settings");
   const [s, m, usage, studentLists, num] = await Promise.all([
     getSettings(),
@@ -170,6 +183,9 @@ export default async function SettingsPage() {
     sections: m.sections.filter((sec) => sec.classId === c.id).map((sec) => ({ id: sec.id, name: sec.name, used: usage.usedSectionIds.has(sec.id) })),
   }));
   const currentYear = m.years.find((y) => y.isCurrent) ?? m.years[0];
+  // Class session dates: the year picked with the buttons (?sy=), else the current year.
+  const sessYear = m.years.find((y) => y.id === Number(syParam)) ?? currentYear;
+  const sessRows = sessYear ? await sessions.listSessions(sessYear.id) : [];
   const totalStudents = classItems.reduce((n, c) => n + c.students.length, 0);
   const totalSections = classItems.reduce((n, c) => n + c.sections.length, 0);
 
@@ -348,6 +364,40 @@ export default async function SettingsPage() {
             <FieldError name="name" />
             <FieldError name="endDate" />
           </ActionForm>
+
+          {sessYear && (
+          <div className="mt-6 border-t border-gray-100 pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-ink">Class session dates</h3>
+              <div className="flex flex-wrap gap-1 text-sm" role="group" aria-label="Academic year">
+                {m.years.map((y) => (
+                  <Link key={y.id} href={`/settings?sy=${y.id}#academic-sessions`} scroll={false}
+                    className={`rounded-md px-2.5 py-1 ${y.id === sessYear.id ? "bg-ink text-white" : "border border-gray-200 text-ink hover:bg-gray-50"}`}>
+                    {y.name}{y.isCurrent ? " (current)" : ""}
+                  </Link>
+                ))}
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-gray-600">
+              Classes use the year&apos;s dates (<b>{formatDate(sessYear.startDate)} – {formatDate(sessYear.endDate)}</b>) unless you give them their own,
+              e.g. Nursery–UKG January–December. At most 12 months; one class&apos;s sessions can&apos;t overlap; dates can&apos;t move past bills already made.
+              Students move up automatically the day after their class&apos;s session ends.
+            </p>
+            <div className="mt-3 space-y-2">{sessRows.map((r) => (
+              <ActionForm key={r.classId} action={saveSession} className="flex flex-wrap items-center gap-2 border-b border-gray-100 pb-2">
+                <input type="hidden" name="yearId" value={sessYear.id} /><input type="hidden" name="classId" value={r.classId} />
+                <span className="w-20 text-sm font-medium">{r.className}</span>
+                <input type="date" name="startDate" defaultValue={r.startDate} aria-label={`${r.className} session start`} required className="w-40" />
+                <span className="text-gray-400">to</span>
+                <input type="date" name="endDate" defaultValue={r.endDate} aria-label={`${r.className} session end`} data-after="startDate" data-months="12" required className="w-40" />
+                <Submit variant="secondary">Save</Submit>
+                {r.custom
+                  ? <><span className="text-xs font-medium text-blue-700">own dates</span><Submit variant="secondary" name="reset" value="1">Use year&apos;s dates</Submit></>
+                  : <span className="text-xs text-gray-400">year&apos;s dates</span>}
+              </ActionForm>
+            ))}</div>
+          </div>
+          )}
         </CollapsibleSection>
 
         <ProfileSection id="admission-numbering" title="Admission & Roll Numbering" subtitle="How admission numbers and roll numbers are generated." action={saveNumbering} saveLabel="Save numbering formats">
