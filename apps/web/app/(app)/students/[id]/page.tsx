@@ -159,10 +159,16 @@ export default async function StudentProfile({ params, searchParams }: { params:
           <span className="text-xs text-gray-500">Newest first. When a class&apos;s session ends, the student moves up to the next class automatically.</span>
         </div>
         {sessionsView.length === 0 && <Notice tone="warn">No academic year records yet.</Notice>}
-        {sessionsView.map(({ y, h, ses, prev, bills, pays, billed, paid, balance, isLatest }) => (
+        {sessionsView.map(({ y, h, ses, prev, bills, pays, billed, paid, balance, isLatest }, idx) => (
           <Card key={y.id}
+            className={idx === 0
+              ? "border-2 border-blue-400 ring-4 ring-blue-50 [&>div:first-child]:border-blue-200 [&>div:first-child]:bg-blue-50"
+              : "border-l-4 border-l-gray-300 [&>div:first-child]:bg-gray-100"}
             title={<span className="flex flex-wrap items-center gap-2">
-              <span>{y.name}</span>
+              {idx === 0
+                ? <span className="rounded-full bg-blue-600 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">New session</span>
+                : <span className="rounded-full bg-gray-200 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-600">Previous session</span>}
+              <span className={idx === 0 ? "text-blue-900" : "text-gray-700"}>{y.name}</span>
               {h && <span className="font-normal text-gray-600">· Class {h.className}{h.sectionName ? "-" + h.sectionName : ""}{h.e.rollNo ? ` · Roll ${h.e.rollNo}` : ""}</span>}
               {h && <Badge>{h.e.status.replace("_", " ")}</Badge>}
               {y.isCurrent && <span className="text-xs font-normal text-ink">(current year)</span>}
