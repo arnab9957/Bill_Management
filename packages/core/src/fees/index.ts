@@ -39,11 +39,17 @@ const yearSchema = z.object({
   name: z.string().regex(/^\d{4}-\d{2}$/, "Use e.g. 2027-28"),
   startDate: isoDate,
   endDate: isoDate,
-}).refine((d) => d.startDate < d.endDate, { message: "End must be after start", path: ["endDate"] });
+}).refine((d) => d.startDate < d.endDate, { message: "End must be after start", path: ["endDate"] })
+  .refine((d) => d.endDate <= `${Number(d.startDate.slice(0, 4)) + 1}${d.startDate.slice(4)}`, { message: "An academic year can be at most 12 months", path: ["endDate"] })
+  .refine((d) => d.name.slice(0, 4) === d.startDate.slice(0, 4) && Number(d.name.slice(5)) === (Number(d.name.slice(2, 4)) + 1) % 100,
+    { message: "The name must match the start year, e.g. a year starting in 2027 is 2027-28", path: ["name"] });
 
 export async function createYear(actor: Actor, input: unknown) {
   const d = yearSchema.parse(input);
   const db = getDb();
+  const clash = await db.select().from(academicYears).where(sql`${academicYears.startDate} <= ${d.endDate} and ${academicYears.endDate} >= ${d.startDate}`);
+  if (clash.length) throw new AppError(`These dates overlap academic year ${clash[0]!.name} (${clash[0]!.startDate} to ${clash[0]!.endDate}). Academic years cannot overlap.`, { startDate: "Overlaps" });
+  if ((await db.select({ id: academicYears.id }).from(academicYears).where(eq(academicYears.name, d.name))).length) throw new AppError(`Academic year ${d.name} already exists`, { name: "Already exists" });
   const [y] = await db.insert(academicYears).values(d).returning();
   await audit(db, actor, "create", "academic_year", y!.id, null, d);
   clearMastersCache();

@@ -14,3 +14,4 @@ export * as notifications from "./notifications";
 export type { NotificationAdapter, OutboundMessage, SendResult, ChannelAvailability, WhatsappReminderLink } from "./notifications";
 export * as reports from "./reports";
 export * as ops from "./ops";
+export * as sessions from "./sessions";

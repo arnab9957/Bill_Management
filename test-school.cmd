@@ -29,6 +29,15 @@ call pnpm --filter @sb/db migrate || goto :fail
 call pnpm --filter @sb/db seed -- --demo || goto :fail
 call pnpm --filter @sb/core exec tsx scenarios/load.ts %EXTRA% || goto :fail
 
+echo.
+echo Also play the YEAR-END PROMOTION (daily job on 2 April 2027, then failed / left corrections)?
+set "ROUND=n"
+set /p ROUND=Type y for yes, Enter for no:
+if /i "%ROUND%"=="y" (
+  call pnpm --filter @sb/core exec tsx scenarios/load-promotion-round.ts || goto :fail
+  start "" notepad promotion-round-report.txt
+)
+
 start "" /min cmd /c "node scripts\wait-port.mjs 3001 180 && start "" http://127.0.0.1:3001"
 echo.
 echo  TEST SCHOOL website: http://127.0.0.1:3001   (close this window to stop)

@@ -22,6 +22,8 @@ export function StudentFilters({
   defaultSection,
   defaultSectionId,
   defaultStatus,
+  singleMatchId,
+  exactMatchId,
 }: {
   classes: ClassItem[];
   sections: SectionItem[];
@@ -30,12 +32,23 @@ export function StudentFilters({
   defaultSection?: string;
   defaultSectionId?: string;
   defaultStatus?: string;
+  /** the only student found by the current search (Enter opens it) */
+  singleMatchId?: number;
+  /** the only student found AND the search is exactly their admission no. (opened at once) */
+  exactMatchId?: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const [q, setQ] = useState(defaultQ ?? "");
+
+  // Typed an exact admission number: open that student straight away.
+  // replace (not push) so the browser's Back button doesn't land on this search and re-open the student.
+  useEffect(() => {
+    if (exactMatchId) router.replace(`${pathname}/${exactMatchId}`);
+  }, [exactMatchId, pathname, router]);
+
   const [selectedClassId, setSelectedClassId] = useState(defaultClassId ?? "");
 
   const initialSection = defaultSection ?? (defaultSectionId ? sections.find((s) => String(s.id) === String(defaultSectionId))?.name : "") ?? "";
@@ -140,7 +153,12 @@ export function StudentFilters({
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    applyFilters(q, selectedClassId, selectedSection, selectedStatus);
+    // Enter: open the student if only one matches, otherwise just search now
+    if (singleMatchId) {
+      router.push(`${pathname}/${singleMatchId}`);
+    } else {
+      applyFilters(q, selectedClassId, selectedSection, selectedStatus);
+    }
   };
 
   return (

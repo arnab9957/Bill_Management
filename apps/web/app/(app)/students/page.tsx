@@ -37,6 +37,8 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
           defaultSection={sp.section}
           defaultSectionId={sp.sectionId}
           defaultStatus={sp.status}
+          singleMatchId={sp.q && list.length === 1 ? list[0]!.id : undefined}
+          exactMatchId={sp.q && list.length === 1 && list[0]!.admissionNo.toLowerCase() === sp.q.trim().toLowerCase() ? list[0]!.id : undefined}
         />
         {list.length === 0 ? <Empty>No students found in {year.name}. New admissions and promotions into this year appear here.</Empty> : (
           <table className="data">

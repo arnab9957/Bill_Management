@@ -193,6 +193,7 @@ export default async function SettingsPage() {
               <LinkButton href="/settings/users">Users</LinkButton>
               <LinkButton href="/settings/providers">SMS / WhatsApp / Email</LinkButton>
               <LinkButton href="/settings/health">Backups & health</LinkButton>
+              <LinkButton href="/promotion">Sessions &amp; promotion</LinkButton>
             </div>
           </div>
         </div>
@@ -339,8 +340,8 @@ export default async function SettingsPage() {
                 <span></span>
 
                 <input name="name" placeholder="2027-28" required className="min-w-0" />
-                <input type="date" name="startDate" required className="min-w-0" />
-                <input type="date" name="endDate" required className="min-w-0" />
+                <input type="date" name="startDate" aria-label="Year start" required className="min-w-0" />
+                <input type="date" name="endDate" data-after="startDate" data-months="12" required className="min-w-0" />
                 <Submit variant="secondary">Add</Submit>
               </div>
             </div>
