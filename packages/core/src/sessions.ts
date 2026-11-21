@@ -27,11 +27,18 @@ export const sessionHasDate = (s: { startDate: ISODate; endDate: ISODate }, date
 export async function allSessions(db: Executor = getDb(), yearIds?: number[]): Promise<Map<string, Session>> {
   const years = await db.select().from(academicYears).where(yearIds?.length ? inArray(academicYears.id, yearIds) : undefined);
   const cls = await db.select({ id: classes.id }).from(classes);
-  const custom = await db.select().from(classSessions).where(yearIds?.length ? inArray(classSessions.academicYearId, yearIds) : undefined);
+  const customSessionsList = await db.select().from(classSessions).where(yearIds?.length ? inArray(classSessions.academicYearId, yearIds) : undefined);
   const out = new Map<string, Session>();
   for (const y of years) for (const c of cls) {
-    const o = custom.find((x) => x.academicYearId === y.id && x.classId === c.id);
-    out.set(`${y.id}:${c.id}`, { yearId: y.id, yearName: y.name, classId: c.id, startDate: o?.startDate ?? y.startDate, endDate: o?.endDate ?? y.endDate, custom: !!o });
+    const override = customSessionsList.find((x) => x.academicYearId === y.id && x.classId === c.id);
+    out.set(`${y.id}:${c.id}`, {
+      yearId: y.id,
+      yearName: y.name,
+      classId: c.id,
+      startDate: override?.startDate ?? y.startDate,
+      endDate: override?.endDate ?? y.endDate,
+      custom: !!override,
+    });
   }
   return out;
 }

@@ -4,8 +4,9 @@ import { requireRole } from "@/lib/auth";
 import { getWorkingYear } from "@/lib/year";
 import { Badge, Card, Empty, LinkButton, Money, PageHeader } from "@/components/ui";
 import { ReminderButtons } from "@/components/reminder-buttons";
+import { BillRunModal } from "../billing/bill-run-modal";
 
-export default async function Invoices({ searchParams }: { searchParams: Promise<{ q?: string; period?: string; classId?: string; status?: string }> }) {
+export default async function Invoices({ searchParams }: { searchParams: Promise<{ q?: string; period?: string; classId?: string; status?: string; billrun?: string }> }) {
   const user = await requireRole("billing");
   const sp = await searchParams;
   const { classes } = await fees.masters();
@@ -20,7 +21,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
     <div>
       <PageHeader title="Bills" subtitle={<>{year.name} · {rows.length} shown · balance <Money p={total} /></>} actions={<>
         {rows.length > 0 && <LinkButton href={`/invoices/print-all?${qs}`} target="_blank">🖨 Print all shown ({rows.length})</LinkButton>}
-        <LinkButton variant="primary" href="/billing">Run billing</LinkButton>
+        <BillRunModal classes={classes} year={year} defaultOpen={sp.billrun === "1"} />
       </>} />
       <Card>
         <form className="toolbar mb-6">
