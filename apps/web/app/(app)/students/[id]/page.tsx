@@ -91,7 +91,11 @@ export default async function StudentProfile({ params, searchParams }: { params:
       <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
         <StudentPhoto studentId={id} name={p.s.name} photoPath={p.s.photoPath} canEdit={edit} upload={uploadPhotoAction} remove={removePhotoAction} />
         <div className="w-full min-w-0 flex-1">
-          <PageHeader title={p.s.name} subtitle={<>{p.s.admissionNo} · {inYear ? <>Class {inYear.className}{inYear.sectionName ? "-" + inYear.sectionName : ""}{inYear.e.rollNo ? ` · Roll ${inYear.e.rollNo}` : ""} in {wy.year.name}</> : <span className="text-amber-700">Not enrolled in {wy.year.name}{latest ? ` (last: ${latest.yearName}, Class ${latest.className})` : ""}</span>} · <Badge>{p.s.status}</Badge></>}
+          <PageHeader title={p.s.name} subtitle={<>{p.s.admissionNo} · {latest
+              // Always the newest session (after promotion this is the new class), plus the viewed year's class if different.
+              ? <>Class {latest.className}{latest.sectionName ? "-" + latest.sectionName : ""}{latest.e.rollNo ? ` · Roll ${latest.e.rollNo}` : ""} in {latest.yearName}
+                  {inYear && inYear !== latest && <span className="text-gray-500"> · was {inYear.className}{inYear.sectionName ? "-" + inYear.sectionName : ""} in {inYear.yearName}</span>}</>
+              : <span className="text-amber-700">Not enrolled in any year</span>} · <Badge>{p.s.status}</Badge></>}
             actions={<>
               {can(user.role, "collect") && <LinkButton variant="primary" href={`/collect?student=${id}`}>Collect fee</LinkButton>}
               <LinkButton href={`/students/${id}/statement`}>Statement</LinkButton>
