@@ -11,6 +11,7 @@ import { formatINR } from "../money";
 import { enqueue, studentVars } from "../notifications";
 import { applyWalletToInvoice } from "../payments/wallet";
 import { buildPrintRows } from "../printing";
+import { allSessions, sessionHasPeriod, studentYearOn } from "../sessions";
 import { concessionFor, deriveStatus, isDueInPeriod, lateFeeTarget, type ConcessionRule } from "./rules";
 
 export * from "./rules";
@@ -46,6 +47,8 @@ export interface PlannedLine { feeHeadId: number; description: string; amount: n
 export interface PlannedInvoice {
   studentId: number; admissionNo: string; name: string; className: string; dueDate: ISODate;
   lines: PlannedLine[]; net: number;
+  /** academic year (of the student's class session) the bill belongs to */
+  yearId: number; yearName: string;
 }
 export interface BillRunResult {
   period: string; yearName: string; dryRun: boolean;
@@ -63,41 +66,55 @@ export async function generateInvoices(input: BillRunInput, actor: Actor = SYSTE
   const { period, classIds, studentId, dryRun } = billRunSchema.parse(input);
   const db = getDb();
   const periodStart = dateInPeriod(period, 1);
-  const year = await yearForDate(db, periodStart);
   const periodEnd = dateInPeriod(period, 28); // admissions up to the 28th are billed for the month
 
-  // Only students enrolled in THIS academic year are billed, with the class they have in this year.
-  const conds = [eq(students.status, "active"), lte(students.admissionDate, periodEnd),
-    eq(studentEnrollments.academicYearId, year.id), eq(studentEnrollments.status, "studying")];
+  // Each student is billed in the academic year whose session FOR THEIR CLASS covers this month,
+  // with the class they have in that year. Classes can run on different dates (see sessions.ts).
+  const conds = [eq(students.status, "active"), lte(students.admissionDate, periodEnd), eq(studentEnrollments.status, "studying")];
   if (studentId) conds.push(eq(students.id, studentId));
   else if (classIds.length) conds.push(inArray(studentEnrollments.classId, classIds));
-  const enrolled = await db.select({ s: students, classId: studentEnrollments.classId, className: classes.name, route: transportRoutes })
+  const rows = await db.select({ s: students, classId: studentEnrollments.classId, yearId: studentEnrollments.academicYearId, className: classes.name, route: transportRoutes })
     .from(studentEnrollments).innerJoin(students, eq(students.id, studentEnrollments.studentId))
     .innerJoin(classes, eq(classes.id, studentEnrollments.classId))
     .leftJoin(transportRoutes, eq(transportRoutes.id, students.transportRouteId))
     .where(and(...conds)).orderBy(asc(classes.sortOrder), asc(students.name));
-  const studs = enrolled.map((x) => ({ ...x, s: { ...x.s, classId: x.classId } }));
+  const sess = await allSessions(db, [...new Set(rows.map((r) => r.yearId))]);
+  const seen = new Set<number>();
+  const order = new Map<number, number>();
+  rows.forEach((r, i) => { if (!order.has(r.s.id)) order.set(r.s.id, i); });
+  const studs = rows
+    .map((x) => ({ ...x, s: { ...x.s, classId: x.classId }, session: sess.get(`${x.yearId}:${x.classId}`)! }))
+    .filter((x) => x.session && sessionHasPeriod(x.session, period))
+    // a student is billed in one session per month: the latest one covering it
+    .sort((a, b) => b.session.startDate.localeCompare(a.session.startDate))
+    .filter((x) => { if (seen.has(x.s.id)) return false; seen.add(x.s.id); return true; })
+    .sort((a, b) => order.get(a.s.id)! - order.get(b.s.id)!);
 
-  const result: BillRunResult = { period, yearName: year.name, dryRun, planned: [], skipped: [], totalNet: 0, created: [] };
+  const yearNames = [...new Set(studs.map((x) => x.session.yearName))];
+  let label = yearNames.join(", ");
+  if (!label) { try { label = (await yearForDate(db, periodStart)).name; } catch { label = "-"; } }
+  const result: BillRunResult = { period, yearName: label, dryRun, planned: [], skipped: [], totalNet: 0, created: [] };
   if (!studs.length) return result;
   const ids = studs.map((x) => x.s.id);
+  const yearIds = [...new Set(studs.map((x) => x.yearId))];
 
+  // Already billed for this month (in any year): never bill the same month twice, even across a promotion.
   const existing = new Set((await db.select({ sid: invoices.studentId }).from(invoices)
-    .where(and(eq(invoices.academicYearId, year.id), eq(invoices.period, period), inArray(invoices.studentId, ids)))).map((r) => r.sid));
+    .where(and(eq(invoices.period, period), inArray(invoices.studentId, ids), ne(invoices.status, "cancelled")))).map((r) => r.sid));
 
-  const structures = await db.select({ classId: feeStructures.classId, item: feeStructureItems, head: feeHeads })
+  const structures = await db.select({ yearId: feeStructures.academicYearId, classId: feeStructures.classId, item: feeStructureItems, head: feeHeads })
     .from(feeStructures).innerJoin(feeStructureItems, eq(feeStructureItems.structureId, feeStructures.id))
     .innerJoin(feeHeads, eq(feeHeads.id, feeStructureItems.feeHeadId))
-    .where(eq(feeStructures.academicYearId, year.id)).orderBy(asc(feeHeads.sortOrder));
-  const byClass = new Map<number, typeof structures>();
-  for (const r of structures) byClass.set(r.classId, [...(byClass.get(r.classId) ?? []), r]);
+    .where(inArray(feeStructures.academicYearId, yearIds)).orderBy(asc(feeHeads.sortOrder));
+  const byClass = new Map<string, typeof structures>();
+  for (const r of structures) byClass.set(`${r.yearId}:${r.classId}`, [...(byClass.get(`${r.yearId}:${r.classId}`) ?? []), r]);
 
-  // Which students already had a monthly invoice this year, and which heads were billed.
-  const yearInvoices = await db.select({ sid: invoices.studentId, headId: invoiceLines.feeHeadId })
+  // Which students already had a monthly invoice in that year, and which heads were billed.
+  const yearInvoices = await db.select({ sid: invoices.studentId, yearId: invoices.academicYearId, headId: invoiceLines.feeHeadId })
     .from(invoices).innerJoin(invoiceLines, eq(invoiceLines.invoiceId, invoices.id))
-    .where(and(eq(invoices.academicYearId, year.id), ne(invoices.status, "cancelled"), inArray(invoices.studentId, ids), like(invoices.period, "____-__")));
-  const hadInvoice = new Set(yearInvoices.map((r) => r.sid));
-  const billedHead = new Set(yearInvoices.map((r) => `${r.sid}:${r.headId}`));
+    .where(and(inArray(invoices.academicYearId, yearIds), ne(invoices.status, "cancelled"), inArray(invoices.studentId, ids), like(invoices.period, "____-__")));
+  const hadInvoice = new Set(yearInvoices.map((r) => `${r.sid}:${r.yearId}`));
+  const billedHead = new Set(yearInvoices.map((r) => `${r.sid}:${r.yearId}:${r.headId}`));
 
   const conc = await db.select({ sid: studentConcessions.studentId, t: concessionTypes }).from(studentConcessions)
     .innerJoin(concessionTypes, eq(concessionTypes.id, studentConcessions.concessionTypeId))
@@ -110,17 +127,18 @@ export async function generateInvoices(input: BillRunInput, actor: Actor = SYSTE
 
   const [transportHead] = await db.select().from(feeHeads).where(eq(feeHeads.code, "TRANSPORT"));
 
-  for (const { s, className, route } of studs) {
+  for (const { s, className, route, session, yearId } of studs) {
     if (existing.has(s.id)) { result.skipped.push({ studentId: s.id, name: s.name, reason: "Already billed for this period" }); continue; }
-    const items = byClass.get(s.classId);
-    if (!items?.length && !route) { result.skipped.push({ studentId: s.id, name: s.name, reason: `No fee structure for class ${className} in ${year.name}` }); continue; }
+    const items = byClass.get(`${yearId}:${s.classId}`);
+    if (!items?.length && !route) { result.skipped.push({ studentId: s.id, name: s.name, reason: `No fee structure for class ${className} in ${session.yearName}` }); continue; }
     const rules = concBy.get(s.id) ?? [];
     const lines: PlannedLine[] = [];
     let dueDay = 28;
     for (const { item, head } of items ?? []) {
-      if (!isDueInPeriod(item, period, year.startDate, { firstInvoiceOfYear: !hadInvoice.has(s.id), alreadyBilledThisYear: billedHead.has(`${s.id}:${head.id}`) })) continue;
-      // one-time admission-type heads only for students admitted this academic year
-      if (item.frequency === "one_time" && s.admissionDate < year.startDate) continue;
+      // Months are counted from the start of this class's session.
+      if (!isDueInPeriod(item, period, session.startDate, { firstInvoiceOfYear: !hadInvoice.has(`${s.id}:${yearId}`), alreadyBilledThisYear: billedHead.has(`${s.id}:${yearId}:${head.id}`) })) continue;
+      // one-time admission-type heads only for students admitted during this session
+      if (item.frequency === "one_time" && s.admissionDate < session.startDate) continue;
       const { discount, names } = concessionFor(head.id, item.amount, rules);
       lines.push({ feeHeadId: head.id, description: `${head.name} – ${periodLabel(period)}`, amount: item.amount, discount, net: item.amount - discount, concession: names.join(", ") || undefined });
       dueDay = Math.min(dueDay, item.dueDay);
@@ -132,7 +150,7 @@ export async function generateInvoices(input: BillRunInput, actor: Actor = SYSTE
     }
     if (!lines.length) { result.skipped.push({ studentId: s.id, name: s.name, reason: "Nothing due this period" }); continue; }
     const net = lines.reduce((a, l) => a + l.net, 0);
-    result.planned.push({ studentId: s.id, admissionNo: s.admissionNo, name: s.name, className, dueDate: dateInPeriod(period, dueDay), lines, net });
+    result.planned.push({ studentId: s.id, admissionNo: s.admissionNo, name: s.name, className, dueDate: dateInPeriod(period, dueDay), lines, net, yearId, yearName: session.yearName });
     result.totalNet += net;
   }
 
@@ -144,11 +162,11 @@ export async function generateInvoices(input: BillRunInput, actor: Actor = SYSTE
       // Serialise per student: also blocks a concurrent bill run for the same student.
       await tx.select({ id: students.id }).from(students).where(eq(students.id, p.studentId)).for("update");
       const dup = await tx.select({ id: invoices.id }).from(invoices)
-        .where(and(eq(invoices.studentId, p.studentId), eq(invoices.academicYearId, year.id), eq(invoices.period, period)));
+        .where(and(eq(invoices.studentId, p.studentId), eq(invoices.period, period), ne(invoices.status, "cancelled")));
       if (dup.length) return null;
-      const invoiceNo = await newInvoiceNo(tx, year.name);
+      const invoiceNo = await newInvoiceNo(tx, p.yearName);
       const [inv] = await tx.insert(invoices).values({
-        invoiceNo, studentId: p.studentId, academicYearId: year.id, period, issueDate, dueDate: p.dueDate, createdBy: actor.id,
+        invoiceNo, studentId: p.studentId, academicYearId: p.yearId, period, issueDate, dueDate: p.dueDate, createdBy: actor.id,
       }).returning();
       await tx.insert(invoiceLines).values(p.lines.map((l) => ({
         invoiceId: inv!.id, feeHeadId: l.feeHeadId, kind: "fee" as const,
@@ -178,7 +196,7 @@ export async function addMiscCharge(actor: Actor, input: unknown) {
   const d = miscChargeSchema.parse(input);
   const db = getDb();
   return db.transaction(async (tx) => {
-    const year = await yearForDate(tx, d.dueDate);
+    const year = await studentYearOn(tx, d.studentId, d.dueDate);
     const [head] = await tx.select().from(feeHeads).where(eq(feeHeads.id, d.feeHeadId));
     if (!head) throw new AppError("Unknown fee head");
     await tx.select({ id: students.id }).from(students).where(eq(students.id, d.studentId)).for("update");

@@ -1,4 +1,4 @@
-import { billing, notifications, ops, accounts, getProviderConfig, today, periodOf } from "@sb/core";
+import { billing, notifications, ops, accounts, students, getProviderConfig, today, periodOf } from "@sb/core";
 import { env } from "@sb/db";
 import { buildAdapters, isOnline } from "@sb/notifications";
 import type { Logger } from "pino";
@@ -10,6 +10,18 @@ export const jobs = {
     const period = data?.period ?? periodOf(today());
     const r = await billing.generateInvoices({ period, dryRun: false });
     log.info({ period, created: r.created.length, skipped: r.skipped.length, total: r.totalNet }, "bill run finished");
+  },
+  /**
+   * Daily 05:30 (and once when the worker starts): every class whose session has ended moves up
+   * to the next class. Students who failed or left are fixed on their profile afterwards.
+   */
+  async autoPromote(log: Logger) {
+    if (!(await students.anyClassReadyToPromote(today()))) return;
+    // Backup first; promotion still goes ahead if the backup tool is missing (every step can be changed on the profile).
+    const b = await ops.runBackup("pre_promotion");
+    if (!b.ok) log.warn({ error: b.error }, "backup before auto promotion failed; promoting anyway");
+    const r = await students.autoPromoteAll(today());
+    for (const x of r) log.info({ from: x.from, to: x.to, classes: x.done }, "classes promoted automatically");
   },
   /** Daily: refresh overdue status and add late fees. */
   async lateFee(log: Logger) {

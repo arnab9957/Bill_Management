@@ -150,3 +150,6 @@ table.data tr:hover td { @apply bg-subtle/70; }
 /* school logo (optional), printed above the banner */
 .ss-logo { display: block; margin: 0 auto 1mm; height: 11mm; max-width: 60mm; object-fit: contain; }
 .ss-thermal .ss-logo { height: 8mm; }
+
+/* Date boxes that fail a check (see components/date-guards.tsx) */
+input[type="date"][aria-invalid] { border-color: #dc2626; background-color: #fef2f2; outline-color: #dc2626; }

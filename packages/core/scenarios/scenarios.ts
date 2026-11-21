@@ -139,13 +139,26 @@ export async function loadScenarios(log: (s: string) => void = () => {}, specs: 
   const ids: Record<string, number> = {};
   const families = new Map<string, number>();
   let phone = specs === SPECS ? 9876510000 : 9700000000;
+  // Roll numbers must be unique per class + section: hand out the next free one, counting students already there.
+  const rolls = new Map<string, number>();
+  for (const e of await d.select().from(db.studentEnrollments).where(db.dz.eq(db.studentEnrollments.academicYearId, year.id))) {
+    const k = `${e.classId}:${e.sectionId ?? 0}`;
+    rolls.set(k, Math.max(rolls.get(k) ?? 0, Number(e.rollNo) || 0));
+  }
+  const nextRoll = (classId: number, sectionId?: number) => {
+    const k = `${classId}:${sectionId ?? 0}`;
+    const n = (rolls.get(k) ?? 0) + 1;
+    rolls.set(k, n);
+    return String(n);
+  };
   async function admit(s: Spec) {
     const c = cls(s.cls);
     const famGuardian = s.family ? families.get(s.family) : undefined;
     const surname = s.name.split(" ").at(-1);
     phone++;
+    const sectionId = sec(c.id, s.section);
     const st = await core.students.admitStudent(admin, {
-      admissionNo: s.adm, name: s.name, classId: c.id, sectionId: sec(c.id, s.section), rollNo: s.adm.slice(-2),
+      admissionNo: s.adm, name: s.name, classId: c.id, sectionId, rollNo: nextRoll(c.id, sectionId),
       admissionDate: s.admitted ?? OLD, gender: /a$|i$|ya$/.test(s.name.split(" ")[0]!) ? "F" : "M", academicYearId: year.id,
       ...(famGuardian ? { existingGuardianId: famGuardian } : {
         guardian: {

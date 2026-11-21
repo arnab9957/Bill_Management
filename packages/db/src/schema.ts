@@ -129,6 +129,21 @@ export const classes = pgTable("class", {
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
+/**
+ * A class's own session dates inside an academic year (e.g. Nursery January-December while the school runs April-March).
+ * No row = the academic year's dates. At most 12 months; sessions of one class never overlap across years.
+ */
+export const classSessions = pgTable("class_session", {
+  id: serial("id").primaryKey(),
+  academicYearId: integer("academic_year_id").notNull().references(() => academicYears.id),
+  classId: integer("class_id").notNull().references(() => classes.id),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+}, (t) => [
+  uniqueIndex("class_session_year_class").on(t.academicYearId, t.classId),
+  check("class_session_dates", sql`${t.endDate} > ${t.startDate}`),
+]);
+
 export const sections = pgTable("section", {
   id: serial("id").primaryKey(),
   classId: integer("class_id").notNull().references(() => classes.id),

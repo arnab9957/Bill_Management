@@ -484,6 +484,7 @@ export function StudentInputs({
             id="dob"
             type="date"
             name="dob"
+            data-dob
             defaultValue={s?.dob ?? ""}
             max={today}
             min="1990-01-01"
@@ -509,6 +510,7 @@ export function StudentInputs({
             id="admissionDate"
             type="date"
             name="admissionDate"
+            data-ahead="365"
             defaultValue={s?.admissionDate ?? today}
             required
             min="2000-01-01"

@@ -196,7 +196,7 @@ export function Counter({ today, initialStudentId }: { today: string; initialStu
               {(mode === "cheque" || mode === "dd") && (<>
                 <label className="flex flex-col gap-1">{mode === "dd" ? "DD" : "Cheque"} no.<input value={ref.chequeNo} onChange={(e) => setRef({ ...ref, chequeNo: e.target.value })} required /></label>
                 <label className="flex flex-col gap-1">Bank<input value={ref.bank} onChange={(e) => setRef({ ...ref, bank: e.target.value })} required /></label>
-                <label className="flex flex-col gap-1">Date on cheque<input type="date" value={ref.chequeDate} onChange={(e) => setRef({ ...ref, chequeDate: e.target.value })} /></label>
+                <label className="flex flex-col gap-1">Date on cheque<input type="date" value={ref.chequeDate} data-ahead="180" title="Cheques are valid for 3 months; post-dated up to 6 months" onChange={(e) => setRef({ ...ref, chequeDate: e.target.value })} /></label>
               </>)}
               <div className="flex items-end sm:col-span-2">
                 <button disabled={pending || !paise} className={`${buttonClass("primary")} w-full sm:w-auto`}>

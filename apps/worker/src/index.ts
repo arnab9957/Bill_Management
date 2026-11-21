@@ -24,6 +24,7 @@ const log = pino(
 
 const TZ = "Asia/Kolkata";
 const schedule: { name: JobName; cron: string }[] = [
+  { name: "autoPromote", cron: "30 5 * * *" },   // 05:30 daily, before the bill run
   { name: "billRun", cron: "0 6 1 * *" },        // 06:00 on the 1st
   { name: "lateFee", cron: "30 7 * * *" },       // 07:30 daily
   { name: "dueScan", cron: "0 8 * * *" },        // 08:00 daily
@@ -56,6 +57,8 @@ for (const { name, cron } of schedule) {
   });
 }
 log.info({ jobs: schedule.map((s) => `${s.name} @ ${s.cron}`) }, "worker started");
+// Catch up at start-up: a PC that was off when a session ended promotes those classes now.
+await boss.send("autoPromote", {});
 
 const stop = async () => {
   log.info("worker stopping");

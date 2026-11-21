@@ -27,7 +27,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
   return (
     <div className="space-y-5">
       <PageHeader title="Reports" subtitle={`${formatDate(from)} – ${formatDate(to)}`} actions={<>
-        <form className="toolbar"><input type="date" name="from" defaultValue={from} /><input type="date" name="to" defaultValue={to} /><button className="filter-button">Apply</button></form>
+        <form className="toolbar"><input type="date" name="from" defaultValue={from} aria-label="From" data-past /><input type="date" name="to" defaultValue={to} aria-label="To" data-after="from" /><button className="filter-button">Apply</button></form>
         <LinkButton href={`/reports?from=${addDays(today(), -6)}&to=${today()}`}>Last 7 days</LinkButton>
         {can(user.role, "dayClose") && <LinkButton href="/daybook">Day book</LinkButton>}
         {can(user.role, "receiptsCancel") && <LinkButton href="/cheques">Cheques</LinkButton>}

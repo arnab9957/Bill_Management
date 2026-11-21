@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
 interface ClassItem {
   id: number;
@@ -21,6 +22,8 @@ export function StudentFilters({
   defaultSection,
   defaultSectionId,
   defaultStatus,
+  singleMatchId,
+  exactMatchId,
 }: {
   classes: ClassItem[];
   sections: SectionItem[];
@@ -29,7 +32,31 @@ export function StudentFilters({
   defaultSection?: string;
   defaultSectionId?: string;
   defaultStatus?: string;
+  /** the only student found by the current search (Enter opens it) */
+  singleMatchId?: number;
+  /** the only student found AND the search is exactly their admission no. (opened at once) */
+  exactMatchId?: number;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const formRef = useRef<HTMLFormElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Search as you type / pick: no Search button needed.
+  const search = (delay = 0) => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      const fd = new FormData(formRef.current!);
+      const qs = new URLSearchParams([...fd.entries()].filter(([, v]) => v !== "") as [string, string][]).toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    }, delay);
+  };
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+
+  // Typed an exact admission number: open that student straight away.
+  // replace (not push) so the browser's Back button doesn't land on this search and re-open the student.
+  useEffect(() => { if (exactMatchId) router.replace(`${pathname}/${exactMatchId}`); }, [exactMatchId, pathname, router]);
+
   const [selectedClassId, setSelectedClassId] = useState(defaultClassId ?? "");
 
   const initialSection = defaultSection ?? (defaultSectionId ? sections.find((s) => String(s.id) === String(defaultSectionId))?.name : "") ?? "";
@@ -50,6 +77,7 @@ export function StudentFilters({
   const handleClassChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newClassId = e.target.value;
     setSelectedClassId(newClassId);
+    search(0);
 
     // Keep the current section if it exists in the newly selected class; otherwise reset to All sections
     if (newClassId) {
@@ -61,13 +89,20 @@ export function StudentFilters({
   };
 
   return (
-    <form className="toolbar mb-6" method="GET">
+    <form ref={formRef} className="toolbar mb-6" method="GET" onSubmit={(e) => {
+      e.preventDefault();
+      // Enter: open the student if only one matches, otherwise just search now.
+      if (singleMatchId) router.push(`${pathname}/${singleMatchId}`);
+      else search();
+    }}>
       <input
         name="q"
         defaultValue={defaultQ}
         placeholder="Name, admission no., guardian mobile"
         className="w-full sm:w-72"
         autoFocus
+        autoComplete="off"
+        onChange={() => search(350)}
       />
       <select
         name="classId"
@@ -86,7 +121,7 @@ export function StudentFilters({
       <select
         name="section"
         value={selectedSection}
-        onChange={(e) => setSelectedSection(e.target.value)}
+        onChange={(e) => { setSelectedSection(e.target.value); search(0); }}
         aria-label="Filter by section"
       >
         <option value="">All sections</option>
@@ -100,13 +135,12 @@ export function StudentFilters({
         })}
       </select>
 
-      <select name="status" defaultValue={defaultStatus ?? "active"} aria-label="Filter by status">
+      <select name="status" defaultValue={defaultStatus ?? "active"} aria-label="Filter by status" onChange={() => search(0)}>
         <option value="active">Active</option>
         <option value="left">Left</option>
         <option value="alumni">Alumni</option>
         <option value="">All</option>
       </select>
-      <button className="filter-button" type="submit">Search</button>
     </form>
   );
 }
