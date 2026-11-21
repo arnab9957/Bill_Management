@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useRef } from "react";
 import { useActionResult } from "@/components/action-form";
 
 type Row = { row: number; data?: Record<string, unknown>; errors: Record<string, string> };
@@ -6,11 +7,19 @@ type Row = { row: number; data?: Record<string, unknown>; errors: Record<string,
 export function ImportPreview() {
   const s = useActionResult();
   const d = s?.ok ? (s.data as { rows: Row[] }) : null;
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (d && previewRef.current) {
+      previewRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [d]);
+
   if (!d) return null;
   const bad = d.rows.filter((r) => Object.keys(r.errors).length);
   const shown = bad.length ? bad : d.rows.slice(0, 50);
   return (
-    <div className="mt-4 max-h-112 overflow-auto">
+    <div ref={previewRef} className="mt-4 max-h-112 overflow-auto">
       <p className="mb-2 text-sm">{bad.length ? "Rows with errors:" : `All rows valid. First ${shown.length} shown:`}</p>
       <table className="data">
         <thead><tr><th>Row</th><th>Adm. no.</th><th>Name</th><th>Class</th><th>Guardian</th><th>Mobile</th><th>Problems</th></tr></thead>

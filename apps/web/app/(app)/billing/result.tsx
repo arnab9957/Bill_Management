@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useRef } from "react";
 import { useActionResult } from "@/components/action-form";
 import { formatINR, formatDate } from "@sb/core/src/money-dates-client";
 
@@ -11,10 +12,18 @@ type R = {
 
 export function RunResult() {
   const s = useActionResult();
+  const resultRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (s?.ok && resultRef.current) {
+      resultRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [s]);
+
   if (!s?.ok) return null;
   const r = s.data as R;
   return (
-    <div className="mt-5 space-y-4">
+    <div ref={resultRef} className="mt-5 space-y-4">
       <div className="grid grid-cols-3 gap-3 text-sm">
         <div className="rounded-md bg-gray-50 p-3">{r.dryRun ? "Would create" : "Created"}: <b>{r.dryRun ? r.planned.length : r.created.length}</b> bills</div>
         <div className="rounded-md bg-gray-50 p-3">Total amount: <b>{formatINR(r.totalNet)}</b></div>

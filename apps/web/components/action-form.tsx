@@ -48,39 +48,105 @@ export function Submit({ children, variant = "primary", confirm, name, value, cl
  * exposes field errors to <FieldError>, and optionally resets on success.
  */
 export function ActionForm({
-  action, children, className, resetOnSuccess, onSuccess,
+  action, children, className, resetOnSuccess, onSuccess, id,
 }: {
   action: (prev: ActionState, fd: FormData) => Promise<ActionState>;
   children: ReactNode;
   className?: string;
   resetOnSuccess?: boolean;
   onSuccess?: (s: NonNullable<ActionState>) => void;
+  id?: string;
 }) {
   const [state, formAction] = useActionState(action, null);
   const ref = useRef<HTMLFormElement>(null);
   const lastStateRef = useRef<ActionState>(null);
   const onSuccessRef = useRef(onSuccess);
   onSuccessRef.current = onSuccess;
+  const isScrollingInvalidRef = useRef(false);
 
-  // Until the page's JavaScript has loaded, the form is disabled. A submit before that would be a
-  // plain HTML post, which Next.js can't route to these actions (500 "reading 'bind'").
-  // On a slow link (e.g. a shared demo URL) people can otherwise click before the page is ready.
+  // Form submit is guarded until hydrated, but inputs remain fully interactive immediately
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
+
   useEffect(() => {
     if (state !== lastStateRef.current) {
       lastStateRef.current = state;
       if (state?.ok) {
         if (resetOnSuccess) ref.current?.reset();
         onSuccessRef.current?.(state);
+      } else if (state && state.ok === false && ref.current) {
+        // Auto-scroll globally to the first invalid field or error banner
+        const form = ref.current;
+        let targetEl: HTMLElement | null = null;
+
+        if (state.errors && Object.keys(state.errors).length > 0) {
+          for (const key of Object.keys(state.errors)) {
+            const short = key.includes(".") ? key.split(".").pop()! : key;
+            const el = form.querySelector<HTMLElement>(
+              `[name="${key}"], [name="${short}"], [name="guardian.${short}"]`
+            );
+            if (el) {
+              targetEl = el;
+              break;
+            }
+          }
+        }
+
+        if (!targetEl) {
+          targetEl = form.querySelector<HTMLElement>(
+            '[aria-invalid="true"], :invalid, .text-red-700, [role="status"]'
+          );
+        }
+
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+          if (typeof targetEl.focus === "function") {
+            try {
+              targetEl.focus({ preventScroll: true });
+            } catch {
+              // ignore
+            }
+          }
+          targetEl.classList.add("auto-scroll-highlight");
+          setTimeout(() => targetEl?.classList.remove("auto-scroll-highlight"), 2000);
+        }
       }
     }
   }, [state, resetOnSuccess]);
+
+  const handleInvalidCapture = (e: React.FormEvent<HTMLFormElement>) => {
+    if (isScrollingInvalidRef.current) return;
+    isScrollingInvalidRef.current = true;
+    const target = e.target as HTMLElement;
+    if (target && typeof target.scrollIntoView === "function") {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.classList.add("auto-scroll-highlight");
+      setTimeout(() => {
+        target.classList.remove("auto-scroll-highlight");
+        isScrollingInvalidRef.current = false;
+      }, 1200);
+    } else {
+      isScrollingInvalidRef.current = false;
+    }
+  };
+
   return (
     <StateCtx.Provider value={state}>
     <ErrCtx.Provider value={state?.errors ?? {}}>
-      <form ref={ref} action={formAction} className={className} aria-busy={!ready}>
-        <fieldset disabled={!ready} className="contents">{children}</fieldset>
+      <form
+        ref={ref}
+        id={id}
+        action={formAction}
+        className={className}
+        aria-busy={!ready}
+        onInvalidCapture={handleInvalidCapture}
+        onSubmit={(e) => {
+          if (!ready) {
+            e.preventDefault();
+          }
+        }}
+      >
+        <fieldset className="contents">{children}</fieldset>
         {state?.message && (
           <Notice tone={state.ok ? "ok" : "error"} className="mt-5" role="status">
             {state.message}

@@ -35,6 +35,14 @@ export function Counter({ today, initialStudentId }: { today: string; initialStu
   const [pending, start] = useTransition();
   const searchRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const msgRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (msg && msgRef.current) {
+      msgRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [msg]);
 
   const load = useCallback((id: number) => {
     start(async () => {
@@ -43,7 +51,13 @@ export function Counter({ today, initialStudentId }: { today: string; initialStu
       setResults([]);
       setAlloc({});
       setManual(false);
-      if (s) setAmount(s.total ? (s.total / 100).toString() : "");
+      if (s) {
+        setAmount(s.total ? (s.total / 100).toString() : "");
+        // On smaller screens where form is stacked below sidebar, smooth-scroll to it
+        if (window.innerWidth < 1024) {
+          setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+        }
+      }
       setTimeout(() => amountRef.current?.select(), 30);
     });
   }, []);
@@ -151,7 +165,7 @@ export function Counter({ today, initialStudentId }: { today: string; initialStu
         {!student ? (
           <Empty>Search for a student to begin. Use ↑ ↓ and Enter.</Empty>
         ) : (
-          <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-4">
+          <form ref={formRef} onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-4">
             <div className={panelClass}>
               <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2">
                 <h2 className="text-sm font-semibold">Pending dues</h2>
@@ -205,7 +219,9 @@ export function Counter({ today, initialStudentId }: { today: string; initialStu
               </div>
             </div>
             {msg && (
-              <Notice tone={msg.ok ? "ok" : "error"}>{msg.text} {msg.paymentId && <a className="ml-2 underline" href={`/receipts/${msg.paymentId}/print`} target="_blank">Print again</a>}</Notice>
+              <div ref={msgRef}>
+                <Notice tone={msg.ok ? "ok" : "error"}>{msg.text} {msg.paymentId && <a className="ml-2 underline" href={`/receipts/${msg.paymentId}/print`} target="_blank">Print again</a>}</Notice>
+              </div>
             )}
           </form>
         )}

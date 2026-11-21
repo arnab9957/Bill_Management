@@ -50,7 +50,10 @@ export default async function EditStudent({ params, searchParams }: { params: Pr
         <ActionForm action={save.bind(null, id, g?.id ?? null)}>
           <StudentFields s={p.s} yearId={sel?.e.academicYearId} enrollment={sel?.e} yearLocked />
           {g && <div className="mt-6"><GuardianFields g={g} prefix="guardian." /></div>}
-          <div className="mt-6"><Submit>Save changes</Submit></div>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <Submit>Save changes</Submit>
+            <LinkButton variant="secondary" href={`/students/${id}`}>Cancel</LinkButton>
+          </div>
         </ActionForm>
       </Card>
     </div>

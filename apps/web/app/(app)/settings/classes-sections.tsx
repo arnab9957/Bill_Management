@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useFormStatus } from "react-dom";
 import { ActionForm, FieldError, Submit } from "@/components/action-form";
 import { buttonClass, cx } from "@/components/ui";
+import { STANDARD_CLASSES } from "@/lib/classes";
 import type { ActionState } from "@/lib/action";
 import { CollapsibleSection } from "./section-collapse";
 
@@ -31,6 +32,8 @@ export function ClassesSectionsManager({
   removeSection: Action;
 }) {
   const formRef = useRef<HTMLDivElement>(null);
+  const [selectedPreset, setSelectedPreset] = useState("");
+  const [customClassName, setCustomClassName] = useState("");
   const [className, setClassName] = useState("");
   const [section, setSection] = useState("");
   const [edit, setEdit] = useState<EditTarget | null>(null);
@@ -41,6 +44,8 @@ export function ClassesSectionsManager({
   const reset = useCallback(() => {
     setEdit(null);
     setClassName("");
+    setSelectedPreset("");
+    setCustomClassName("");
     setSection("");
     setTargetClassId(null);
     setSelected(new Set());
@@ -50,6 +55,8 @@ export function ClassesSectionsManager({
     setEdit({ mode: "class", id: c.id });
     setTargetClassId(null);
     setClassName(c.name);
+    setSelectedPreset("__custom__");
+    setCustomClassName(c.name);
     setSection("");
     setSelected(new Set());
     focusForm();
@@ -58,6 +65,8 @@ export function ClassesSectionsManager({
     setEdit({ mode: "section", id: sec.id });
     setTargetClassId(null);
     setClassName(c.name);
+    setSelectedPreset(c.name);
+    setCustomClassName("");
     setSection(sec.name);
     setSelected(new Set());
     focusForm();
@@ -66,15 +75,30 @@ export function ClassesSectionsManager({
     setEdit(null);
     setTargetClassId(c.id);
     setClassName(c.name);
+    setSelectedPreset(c.name);
+    setCustomClassName("");
     setSection("");
     setSelected(new Set(c.students.map((s) => s.id)));
     focusForm();
   };
 
+  const existingClassNames = useMemo(() => new Set(classes.map((c) => c.name.toLowerCase())), [classes]);
+
+  const effectiveClassName = edit?.mode === "class"
+    ? className.trim()
+    : targetClassId != null || edit?.mode === "section"
+      ? className.trim()
+      : selectedPreset === "__custom__"
+        ? customClassName.trim()
+        : selectedPreset.trim();
+
   const classNameLocked = targetClassId != null || edit?.mode === "section";
+  const isSectionDisabled = edit?.mode === "class";
+  const isCreateClass = !edit && targetClassId == null;
+  const isSectionRequired = !isSectionDisabled && !isCreateClass;
   const targetClass = targetClassId != null
     ? classes.find((c) => c.id === targetClassId) ?? null
-    : !edit ? classes.find((c) => c.name.toLowerCase() === className.trim().toLowerCase()) ?? null : null;
+    : !edit ? classes.find((c) => c.name.toLowerCase() === effectiveClassName.toLowerCase()) ?? null : null;
   const checklistStudents = targetClass?.students ?? [];
   const isFirstSection = targetClass?.sections.length === 0;
   const movingStudents = !edit && section.trim().length > 0 && checklistStudents.length > 0;
@@ -116,15 +140,104 @@ export function ClassesSectionsManager({
           <input type="hidden" name="id" value={edit?.id ?? ""} />
           {targetClassId != null && <input type="hidden" name="classId" value={targetClassId} />}
           {classNameLocked && <input type="hidden" name="className" value={className} />}
-          <div className="flex flex-wrap items-end gap-2">
-            <label className="field-stack min-w-[200px] flex-1">Class name
-              <input name="className" value={className} onChange={(e) => setClassName(e.target.value)} placeholder="e.g. Class I" maxLength={32} required disabled={classNameLocked} className={classNameLocked ? "opacity-60" : undefined} />
+          <div className="flex flex-wrap items-end gap-2.5">
+            {edit?.mode === "class" ? (
+              <label className="field-stack min-w-[200px] flex-1">
+                <span>Class name <span className="font-semibold text-red-600">*</span></span>
+                <input
+                  name="className"
+                  value={className}
+                  onChange={(e) => setClassName(e.target.value)}
+                  placeholder="e.g. Class I"
+                  maxLength={32}
+                  required
+                />
+              </label>
+            ) : targetClassId != null ? (
+              <label className="field-stack min-w-[200px] flex-1">
+                <span>Class</span>
+                <input value={className} disabled className="opacity-60 bg-gray-100" />
+              </label>
+            ) : (
+              <>
+                <label className="field-stack min-w-[180px] flex-1">
+                  <span>Class <span className="font-semibold text-red-600">*</span></span>
+                  <select
+                    value={selectedPreset}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedPreset(val);
+                      if (val !== "__custom__") {
+                        setCustomClassName("");
+                      }
+                    }}
+                    required
+                    className="h-10 cursor-pointer rounded-lg border border-gray-300 bg-surface px-3 py-2 text-sm font-medium text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/15"
+                  >
+                    <option value="" disabled>Choose a class…</option>
+                    <optgroup label="Preset classes">
+                      {STANDARD_CLASSES.map((c) => {
+                        const exists = existingClassNames.has(c.toLowerCase());
+                        return (
+                          <option key={c} value={c}>
+                            {c}{exists ? " (already in school)" : ""}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                    <option value="__custom__">➕ Create New Class</option>
+                  </select>
+                </label>
+
+                {selectedPreset === "__custom__" && (
+                  <label className="field-stack min-w-[180px] flex-1">
+                    <span>New Class Name <span className="font-semibold text-red-600">*</span></span>
+                    <input
+                      name="className"
+                      value={customClassName}
+                      onChange={(e) => setCustomClassName(e.target.value)}
+                      placeholder="e.g. Playgroup, Grade 1"
+                      maxLength={32}
+                      autoFocus
+                      required
+                    />
+                  </label>
+                )}
+
+                {selectedPreset !== "" && selectedPreset !== "__custom__" && (
+                  <input type="hidden" name="className" value={selectedPreset} />
+                )}
+              </>
+            )}
+
+            <label className="field-stack w-44">
+              <span>
+                Section{" "}
+                {isSectionDisabled ? null : isSectionRequired ? (
+                  <span className="font-semibold text-red-600">*</span>
+                ) : (
+                  <span className="text-xs font-normal text-gray-500">(optional)</span>
+                )}
+              </span>
+              <input
+                name="section"
+                value={section}
+                onChange={(e) => setSection(e.target.value)}
+                placeholder={isCreateClass ? "e.g. A (optional)" : "e.g. A"}
+                maxLength={16}
+                disabled={isSectionDisabled}
+                required={isSectionRequired}
+              />
             </label>
-            <label className="field-stack w-40">Section
-              <input name="section" value={section} onChange={(e) => setSection(e.target.value)} placeholder="e.g. A" maxLength={16} disabled={edit?.mode === "class"} />
-            </label>
-            <Submit className="cursor-pointer">{targetClassId != null ? "Create section" : edit ? "Save changes" : "Create class"}</Submit>
-            {(edit || targetClassId != null) && <button type="button" onClick={reset} className={cx(buttonClass("secondary"), "cursor-pointer")}>Cancel</button>}
+
+            <Submit className="cursor-pointer">
+              {targetClassId != null ? "Create section" : edit ? "Save changes" : "Create class"}
+            </Submit>
+            {(edit || targetClassId != null || selectedPreset) && (
+              <button type="button" onClick={reset} className={cx(buttonClass("secondary"), "cursor-pointer")}>
+                Cancel
+              </button>
+            )}
           </div>
           {movingStudents && submittedStudents.map((s) => <input key={s.id} type="hidden" name="studentIds" value={s.id} />)}
           {showChecklist && <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
@@ -161,7 +274,7 @@ export function ClassesSectionsManager({
           ? `Creating the first section in ${targetClass?.name}. All ${checklistStudents.length} students will move into it automatically.`
           : targetClassId != null
             ? `Creating a section in ${className}. Select the students to move, then save.`
-            : "Enter a class name and optional section. If the class already exists, the section is added to it."}</p>
+            : "Choose a preset or create a new class. Section is optional."}</p>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {classes.map((c) => (

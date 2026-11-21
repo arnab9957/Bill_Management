@@ -10,7 +10,11 @@ import { AppError, audit, getSettings, type Actor } from "../common";
 import { percentOf } from "../money";
 
 // ---------------------------------------------------------------- masters
-export async function masters() {
+let mastersCache: { at: number; data: Awaited<ReturnType<typeof loadMasters>> } | undefined;
+const MASTERS_TTL_MS = 30_000;
+export const clearMastersCache = () => { mastersCache = undefined; };
+
+async function loadMasters() {
   const db = getDb();
   const [years, cls, secs, routes, heads] = await Promise.all([
     db.select().from(academicYears).orderBy(asc(academicYears.startDate)),
@@ -20,6 +24,15 @@ export async function masters() {
     db.select().from(feeHeads).orderBy(asc(feeHeads.sortOrder)),
   ]);
   return { years, classes: cls, sections: secs, routes, heads };
+}
+
+export async function masters(forceRefresh = false) {
+  if (!forceRefresh && mastersCache && Date.now() - mastersCache.at < MASTERS_TTL_MS) {
+    return mastersCache.data;
+  }
+  const data = await loadMasters();
+  mastersCache = { at: Date.now(), data };
+  return data;
 }
 
 const yearSchema = z.object({
@@ -39,6 +52,7 @@ export async function createYear(actor: Actor, input: unknown) {
   if ((await db.select({ id: academicYears.id }).from(academicYears).where(eq(academicYears.name, d.name))).length) throw new AppError(`Academic year ${d.name} already exists`, { name: "Already exists" });
   const [y] = await db.insert(academicYears).values(d).returning();
   await audit(db, actor, "create", "academic_year", y!.id, null, d);
+  clearMastersCache();
   return y!;
 }
 export async function setCurrentYear(actor: Actor, yearId: number) {
@@ -48,11 +62,13 @@ export async function setCurrentYear(actor: Actor, yearId: number) {
     await tx.update(academicYears).set({ isCurrent: true }).where(eq(academicYears.id, yearId));
     await audit(tx, actor, "set_current", "academic_year", yearId);
   });
+  clearMastersCache();
 }
 export async function createClass(actor: Actor, name: string, sortOrder: number) {
   const db = getDb();
   const [c] = await db.insert(classes).values({ name: z.string().trim().min(1).parse(name), sortOrder }).returning();
   await audit(db, actor, "create", "class", c!.id, null, { name });
+  clearMastersCache();
   return c!;
 }
 export async function createSection(actor: Actor, classId: number, name: string) {
@@ -60,6 +76,7 @@ export async function createSection(actor: Actor, classId: number, name: string)
   const [s] = await db.insert(sections).values({ classId, name: z.string().trim().min(1).parse(name) }).onConflictDoNothing().returning();
   if (!s) throw new AppError("Section already exists");
   await audit(db, actor, "create", "section", s.id, null, { classId, name });
+  clearMastersCache();
   return s;
 }
 
@@ -103,6 +120,7 @@ export async function addClassWithSection(actor: Actor, className: string, sortO
     } else if (!created) {
       throw new AppError("Class already exists. Enter a section to add to it.");
     }
+    clearMastersCache();
     return { cls, created, sectionAdded, moved };
   });
 }
@@ -117,6 +135,7 @@ export async function renameClass(actor: Actor, classId: number, name: string) {
   if (duplicate) throw new AppError("A class with this name already exists");
   const [updated] = await db.update(classes).set({ name: clean }).where(eq(classes.id, classId)).returning();
   await audit(db, actor, "update", "class", classId, old, updated);
+  clearMastersCache();
   return updated!;
 }
 
@@ -130,6 +149,7 @@ export async function renameSection(actor: Actor, sectionId: number, name: strin
   if (duplicate) throw new AppError("A section with this name already exists in this class");
   const [updated] = await db.update(sections).set({ name: clean }).where(eq(sections.id, sectionId)).returning();
   await audit(db, actor, "update", "section", sectionId, old, updated);
+  clearMastersCache();
   return updated!;
 }
 
@@ -173,6 +193,7 @@ export async function removeSection(actor: Actor, sectionId: number) {
   if (student || enrolment) throw new AppError(`Section ${section.name} has students, so it cannot be removed`);
   await db.delete(sections).where(eq(sections.id, sectionId));
   await audit(db, actor, "delete", "section", sectionId, section, null);
+  clearMastersCache();
   return section;
 }
 
@@ -197,6 +218,7 @@ export async function removeClass(actor: Actor, classId: number) {
     await tx.delete(sections).where(eq(sections.classId, classId));
     await tx.delete(classes).where(eq(classes.id, classId));
     await audit(tx, actor, "delete", "class", classId, cls, null);
+    clearMastersCache();
     return cls;
   });
 }
@@ -210,6 +232,7 @@ export async function saveRoute(actor: Actor, input: { id?: number; name: string
     const [r] = await db.insert(transportRoutes).values(input).returning();
     await audit(db, actor, "create", "transport_route", r!.id, null, input);
   }
+  clearMastersCache();
 }
 
 // ---------------------------------------------------------------- fee heads & structures
@@ -219,6 +242,7 @@ export async function createFeeHead(actor: Actor, input: unknown) {
   const [h] = await db.insert(feeHeads).values({ ...d, sortOrder: 50 }).onConflictDoNothing().returning();
   if (!h) throw new AppError("A fee head with this code exists", { code: "Already used" });
   await audit(db, actor, "create", "fee_head", h.id, null, d);
+  clearMastersCache();
   return h;
 }
 
@@ -238,6 +262,7 @@ export async function saveReceiptRows(actor: Actor, input: unknown) {
     }
     await audit(tx, actor, "update", "fee_head", null, before, rows.map((r) => ({ id: r.id, order: r.show ? r.order : null, label: r.label || null })));
   });
+  clearMastersCache();
 }
 
 export async function getOrCreateStructure(actor: Actor, academicYearId: number, classId: number) {
