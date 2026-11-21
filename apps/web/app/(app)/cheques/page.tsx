@@ -26,7 +26,7 @@ export default async function Cheques({ searchParams }: { searchParams: Promise<
   const rows = await payments.listCheques(status);
   return (
     <div>
-      <PageHeader title="Cheque register" actions={<>{(["pending", "cleared", "bounced"] as const).map((s) => <Link key={s} href={`?status=${s}`} className={`rounded-md border px-3 py-1.5 text-sm capitalize ${s === status ? "border-ink bg-ink text-white" : "border-gray-300 bg-white"}`}>{s}</Link>)}</>} />
+      <PageHeader title="Cheque register" actions={<>{(["pending", "cleared", "bounced"] as const).map((s) => <Link key={s} href={`?status=${s}`} className={`rounded-md border px-3 py-1.5 text-sm capitalize ${s === status ? "border-accent bg-accent text-white" : "border-gray-300 bg-white"}`}>{s}</Link>)}</>} />
       <Card>
         {rows.length === 0 ? <Empty>No {status} cheques.</Empty> : (
           <table className="data">

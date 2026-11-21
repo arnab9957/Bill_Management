@@ -2,40 +2,62 @@
 
 @theme {
   --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", "Nirmala UI", sans-serif;
-  --color-canvas: #f0f4f9;
+  --color-canvas: #f4f6fb;
   --color-surface: #ffffff;
-  --color-sidebar: #ffffff;
-  --color-navy: #0f172a;
-  --color-navy-soft: #1e293b;
-  --color-ink: #0f172a;
-  --color-accent: #2563eb;
-  --color-accent-ink: #1d4ed8;
-  --color-accent-soft: #eff6ff;
-  --color-gray-50: #f8fafc;
-  --color-gray-100: #f1f5f9;
-  --color-gray-200: #e2e8f0;
-  --color-gray-300: #cbd5e1;
-  --color-gray-400: #94a3b8;
-  --color-gray-500: #64748b;
-  --color-gray-600: #475569;
-  --color-gray-700: #334155;
-  --color-gray-800: #1e293b;
-  --color-gray-900: #0f172a;
-  --color-gray-950: #020617;
-  --color-brand-50: #ecfdf5;
-  --color-brand-100: #d1fae5;
-  --color-brand-200: #a7f3d0;
-  --color-brand-300: #6ee7b7;
-  --color-brand-600: #059669;
-  --color-brand-700: #047857;
-  --color-brand-800: #065f46;
-  --color-brand-900: #064e3b;
+  --color-sidebar: #101828;
+  --color-chrome: #101828;
+  --color-chrome-deep: #0b1220;
+  --color-chrome-soft: #1d2939;
+  --color-chrome-line: #2b3648;
+  --color-chrome-accent: #a5b4fc;
+  --color-chrome-muted: #98a2b3;
+  --color-navy: #101828;
+  --color-navy-soft: #1d2939;
+  --color-ink: #101828;
+  --color-blue-50: #eef2ff;
+  --color-blue-100: #e0e7ff;
+  --color-blue-200: #c7d2fe;
+  --color-blue-300: #a5b4fc;
+  --color-blue-400: #818cf8;
+  --color-blue-500: #6366f1;
+  --color-blue-600: #4f46e5;
+  --color-blue-700: #4338ca;
+  --color-blue-800: #3730a3;
+  --color-blue-900: #312e81;
+  --color-blue-950: #1e1b4b;
+  --color-accent: #4f46e5;
+  --color-accent-ink: #4338ca;
+  --color-accent-soft: #eef2ff;
+  --color-tint: #eef2ff;
+  --color-subtle: #f8fafc;
+  --color-highlight: #f59e0b;
+  --color-highlight-soft: #fef3c7;
+  --color-teal: #0e7490;
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f2f4f7;
+  --color-gray-200: #e4e7ec;
+  --color-gray-300: #d0d5dd;
+  --color-gray-400: #98a2b3;
+  --color-gray-500: #667085;
+  --color-gray-600: #475467;
+  --color-gray-700: #344054;
+  --color-gray-800: #1d2939;
+  --color-gray-900: #101828;
+  --color-gray-950: #0b1220;
+  --color-brand-50: #ecfdf3;
+  --color-brand-100: #d1fadf;
+  --color-brand-200: #a6f4c5;
+  --color-brand-300: #6ce9a6;
+  --color-brand-600: #12b76a;
+  --color-brand-700: #039855;
+  --color-brand-800: #027a48;
+  --color-brand-900: #05603a;
 }
 
 :root { color-scheme: light; }
 html, body { background: var(--color-canvas); color: var(--color-ink); }
-body { font-feature-settings: "cv02", "cv03", "cv04", "cv11"; }
-::selection { background: #dbeafe; color: #1e40af; }
+body { font-feature-settings: "cv02", "cv03", "cv04", "cv11"; -webkit-font-smoothing: antialiased; }
+::selection { background: #e0e7ff; color: #3730a3; }
 input, select, textarea {
   @apply max-w-full rounded-lg border border-gray-300 bg-surface px-3 py-2 text-base text-ink outline-none transition sm:text-sm placeholder:text-gray-400 focus:border-accent focus:ring-4 focus:ring-accent/15;
 }
@@ -56,14 +78,14 @@ label:has(input[type="checkbox"]), label:has(input[type="radio"]) { @apply text-
 .toolbar { @apply flex flex-wrap items-end gap-3; }
 .filter-button { @apply inline-flex items-center justify-center rounded-lg border border-gray-300 bg-surface px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:border-accent hover:bg-accent-soft hover:text-accent-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20; }
 table.data { @apply w-full text-sm; }
-table.data th { @apply whitespace-nowrap border-b border-gray-200 bg-gray-50 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600; }
+table.data th { @apply whitespace-nowrap border-b border-gray-200 bg-subtle/70 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600; }
 @media (max-width: 639px) {
   table.data th, table.data td { @apply px-3 py-2; }
   form.flex > input:not([type="checkbox"]):not([type="radio"]), form.flex > select { @apply min-w-0 flex-1 basis-40; }
 }
 table.data td { @apply whitespace-nowrap border-b border-gray-100 px-4 py-3 align-top; }
 table.data td.wrap { @apply min-w-48 whitespace-normal; }
-table.data tr:hover td { @apply bg-gray-50; }
+table.data tr:hover td { @apply bg-subtle/70; }
 .num { @apply text-right tabular-nums; }
 @keyframes navbar { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
 
