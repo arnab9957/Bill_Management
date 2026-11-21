@@ -108,7 +108,7 @@ export function ClassesSectionsManager({
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(checklistStudents.map((s) => s.id)));
 
   return (
-    <CollapsibleSection id="classes-sections" title="Classes & sections" subtitle="Create classes, rename sections and place students in them.">
+    <CollapsibleSection id="classes-sections" title="Classes & Sections" subtitle="Create classes, rename sections and place students in them.">
       <div ref={formRef} className="rounded-xl border border-gray-200 bg-gray-50/60 p-4">
         <div className="eyebrow mb-3">Add or edit</div>
         <ActionForm action={add} className="space-y-2" onSuccess={reset}>

@@ -20,6 +20,7 @@ export default async function Invoices({ searchParams }: { searchParams: Promise
     <div>
       <PageHeader title="Bills" subtitle={<>{year.name} · {rows.length} shown · balance <Money p={total} /></>} actions={<>
         {rows.length > 0 && <LinkButton href={`/invoices/print-all?${qs}`} target="_blank">🖨 Print all shown ({rows.length})</LinkButton>}
+        {can(user.role, "settings") && <LinkButton href="/invoices/settings">Bills Settings</LinkButton>}
         <LinkButton variant="primary" href="/billing">Run billing</LinkButton>
       </>} />
       <Card>
