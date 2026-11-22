@@ -142,7 +142,16 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
         } />
         <Card
           title={`Fee structures ${year?.name ?? ""}`}
-          actions={<LinkButton variant="secondary" size="sm" href="/settings?open=classes-sections#classes-sections">Manage classes</LinkButton>}
+          actions={
+            <LinkButton
+              variant="secondary"
+              size="sm"
+              className="!border-accent/40 !bg-accent-soft/80 !text-accent-ink hover:!bg-accent hover:!text-white font-semibold shadow-xs"
+              href="/settings?open=classes-sections#classes-sections"
+            >
+              Manage classes
+            </LinkButton>
+          }
         >
           <table className="data">
             <thead>
@@ -151,18 +160,25 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
                 <th className="text-center">Heads</th>
                 <th className="text-center">Monthly</th>
                 <th className="text-center">Yearly total</th>
-                <th className="text-center" />
+                <th className="text-center w-28">Action</th>
               </tr>
             </thead>
             <tbody>{structs.map((s) => (
               <tr key={s.classId}>
-                <td>{s.className}</td>
+                <td className="font-medium text-ink">{s.className}</td>
                 <td className="text-center tabular-nums">{s.items}</td>
                 <td className="text-center"><Money p={s.monthly} /></td>
                 <td className="text-center"><Money p={s.annualTotal} /></td>
                 <td className="text-center">
-                  <Link className="text-ink hover:underline" href={`/fees/structure/${yearId}/${s.classId}`}>
-                    {s.items ? "Edit" : "Set up"}
+                  <Link
+                    href={`/fees/structure/${yearId}/${s.classId}`}
+                    className={
+                      s.items
+                        ? "inline-flex items-center justify-center rounded-md border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-gray-700 shadow-2xs hover:border-accent hover:bg-accent-soft hover:text-accent-ink transition"
+                        : "inline-flex items-center justify-center gap-1 rounded-md bg-accent px-3 py-1 text-xs font-semibold text-white shadow-xs hover:bg-accent-ink transition"
+                    }
+                  >
+                    {s.items ? "Edit" : "Set up →"}
                   </Link>
                 </td>
               </tr>

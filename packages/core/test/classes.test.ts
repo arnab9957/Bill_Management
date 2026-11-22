@@ -11,9 +11,13 @@ describe("Class Ordering", () => {
     expect(computeClassSortOrder("Class I")).toBe(100);
     expect(computeClassSortOrder("Class 1")).toBe(100);
     expect(computeClassSortOrder("1st")).toBe(100);
+    expect(computeClassSortOrder("I")).toBe(100);
+    expect(computeClassSortOrder("S-I")).toBe(100);
 
     expect(computeClassSortOrder("Class II")).toBe(200);
     expect(computeClassSortOrder("Class 2")).toBe(200);
+    expect(computeClassSortOrder("II")).toBe(200);
+    expect(computeClassSortOrder("S-II")).toBe(200);
 
     expect(computeClassSortOrder("Class IX")).toBe(900);
     expect(computeClassSortOrder("Class 9")).toBe(900);
