@@ -58,6 +58,14 @@ if "%FRESH%"=="1" (
   echo.
 )
 
+rem --- 4b. Database dashboard (Drizzle Studio) in its own minimised window
+node scripts\wait-port.mjs 4983 0 --check
+if errorlevel 1 (
+  echo Starting the database dashboard...
+  start "School Billing - DB dashboard" /min cmd /k "pnpm db:studio"
+  start "" /min cmd /c "node scripts\wait-port.mjs 4983 60 && start "" https://local.drizzle.studio"
+)
+
 rem --- 5. Open the browser as soon as the website answers (in the background)
 start "" /min cmd /c "node scripts\wait-port.mjs 3000 180 && start "" http://127.0.0.1:3000"
 
@@ -65,6 +73,7 @@ rem --- 6. Website + reminder worker (this window). Code changes appear on brows
 echo.
 echo  Starting the website and reminder worker...
 echo  Website:  http://127.0.0.1:3000
+echo  DB dashboard:  https://local.drizzle.studio
 echo  Keep this window and the Database window open. Close them to stop.
 echo.
 call pnpm dev
