@@ -281,7 +281,7 @@ export async function applyLateFees(onDate: ISODate = today()): Promise<{ invoic
     .where(and(gt(invoices.balance, 0), sql`${invoices.dueDate} < ${onDate}`, inArray(invoices.status, ["issued", "partial"])));
 
   const [lateHead] = await db.select().from(feeHeads).where(eq(feeHeads.code, "LATE_FEE"));
-  const rules = await db.select().from(lateFeeRules).where(eq(lateFeeRules.isActive, true));
+  const rules = await db.select().from(lateFeeRules).where(and(eq(lateFeeRules.isActive, true), gt(lateFeeRules.amount, 0)));
   let touched = 0, added = 0;
   for (const rule of rules) {
     const due = await db.select().from(invoices)

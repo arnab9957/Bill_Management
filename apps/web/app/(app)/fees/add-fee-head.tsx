@@ -41,13 +41,38 @@ export const PRESET_HEADS: PresetFeeHead[] = [
 
 const SYSTEM_CODES = new Set(["TRANSPORT", "LATE_FEE", "BOUNCE", "OPENING"]);
 
+export interface LateFeeRuleItem {
+  academicYearId: number;
+  graceDays: number;
+  kind: "flat" | "per_day" | "percent";
+  amount: number;
+  maxCap: number;
+  isActive?: boolean;
+}
+
 interface FeeHeadFormCardProps {
   existingHeads: FeeHeadItem[];
   addAction: (prev: ActionState, fd: FormData) => Promise<ActionState>;
   editAction: (prev: ActionState, fd: FormData) => Promise<ActionState>;
+  lateAction?: (prev: ActionState, fd: FormData) => Promise<ActionState>;
+  lateRule?: LateFeeRuleItem | null;
+  yearId?: number;
+  yearName?: string;
 }
 
-export function FeeHeadFormCard({ existingHeads, addAction, editAction }: FeeHeadFormCardProps) {
+function toRupeeStr(p: number): string {
+  return `${Math.floor(p / 100)}${p % 100 ? "." + (p % 100).toString().padStart(2, "0") : ""}`;
+}
+
+export function FeeHeadFormCard({
+  existingHeads,
+  addAction,
+  editAction,
+  lateAction,
+  lateRule,
+  yearId,
+  yearName,
+}: FeeHeadFormCardProps) {
   const { editingHead, cancelEdit, formCardRef } = useFeeHeads();
 
   return (
@@ -79,6 +104,68 @@ export function FeeHeadFormCard({ existingHeads, addAction, editAction }: FeeHea
             existingHeads={existingHeads}
             action={addAction}
           />
+        )}
+
+        {/* Setup late fee rule merged within Add Fee Heads */}
+        {!editingHead && lateAction && yearId && (
+          <div className="mt-4 pt-3.5 border-t border-gray-100">
+            <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-700">
+                Late fee rule {yearName ? `(${yearName})` : ""}
+              </span>
+              <span className="text-[10px] text-gray-500">
+                0 = no late fee • applies to overdue bills
+              </span>
+            </div>
+            <ActionForm action={lateAction} className="flex flex-wrap items-end gap-3 sm:gap-4">
+              <input type="hidden" name="academicYearId" value={yearId} />
+              <label className="flex flex-col gap-1 min-w-[110px]">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">Grace days</span>
+                <input name="graceDays" type="number" defaultValue={lateRule?.graceDays ?? 5} className="w-28 text-sm" />
+              </label>
+              <label className="flex flex-col gap-1 min-w-[150px]">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">Kind</span>
+                <select name="kind" defaultValue={lateRule?.kind ?? "per_day"} className="text-sm">
+                  <option value="per_day">₹ per day late</option>
+                  <option value="flat">Flat ₹ once</option>
+                  <option value="percent">% of bill once</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 min-w-[140px]">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">Amount (₹ or %, 0 = none)</span>
+                <input
+                  name="amount"
+                  defaultValue={
+                    lateRule
+                      ? lateRule.kind === "percent"
+                        ? String(lateRule.amount / 100)
+                        : toRupeeStr(lateRule.amount)
+                      : "0"
+                  }
+                  className="w-32 text-sm"
+                />
+                <FieldError name="amount" />
+              </label>
+              <label className="flex flex-col gap-1 min-w-[160px]">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                  Maximum per bill (₹, 0 = none)
+                </span>
+                <input
+                  name="maxCap"
+                  defaultValue={lateRule ? toRupeeStr(lateRule.maxCap) : "500"}
+                  className="w-36 text-sm"
+                />
+              </label>
+              <div className="pb-0.5">
+                <Submit
+                  variant="secondary"
+                  className="!border-accent/40 !bg-accent-soft/80 !text-accent-ink hover:!bg-accent hover:!text-white font-semibold shadow-xs"
+                >
+                  Save rule
+                </Submit>
+              </div>
+            </ActionForm>
+          </div>
         )}
 
         {/* Compact badges of existing heads */}

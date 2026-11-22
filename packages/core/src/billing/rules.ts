@@ -88,6 +88,7 @@ export function lateFeeTarget(
   onDate: ISODate,
   feeAmount: number,
 ): { total: Paise; step: number } | null {
+  if (rule.amount <= 0) return null;
   const daysLate = daysBetween(dueDate, onDate) - rule.graceDays;
   if (daysLate <= 0) return null;
   let total: number;

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
-import { fees, getSettings, toRupeeString, schoolLogoDataUri } from "@sb/core";
+import { fees, getSettings, schoolLogoDataUri } from "@sb/core";
 import { requireRole } from "@/lib/auth";
 import { getWorkingYear } from "@/lib/year";
 import { formObject, run, type ActionState } from "@/lib/action";
@@ -194,11 +194,15 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           </ActionForm>
         </Card>
 
-        {/* Full-width: Add Fee Heads */}
+        {/* Full-width: Add Fee Heads & Late Fee Setup */}
         <FeeHeadFormCard
           existingHeads={m.heads}
           addAction={addHead}
           editAction={editHead}
+          lateAction={saveLate}
+          lateRule={late}
+          yearId={yearId}
+          yearName={year?.name}
         />
 
         {concessionsOn && (
@@ -244,62 +248,6 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             </p>
           </Card>
         )}
-
-        {/* Full-width: Setup Late Fee Rule */}
-        <Card title={`Setup late fee rule ${year?.name ? `(${year.name})` : ""}`}>
-          <ActionForm action={saveLate} className="flex flex-wrap items-end gap-3 sm:gap-4">
-            <input type="hidden" name="academicYearId" value={yearId} />
-            <label className="flex flex-col gap-1 min-w-[120px]">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">Grace days</span>
-              <input name="graceDays" type="number" defaultValue={late?.graceDays ?? 5} className="w-28 text-sm" />
-            </label>
-            <label className="flex flex-col gap-1 min-w-[160px]">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">Kind</span>
-              <select name="kind" defaultValue={late?.kind ?? "per_day"} className="text-sm">
-                <option value="per_day">₹ per day late</option>
-                <option value="flat">Flat ₹ once</option>
-                <option value="percent">% of bill once</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 min-w-[140px]">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">Amount (₹ or %)</span>
-              <input
-                name="amount"
-                defaultValue={
-                  late
-                    ? late.kind === "percent"
-                      ? String(late.amount / 100)
-                      : toRupeeString(late.amount)
-                    : "10"
-                }
-                className="w-32 text-sm"
-              />
-              <FieldError name="amount" />
-            </label>
-            <label className="flex flex-col gap-1 min-w-[160px]">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
-                Maximum per bill (₹, 0 = none)
-              </span>
-              <input
-                name="maxCap"
-                defaultValue={late ? toRupeeString(late.maxCap) : "500"}
-                className="w-36 text-sm"
-              />
-            </label>
-            <label className="flex items-center gap-2 pb-2 text-xs font-medium cursor-pointer select-none">
-              <input
-                type="checkbox"
-                name="isActive"
-                defaultChecked={late?.isActive ?? true}
-                className="h-4 w-4 rounded text-accent"
-              />
-              <span>Active</span>
-            </label>
-            <div className="pb-0.5">
-              <Submit>Save rule</Submit>
-            </div>
-          </ActionForm>
-        </Card>
 
         <ReceiptRowsManager
           initialHeads={m.heads}

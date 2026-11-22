@@ -203,23 +203,24 @@ export const lateFeeRuleSchema = z
     kind: z.enum(["flat", "per_day", "percent"]),
     amount: z.string().trim().min(1),
     maxCap: rupeesToPaise,
-    isActive: checkbox,
+    isActive: z.boolean().optional(),
   })
   .transform((d, ctx) => {
     if (d.kind === "percent") {
       const pct = Number(d.amount);
-      if (!(pct > 0 && pct <= 100)) {
+      if (Number.isNaN(pct) || pct < 0 || pct > 100) {
         ctx.addIssue({ code: "custom", path: ["amount"], message: "Percent must be between 0 and 100" });
         return z.NEVER;
       }
-      return { ...d, amount: Math.round(pct * 100) };
+      const amount = Math.round(pct * 100);
+      return { ...d, amount, isActive: amount > 0 };
     }
     const p = rupeesToPaise.safeParse(d.amount);
     if (!p.success) {
       ctx.addIssue({ code: "custom", path: ["amount"], message: "Invalid amount" });
       return z.NEVER;
     }
-    return { ...d, amount: p.data };
+    return { ...d, amount: p.data, isActive: p.data > 0 };
   });
 
 // ---------------------------------------------------------------- billing
