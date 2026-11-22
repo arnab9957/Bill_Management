@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FieldError } from "@/components/action-form";
 import { extractAdmissionFormData, getAdmissionFormElement, saveAdmissionDraft } from "@/lib/admission-drafts";
+import { compareClasses } from "@/lib/classes";
 
 interface ClassItem {
   id: number;
@@ -35,6 +36,7 @@ export function ClassSectionSelects({
   const [selectedSectionId, setSelectedSectionId] = useState<string>(
     defaultSectionId != null ? String(defaultSectionId) : ""
   );
+  const sortedClasses = useMemo(() => [...classes].sort(compareClasses), [classes]);
 
   useEffect(() => {
     setSelectedClassId(defaultClassId != null ? String(defaultClassId) : "");
@@ -136,7 +138,7 @@ export function ClassSectionSelects({
           required
         >
           <option value="">Select class</option>
-          {classes.map((c) => (
+          {sortedClasses.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
             </option>

@@ -67,9 +67,10 @@ export async function provisionSchool(db: DB, p: SchoolProfile, o: ProvisionOpti
 
     // 3. Classes (in the order listed) and their sections
     for (const [i, c] of p.classes.entries()) {
-      await tx.insert(s.classes).values({ name: c.name, sortOrder: i }).onConflictDoNothing();
+      const sortOrder = (i + 1) * 10;
+      await tx.insert(s.classes).values({ name: c.name, sortOrder }).onConflictDoNothing();
       const [cls] = await tx.select().from(s.classes).where(eq(s.classes.name, c.name));
-      if (o.overwrite) await tx.update(s.classes).set({ sortOrder: i }).where(eq(s.classes.id, cls!.id));
+      if (o.overwrite) await tx.update(s.classes).set({ sortOrder }).where(eq(s.classes.id, cls!.id));
       for (const sec of c.sections) await tx.insert(s.sections).values({ classId: cls!.id, name: sec }).onConflictDoNothing();
     }
 

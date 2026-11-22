@@ -3,9 +3,30 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useFormStatus } from "react-dom";
 import { ActionForm, FieldError, Submit } from "@/components/action-form";
 import { buttonClass, cx } from "@/components/ui";
-import { STANDARD_CLASSES } from "@/lib/classes";
+import { PRESET_CLASSES, type PresetClass, compareClasses } from "@/lib/classes";
 import type { ActionState } from "@/lib/action";
 import { CollapsibleSection } from "./section-collapse";
+
+function matchesClassPreset(p: PresetClass, query: string): boolean {
+  if (!query) return true;
+  const q = query.toLowerCase().trim();
+  if (p.name.toLowerCase().includes(q)) return true;
+  return p.keywords.some((k) => k === q || k.includes(q) || q.includes(k));
+}
+
+function scoreClassPreset(p: PresetClass, query: string): number {
+  if (!query) return 0;
+  const q = query.toLowerCase().trim();
+  const nameLower = p.name.toLowerCase();
+  if (nameLower === q) return 100;
+  if (nameLower.startsWith(q)) return 80;
+  if (nameLower.includes(q)) return 60;
+  if (p.keywords.some((k) => k === q)) return 50;
+  if (p.keywords.some((k) => k.startsWith(q))) return 30;
+  if (p.keywords.some((k) => k.includes(q))) return 20;
+  if (p.keywords.some((k) => q.includes(k))) return 15;
+  return 0;
+}
 
 const actionLink = "cursor-pointer text-xs font-semibold transition-colors";
 const renameLink = cx(actionLink, "text-accent-ink hover:text-accent");
@@ -32,65 +53,129 @@ export function ClassesSectionsManager({
   removeSection: Action;
 }) {
   const formRef = useRef<HTMLDivElement>(null);
-  const [selectedPreset, setSelectedPreset] = useState("");
-  const [customClassName, setCustomClassName] = useState("");
   const [className, setClassName] = useState("");
   const [section, setSection] = useState("");
   const [edit, setEdit] = useState<EditTarget | null>(null);
   const [targetClassId, setTargetClassId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+
+  const comboboxRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (comboboxRef.current && !comboboxRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const focusForm = () => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   const reset = useCallback(() => {
     setEdit(null);
     setClassName("");
-    setSelectedPreset("");
-    setCustomClassName("");
     setSection("");
     setTargetClassId(null);
     setSelected(new Set());
+    setIsOpen(false);
+    setHighlightedIndex(-1);
   }, []);
 
   const startRenameClass = (c: ClassItem) => {
     setEdit({ mode: "class", id: c.id });
     setTargetClassId(null);
     setClassName(c.name);
-    setSelectedPreset("__custom__");
-    setCustomClassName(c.name);
     setSection("");
     setSelected(new Set());
+    setIsOpen(false);
     focusForm();
   };
   const startRenameSection = (c: ClassItem, sec: SectionItem) => {
     setEdit({ mode: "section", id: sec.id });
     setTargetClassId(null);
     setClassName(c.name);
-    setSelectedPreset(c.name);
-    setCustomClassName("");
     setSection(sec.name);
     setSelected(new Set());
+    setIsOpen(false);
     focusForm();
   };
   const startCreateSection = (c: ClassItem) => {
     setEdit(null);
     setTargetClassId(c.id);
     setClassName(c.name);
-    setSelectedPreset(c.name);
-    setCustomClassName("");
     setSection("");
     setSelected(new Set(c.students.map((s) => s.id)));
+    setIsOpen(false);
     focusForm();
   };
 
+  const sortedClasses = useMemo(() => [...classes].sort(compareClasses), [classes]);
   const existingClassNames = useMemo(() => new Set(classes.map((c) => c.name.toLowerCase())), [classes]);
 
-  const effectiveClassName = edit?.mode === "class"
-    ? className.trim()
-    : targetClassId != null || edit?.mode === "section"
-      ? className.trim()
-      : selectedPreset === "__custom__"
-        ? customClassName.trim()
-        : selectedPreset.trim();
+  const effectiveClassName = className.trim();
+
+  // Filter and score presets
+  const filteredPresets = useMemo(() => {
+    const q = className.trim();
+    if (!q) return PRESET_CLASSES;
+    return PRESET_CLASSES
+      .filter((p) => matchesClassPreset(p, q))
+      .sort((a, b) => scoreClassPreset(b, q) - scoreClassPreset(a, q));
+  }, [className]);
+
+  const hasExactMatch = useMemo(() => {
+    const q = className.trim().toLowerCase();
+    return PRESET_CLASSES.some((p) => p.name.toLowerCase() === q);
+  }, [className]);
+
+  const showCustomOption = Boolean(className.trim() && !hasExactMatch);
+  const totalOptions = filteredPresets.length + (showCustomOption ? 1 : 0);
+
+  const selectPreset = (name: string) => {
+    setClassName(name);
+    setIsOpen(false);
+    setHighlightedIndex(-1);
+  };
+
+  const selectCustom = (name: string) => {
+    setClassName(name);
+    setIsOpen(false);
+    setHighlightedIndex(-1);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isOpen) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        setIsOpen(true);
+        e.preventDefault();
+      }
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (totalOptions > 0 ? (prev + 1) % totalOptions : -1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (totalOptions > 0 ? (prev - 1 + totalOptions) % totalOptions : -1));
+    } else if (e.key === "Enter") {
+      if (highlightedIndex >= 0 && highlightedIndex < filteredPresets.length) {
+        e.preventDefault();
+        selectPreset(filteredPresets[highlightedIndex]!.name);
+      } else if (showCustomOption && highlightedIndex === filteredPresets.length) {
+        e.preventDefault();
+        selectCustom(className.trim());
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setIsOpen(false);
+    }
+  };
 
   const classNameLocked = targetClassId != null || edit?.mode === "section";
   const isSectionDisabled = edit?.mode === "class";
@@ -132,8 +217,13 @@ export function ClassesSectionsManager({
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(checklistStudents.map((s) => s.id)));
 
   return (
-    <CollapsibleSection id="classes-sections" title="Classes & Sections" subtitle="Create classes, rename sections and place students in them.">
-      <div ref={formRef} className="rounded-xl border border-gray-200 bg-gray-50/60 p-4">
+    <CollapsibleSection
+      id="classes-sections"
+      title="Classes & Sections"
+      subtitle="Create classes, rename sections and place students in them."
+      overflowVisible={true}
+    >
+      <div ref={formRef} className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 relative z-30">
         <div className="eyebrow mb-3">Add or edit</div>
         <ActionForm action={add} className="space-y-2" onSuccess={reset}>
           <input type="hidden" name="mode" value={targetClassId != null ? "createSection" : edit?.mode ?? "create"} />
@@ -141,73 +231,116 @@ export function ClassesSectionsManager({
           {targetClassId != null && <input type="hidden" name="classId" value={targetClassId} />}
           {classNameLocked && <input type="hidden" name="className" value={className} />}
           <div className="flex flex-wrap items-end gap-2.5">
-            {edit?.mode === "class" ? (
-              <label className="field-stack min-w-[200px] flex-1">
-                <span>Class name <span className="font-semibold text-red-600">*</span></span>
-                <input
-                  name="className"
-                  value={className}
-                  onChange={(e) => setClassName(e.target.value)}
-                  placeholder="e.g. Class I"
-                  maxLength={32}
-                  required
-                />
-              </label>
-            ) : targetClassId != null ? (
+            {classNameLocked ? (
               <label className="field-stack min-w-[200px] flex-1">
                 <span>Class</span>
                 <input value={className} disabled className="opacity-60 bg-gray-100" />
               </label>
             ) : (
-              <>
-                <label className="field-stack min-w-[180px] flex-1">
-                  <span>Class <span className="font-semibold text-red-600">*</span></span>
-                  <select
-                    value={selectedPreset}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setSelectedPreset(val);
-                      if (val !== "__custom__") {
-                        setCustomClassName("");
-                      }
-                    }}
-                    required
-                    className="h-10 cursor-pointer rounded-lg border border-gray-300 bg-surface px-3 py-2 text-sm font-medium text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/15"
+              <div ref={comboboxRef} className="relative field-stack min-w-[220px] flex-1">
+                <span>
+                  Class <span className="font-semibold text-red-600">*</span>
+                  {edit?.mode === "class" && (
+                    <span className="ml-1 text-[11px] font-normal text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.2">
+                      Renaming
+                    </span>
+                  )}
+                </span>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  name="className"
+                  value={className}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setClassName(val);
+                    setIsOpen(true);
+                    setHighlightedIndex(-1);
+                  }}
+                  onFocus={() => setIsOpen(true)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Search preset or type class name…"
+                  autoComplete="off"
+                  maxLength={32}
+                  required
+                  className="w-full text-sm"
+                />
+
+                {/* Auto-suggest dropdown menu */}
+                {isOpen && (
+                  <div
+                    className="absolute left-0 right-0 top-full z-50 mt-1 max-h-80 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-2xl text-xs"
                   >
-                    <option value="" disabled>Choose a class…</option>
-                    <optgroup label="Preset classes">
-                      {STANDARD_CLASSES.map((c) => {
-                        const exists = existingClassNames.has(c.toLowerCase());
+                    {/* Header hint */}
+                    <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                      <span>{className.trim() ? "Suggestions & Matching Classes" : "Standard Preset Classes"}</span>
+                      <span className="text-[9px] text-gray-400 font-normal">Select or type custom</span>
+                    </div>
+
+                    {filteredPresets.length > 0 ? (
+                      filteredPresets.map((p, index) => {
+                        const isHighlighted = highlightedIndex === index;
+                        const alreadyExists = existingClassNames.has(p.name.toLowerCase());
+                        const isCurrentClass = edit?.mode === "class" && p.name.toLowerCase() === className.toLowerCase();
                         return (
-                          <option key={c} value={c}>
-                            {c}{exists ? " (already in school)" : ""}
-                          </option>
+                          <button
+                            key={p.name}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              selectPreset(p.name);
+                            }}
+                            className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2 border-b border-gray-50 last:border-b-0 transition ${
+                              isHighlighted
+                                ? "bg-accent/10 text-accent-ink font-semibold"
+                                : "hover:bg-gray-50 text-gray-800"
+                            }`}
+                          >
+                            <span className="font-medium text-xs">{p.name}</span>
+                            {alreadyExists && !isCurrentClass && (
+                              <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-medium text-gray-500">
+                                In school
+                              </span>
+                            )}
+                            {isCurrentClass && (
+                              <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700 border border-amber-200">
+                                Current
+                              </span>
+                            )}
+                          </button>
                         );
-                      })}
-                    </optgroup>
-                    <option value="__custom__">➕ Create New Class</option>
-                  </select>
-                </label>
+                      })
+                    ) : (
+                      <div className="px-3 py-2.5 text-center text-xs text-gray-500">
+                        No matching preset class found.
+                      </div>
+                    )}
 
-                {selectedPreset === "__custom__" && (
-                  <label className="field-stack min-w-[180px] flex-1">
-                    <span>New Class Name <span className="font-semibold text-red-600">*</span></span>
-                    <input
-                      name="className"
-                      value={customClassName}
-                      onChange={(e) => setCustomClassName(e.target.value)}
-                      placeholder="e.g. Playgroup, Grade 1"
-                      maxLength={32}
-                      autoFocus
-                      required
-                    />
-                  </label>
+                    {/* Custom Class option when typing a unique name */}
+                    {showCustomOption && (
+                      <div className="border-t border-gray-100 p-1 bg-subtle/50">
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            selectCustom(className.trim());
+                          }}
+                          className={`w-full text-left px-2.5 py-1.5 flex items-center gap-1.5 rounded-md text-xs font-semibold transition ${
+                            highlightedIndex === filteredPresets.length
+                              ? "bg-accent text-white"
+                              : "text-accent-ink hover:bg-accent-soft"
+                          }`}
+                        >
+                          <span>➕</span>
+                          <span>
+                            Use custom class: <strong>&ldquo;{className.trim()}&rdquo;</strong>
+                          </span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
-
-                {selectedPreset !== "" && selectedPreset !== "__custom__" && (
-                  <input type="hidden" name="className" value={selectedPreset} />
-                )}
-              </>
+              </div>
             )}
 
             <label className="field-stack w-44">
@@ -233,7 +366,7 @@ export function ClassesSectionsManager({
             <Submit className="cursor-pointer">
               {targetClassId != null ? "Create section" : edit ? "Save changes" : "Create class"}
             </Submit>
-            {(edit || targetClassId != null || selectedPreset) && (
+            {(edit || targetClassId != null || className) && (
               <button type="button" onClick={reset} className={cx(buttonClass("secondary"), "cursor-pointer")}>
                 Cancel
               </button>
@@ -277,7 +410,7 @@ export function ClassesSectionsManager({
             : "Choose a preset or create a new class. Section is optional."}</p>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {classes.map((c) => (
+        {sortedClasses.map((c) => (
           <article key={c.id} className="overflow-hidden rounded-xl border border-gray-200 bg-surface shadow-[0_1px_2px_rgba(16,24,40,0.06)] transition-colors hover:border-gray-300">
             <div className="p-5">
               <div className="flex items-start justify-between gap-3">

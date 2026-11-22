@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { run, type ActionState } from "@/lib/action";
 import { ActionForm, Submit } from "@/components/action-form";
 import { Card, Empty, LinkButton, Money, Notice, PageHeader } from "@/components/ui";
+import { compareClasses } from "@/lib/classes";
 
 async function promote(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
@@ -55,7 +56,7 @@ export default async function PromoteClass({ params, searchParams }: { params: P
   const list = await students.promotionList(from.id, classId, to.id);
   const open = list.filter((s) => s.canPromote);
   const moved = list.filter((s) => s.movedTo || s.status === "left");
-  const ordered = [...m.classes].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  const ordered = [...m.classes].sort(compareClasses);
   const carry = open.reduce((a, s) => a + s.dues, 0);
 
   return (

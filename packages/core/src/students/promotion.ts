@@ -11,11 +11,13 @@ import { today } from "../dates";
 import { allSessions, saveClassSession } from "../sessions";
 import { copyStructures, createYear } from "../fees";
 import { promoteStudent, syncLatest } from "./enrollment";
+import { compareClasses } from "../classes";
 
 export type PromoteAction = "promote" | "repeat" | "leave" | "skip";
 
 async function ordered(db: Executor) {
-  return db.select().from(classes).orderBy(asc(classes.sortOrder), asc(classes.name));
+  const rows = await db.select().from(classes).orderBy(asc(classes.sortOrder), asc(classes.name));
+  return [...rows].sort(compareClasses);
 }
 /** The class after this one by class order; null for the highest class (passes out). */
 export function nextClassOf(list: { id: number }[], classId: number): number | null {

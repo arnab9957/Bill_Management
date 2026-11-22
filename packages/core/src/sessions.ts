@@ -7,6 +7,7 @@ import { and, desc, eq, inArray, like, ne, sql } from "drizzle-orm";
 import { getDb, academicYears, classSessions, classes, invoices, studentEnrollments, type Executor } from "@sb/db";
 import { AppError, audit, yearForDate, type Actor } from "./common";
 import { addDays, monthOffset, periodOf, type ISODate } from "./dates";
+import { compareClasses } from "./classes";
 
 export interface Session { yearId: number; yearName: string; classId: number; startDate: ISODate; endDate: ISODate; custom: boolean }
 type Year = typeof academicYears.$inferSelect;
@@ -72,7 +73,8 @@ export async function studentYearOn(db: Executor, studentId: number, date: ISODa
 export async function listSessions(yearId: number) {
   const db = getDb();
   const map = await allSessions(db, [yearId]);
-  const cls = await db.select().from(classes).orderBy(classes.sortOrder, classes.name);
+  const rawCls = await db.select().from(classes);
+  const cls = [...rawCls].sort(compareClasses);
   return cls.map((c) => ({ className: c.name, sortOrder: c.sortOrder, ...map.get(`${yearId}:${c.id}`)! }));
 }
 

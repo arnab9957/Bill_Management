@@ -68,7 +68,19 @@ export function SchoolSheet(p: SchoolSheetProps) {
             const a = rupeesAndPaise(r.amount);
             return (
               <tr key={`${r.label}-${i}`} className={`ss-row${i === rows.length - 1 ? " ss-last" : ""}`}>
-                <td>{r.label}</td><td className="ss-p">{r.period}</td><td className="ss-n">{a.rs}</td><td className="ss-n">{a.p}</td>
+                <td>
+                  <span className="inline-flex items-center gap-1.5 align-middle">
+                    <span>{r.label}</span>
+                    {r.isRefundable && (
+                      <span className="rounded border border-black/70 px-1 py-0.5 text-[6.5pt] leading-none font-sans font-semibold tracking-tight text-black print:border-black print:text-black">
+                        Refundable
+                      </span>
+                    )}
+                  </span>
+                </td>
+                <td className="ss-p">{r.period}</td>
+                <td className="ss-n">{a.rs}</td>
+                <td className="ss-n">{a.p}</td>
               </tr>
             );
           })}
