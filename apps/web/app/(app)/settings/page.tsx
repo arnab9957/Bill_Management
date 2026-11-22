@@ -8,6 +8,7 @@ import { ActionForm, FieldError, Submit } from "@/components/action-form";
 import { LinkButton } from "@/components/ui";
 import Link from "next/link";
 import { ClassesSectionsManager } from "./classes-sections";
+import { FolderPicker } from "@/components/folder-picker";
 import { CollapsibleSection, SectionCollapseProvider } from "./section-collapse";
 import { ProfileSection } from "./profile-section";
 import { NumberingFormatFields } from "./numbering-format-fields";
@@ -48,7 +49,12 @@ async function saveContact(_: ActionState, fd: FormData): Promise<ActionState> {
 
 async function saveBilling(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
-  return saveSection(_, fd, "Bill and receipt settings saved");
+  const r = await saveSection(_, fd, "Bill and receipt settings saved");
+  // Start number for the receipt book: only sent while no receipt has been issued in this series
+  const raw = fd.get("next");
+  if (!r?.ok || raw === null || String(raw).trim() === "" || String(raw) === String(fd.get("nextWas"))) return r;
+  const n = await setNextNumber(_, fd);
+  return n?.ok ? { ok: true, message: `${r.message}. ${n.message}` } : n;
 }
 
 async function saveNumbering(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -280,24 +286,20 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <input name="receiptDigits" type="number" min={1} max={10} defaultValue={s.receiptDigits} />
             <FieldError name="receiptDigits" />
           </label>
+          {num && (num.canSetStart ? (
+            <label className={field}>
+              <span className="flex items-baseline gap-1.5">
+                First receipt number <span className="text-xs font-normal text-gray-500">(only if you used a paper book: at 6434, type 6435)</span>
+              </span>
+              <input name="next" type="number" min={1} defaultValue={num.next} />
+              <input type="hidden" name="nextWas" value={num.next} />
+              <FieldError name="next" />
+            </label>
+          ) : (
+            <p className="text-sm text-gray-600 self-end">Next receipt: <b className="font-mono">{num.text}</b> <span className="text-gray-500">({num.issued} issued)</span></p>
+          ))}
         </ProfileSection>
 
-        <CollapsibleSection id="receipt-numbers" title="Receipt numbers" subtitle="Set the starting number for the current paper series.">
-          {num ? (<>
-            <p className="text-sm">The next receipt will be numbered <b className="font-mono text-base">{num.text}</b>
-              <span className="ml-2 text-gray-500">(series {num.series}, {num.issued} issued so far)</span></p>
-            {num.canSetStart ? (
-              <ActionForm action={setNextNumber} className="mt-3 flex flex-wrap items-end gap-2">
-                <label className={field}>Continue the paper receipt book from number
-                  <input name="next" type="number" min={1} defaultValue={num.next} className="w-44" /><FieldError name="next" /></label>
-                <Submit variant="secondary">Set number</Submit>
-              </ActionForm>
-            ) : (
-              <p className="mt-2 text-sm text-gray-500">Numbers in this series are already in use, so they can&apos;t be changed. To continue from another number, change the receipt prefix above, save, and set the number here.</p>
-            )}
-            <p className="mt-2 text-xs text-gray-500">Do this before the first receipt is printed (if the paper book is at 6434, type 6435).</p>
-          </>) : <p className="text-sm text-gray-500">Set a current academic year first.</p>}
-        </CollapsibleSection>
 
         <ProfileSection id="reminder-timing" title="Reminder timing" subtitle="Quiet hours and the overdue reminder schedule." action={saveReminders} saveLabel="Save reminder timing">
           <label className={field}>Send messages from<input name="quietStart" defaultValue={s.quietStart} /><FieldError name="quietStart" /></label>
@@ -311,7 +313,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <span className="flex items-baseline gap-1.5">
               Backup folder <span className="text-xs font-normal text-gray-500">(second disk recommended)</span>
             </span>
-            <input name="backupPath" defaultValue={s.backupPath ?? ""} placeholder="D:\SchoolBackups" />
+            <FolderPicker name="backupPath" defaultValue={s.backupPath ?? ""} placeholder="D:\SchoolBackups" />
           </label>
           <label className="flex items-start gap-2"><input type="checkbox" name="concessionsEnabled" defaultChecked={s.concessionsEnabled} className="mt-0.5" />
             <span>Fee concessions <span className={hint}>— sibling, staff ward or merit discounts applied to new bills.</span></span></label>
