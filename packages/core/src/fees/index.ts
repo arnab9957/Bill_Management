@@ -1,6 +1,6 @@
 import { and, asc, count, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import {
-  getDb, academicYears, classes, concessionTypes, feeHeads, feeStructureItems, feeStructures, lateFeeRules, sections,
+  getDb, academicYears, classes, concessionTypes, feeHeads, feeStructureItems, feeStructures, invoiceLines, lateFeeRules, sections,
   studentConcessions, studentEnrollments, transportRoutes, students,
 } from "@sb/db";
 import {
@@ -8,6 +8,7 @@ import {
 } from "@sb/validation";
 import { AppError, audit, getSettings, type Actor } from "../common";
 import { percentOf } from "../money";
+import { compareClasses, computeClassSortOrder, syncClassSortOrders } from "../classes";
 
 // ---------------------------------------------------------------- masters
 let mastersCache: { at: number; data: Awaited<ReturnType<typeof loadMasters>> } | undefined;
@@ -18,12 +19,20 @@ async function loadMasters() {
   const db = getDb();
   const [years, cls, secs, routes, heads] = await Promise.all([
     db.select().from(academicYears).orderBy(asc(academicYears.startDate)),
-    db.select().from(classes).orderBy(asc(classes.sortOrder)),
+    db.select().from(classes).orderBy(asc(classes.sortOrder), asc(classes.name)),
     db.select().from(sections).orderBy(asc(sections.name)),
     db.select().from(transportRoutes).orderBy(asc(transportRoutes.name)),
     db.select().from(feeHeads).orderBy(asc(feeHeads.sortOrder)),
   ]);
-  return { years, classes: cls, sections: secs, routes, heads };
+
+  // If any class has sortOrder: 0 or out of sync, automatically fix it in the DB
+  const needsFix = cls.some((c) => c.sortOrder === 0 || c.sortOrder !== computeClassSortOrder(c.name));
+  if (needsFix) {
+    syncClassSortOrders(db).catch(console.error);
+  }
+
+  const sortedClasses = [...cls].sort(compareClasses);
+  return { years, classes: sortedClasses, sections: secs, routes, heads };
 }
 
 export async function masters(forceRefresh = false) {
@@ -64,10 +73,12 @@ export async function setCurrentYear(actor: Actor, yearId: number) {
   });
   clearMastersCache();
 }
-export async function createClass(actor: Actor, name: string, sortOrder: number) {
+export async function createClass(actor: Actor, name: string, sortOrder?: number) {
   const db = getDb();
-  const [c] = await db.insert(classes).values({ name: z.string().trim().min(1).parse(name), sortOrder }).returning();
-  await audit(db, actor, "create", "class", c!.id, null, { name });
+  const clean = z.string().trim().min(1).max(32).parse(name);
+  const order = sortOrder && sortOrder > 0 ? sortOrder : computeClassSortOrder(clean);
+  const [c] = await db.insert(classes).values({ name: clean, sortOrder: order }).returning();
+  await audit(db, actor, "create", "class", c!.id, null, { name: clean, sortOrder: order });
   clearMastersCache();
   return c!;
 }
@@ -85,6 +96,7 @@ export async function addClassWithSection(actor: Actor, className: string, sortO
   const name = z.string().trim().max(32).parse(className);
   const section = z.string().trim().max(16).parse(sectionName);
   const ids = [...new Set(studentIds.map(Number).filter(Number.isFinite))];
+  const order = sortOrder && sortOrder > 0 ? sortOrder : computeClassSortOrder(name);
   return db.transaction(async (tx) => {
     const [found] = classId
       ? await tx.select().from(classes).where(eq(classes.id, classId)).limit(1)
@@ -93,10 +105,10 @@ export async function addClassWithSection(actor: Actor, className: string, sortO
     let created = false;
     if (!cls) {
       if (!name) throw new AppError("Class not found");
-      const [inserted] = await tx.insert(classes).values({ name, sortOrder }).returning();
+      const [inserted] = await tx.insert(classes).values({ name, sortOrder: order }).returning();
       cls = inserted!;
       created = true;
-      await audit(tx, actor, "create", "class", cls.id, null, { name, sortOrder });
+      await audit(tx, actor, "create", "class", cls.id, null, { name, sortOrder: order });
     }
     let sectionAdded = false;
     let moved = 0;
@@ -133,7 +145,8 @@ export async function renameClass(actor: Actor, classId: number, name: string) {
   const [duplicate] = await db.select({ id: classes.id }).from(classes)
     .where(and(ne(classes.id, classId), sql`lower(${classes.name}) = lower(${clean})`)).limit(1);
   if (duplicate) throw new AppError("A class with this name already exists");
-  const [updated] = await db.update(classes).set({ name: clean }).where(eq(classes.id, classId)).returning();
+  const order = computeClassSortOrder(clean);
+  const [updated] = await db.update(classes).set({ name: clean, sortOrder: order }).where(eq(classes.id, classId)).returning();
   await audit(db, actor, "update", "class", classId, old, updated);
   clearMastersCache();
   return updated!;
@@ -236,14 +249,119 @@ export async function saveRoute(actor: Actor, input: { id?: number; name: string
 }
 
 // ---------------------------------------------------------------- fee heads & structures
+export function generateFeeHeadCode(name: string): string {
+  let c = name
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+  if (!c) c = "FEE_" + Date.now().toString(36).toUpperCase();
+  return c.slice(0, 32);
+}
+
 export async function createFeeHead(actor: Actor, input: unknown) {
   const d = feeHeadSchema.parse(input);
   const db = getDb();
-  const [h] = await db.insert(feeHeads).values({ ...d, sortOrder: 50 }).onConflictDoNothing().returning();
+  let baseCode = d.code?.trim() || generateFeeHeadCode(d.name);
+  if (baseCode.length > 32) baseCode = baseCode.slice(0, 32);
+
+  // Auto-resolve code collisions if auto-generated or duplicate
+  let candidate = baseCode;
+  let counter = 1;
+  while (true) {
+    const [existing] = await db.select({ id: feeHeads.id }).from(feeHeads).where(eq(feeHeads.code, candidate));
+    if (!existing) break;
+    counter++;
+    const suffix = `_${counter}`;
+    candidate = `${baseCode.slice(0, 32 - suffix.length)}${suffix}`;
+  }
+
+  const [h] = await db.insert(feeHeads).values({
+    code: candidate,
+    name: d.name,
+    type: d.type,
+    isRefundable: d.isRefundable,
+    sortOrder: 50,
+  }).onConflictDoNothing().returning();
   if (!h) throw new AppError("A fee head with this code exists", { code: "Already used" });
-  await audit(db, actor, "create", "fee_head", h.id, null, d);
+  await audit(db, actor, "create", "fee_head", h.id, null, { ...d, code: candidate });
   clearMastersCache();
   return h;
+}
+
+export async function updateFeeHead(actor: Actor, input: unknown) {
+  const schema = z.object({
+    id: z.coerce.number().int().positive(),
+    name: z.string().trim().min(1, "Name is required"),
+    code: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() ? v.trim().toUpperCase() : undefined),
+      z.string().regex(/^[A-Z0-9_]+$/, "Use A-Z, 0-9, _").optional(),
+    ),
+    type: z.enum(["recurring", "one_time", "optional"]),
+    isRefundable: z.coerce.boolean().default(false),
+  });
+  const d = schema.parse(input);
+  const db = getDb();
+  const [head] = await db.select().from(feeHeads).where(eq(feeHeads.id, d.id));
+  if (!head) throw new AppError("Fee head not found");
+
+  const SYSTEM_HEAD_CODES = new Set(["TRANSPORT", "LATE_FEE", "BOUNCE", "OPENING"]);
+  const nextCode = d.code || head.code;
+
+  if (SYSTEM_HEAD_CODES.has(head.code) && nextCode !== head.code) {
+    throw new AppError(`Cannot change code of core system head "${head.name}"`);
+  }
+
+  if (nextCode !== head.code) {
+    const [conflict] = await db.select({ id: feeHeads.id }).from(feeHeads).where(and(eq(feeHeads.code, nextCode), ne(feeHeads.id, d.id)));
+    if (conflict) throw new AppError("A fee head with this code exists", { code: "Already used" });
+  }
+
+  const [updated] = await db.update(feeHeads).set({
+    name: d.name,
+    code: nextCode,
+    type: d.type,
+    isRefundable: d.isRefundable,
+  }).where(eq(feeHeads.id, d.id)).returning();
+
+  await audit(db, actor, "update", "fee_head", d.id, head, updated);
+  clearMastersCache();
+  return updated;
+}
+
+export async function deleteFeeHead(actor: Actor, headId: number) {
+  const db = getDb();
+  const [head] = await db.select().from(feeHeads).where(eq(feeHeads.id, headId));
+  if (!head) throw new AppError("Fee head not found");
+
+  const SYSTEM_HEAD_CODES = new Set(["TRANSPORT", "LATE_FEE", "BOUNCE", "OPENING"]);
+  if (SYSTEM_HEAD_CODES.has(head.code)) {
+    throw new AppError(`"${head.name}" is a core system head and cannot be deleted`);
+  }
+
+  // Check if used in invoice lines
+  const [usedInLine] = await db.select({ id: invoiceLines.id }).from(invoiceLines).where(eq(invoiceLines.feeHeadId, headId)).limit(1);
+  if (usedInLine) {
+    throw new AppError(`Cannot delete "${head.name}" because it has already been billed on student invoices`);
+  }
+
+  // Check if used in concession types
+  const [usedInConcession] = await db.select({ id: concessionTypes.id }).from(concessionTypes).where(eq(concessionTypes.feeHeadId, headId)).limit(1);
+  if (usedInConcession) {
+    throw new AppError(`Cannot delete "${head.name}" because it is linked to a concession type. Remove or update that concession first.`);
+  }
+
+  await db.transaction(async (tx) => {
+    // Delete from fee structure items
+    await tx.delete(feeStructureItems).where(eq(feeStructureItems.feeHeadId, headId));
+    // Delete fee head
+    await tx.delete(feeHeads).where(eq(feeHeads.id, headId));
+    await audit(tx, actor, "delete", "fee_head", headId, head, null);
+  });
+
+  clearMastersCache();
+  return head;
 }
 
 /**
@@ -283,9 +401,9 @@ export async function listStructures(academicYearId: number) {
   const db = getDb();
   const rows = await db.select({ s: feeStructures, className: classes.name, sortOrder: classes.sortOrder, item: feeStructureItems })
     .from(classes).leftJoin(feeStructures, and(eq(feeStructures.classId, classes.id), eq(feeStructures.academicYearId, academicYearId)))
-    .leftJoin(feeStructureItems, eq(feeStructureItems.structureId, feeStructures.id)).orderBy(asc(classes.sortOrder));
+    .leftJoin(feeStructureItems, eq(feeStructureItems.structureId, feeStructures.id)).orderBy(asc(classes.sortOrder), asc(classes.name));
   const out = new Map<string, { classId: number; className: string; structureId: number | null; monthly: number; annualTotal: number; items: number }>();
-  const cls = await db.select().from(classes).orderBy(asc(classes.sortOrder));
+  const cls = (await db.select().from(classes)).sort(compareClasses);
   for (const c of cls) out.set(c.name, { classId: c.id, className: c.name, structureId: null, monthly: 0, annualTotal: 0, items: 0 });
   for (const r of rows) {
     const o = out.get(r.className)!;

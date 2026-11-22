@@ -12,6 +12,7 @@ export interface PrintHead {
   receiptOrder: number | null;
   receiptLabel: string | null;
   sortOrder: number;
+  isRefundable?: boolean;
 }
 
 /** One paid (or billed) amount against a fee head. */
@@ -31,6 +32,7 @@ export interface PrintRow {
   amount: number;
   /** false = not one of the school's fixed rows (shown only because it has an amount). */
   fixed: boolean;
+  isRefundable?: boolean;
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"];
@@ -76,13 +78,27 @@ export function buildPrintRows(heads: readonly PrintHead[], lines: readonly Prin
     .sort((a, b) => a.receiptOrder! - b.receiptOrder! || a.sortOrder - b.sortOrder || a.id - b.id);
   const rows: PrintRow[] = fixed.map((h) => {
     const v = byHead.get(h.id);
-    return { label: label(h), period: periodFor(h, v?.periods ?? []), amount: v?.amount ?? 0, fixed: true };
+    return {
+      label: label(h),
+      period: periodFor(h, v?.periods ?? []),
+      amount: v?.amount ?? 0,
+      fixed: true,
+      ...(h.isRefundable ? { isRefundable: true } : {}),
+    };
   });
 
   const fixedIds = new Set(fixed.map((h) => h.id));
   for (const h of heads) {
     const v = byHead.get(h.id);
-    if (!fixedIds.has(h.id) && v && v.amount !== 0) rows.push({ label: label(h), period: periodFor(h, v.periods), amount: v.amount, fixed: false });
+    if (!fixedIds.has(h.id) && v && v.amount !== 0) {
+      rows.push({
+        label: label(h),
+        period: periodFor(h, v.periods),
+        amount: v.amount,
+        fixed: false,
+        ...(h.isRefundable ? { isRefundable: true } : {}),
+      });
+    }
   }
   const unknown = byHead.get(null);
   if (unknown && unknown.amount !== 0) rows.push({ label: "Other", period: "", amount: unknown.amount, fixed: false });

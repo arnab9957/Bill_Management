@@ -24,16 +24,31 @@ export function SectionHeading({ children, className }: { children: ReactNode; c
   return <h2 className={cx("eyebrow mb-2", className)}>{children}</h2>;
 }
 
-export function Card({ title, children, className, actions }: { title?: ReactNode; children: ReactNode; className?: string; actions?: ReactNode }) {
+export function Card({
+  title,
+  children,
+  className,
+  bodyClassName,
+  actions,
+  overflow = "auto",
+}: {
+  title?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  bodyClassName?: string;
+  actions?: ReactNode;
+  overflow?: "auto" | "visible" | "hidden";
+}) {
+  const isVisible = overflow === "visible";
   return (
-    <section className={cx(panelClass, className)}>
+    <section className={cx(panelClass, isVisible && "!overflow-visible", className)}>
       {title && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200/70 bg-subtle/70 px-5 py-4 sm:px-6">
           <h2 className="text-sm font-semibold tracking-tight text-ink">{title}</h2>
           {actions}
         </div>
       )}
-      <div className="overflow-x-auto p-5 sm:p-6">{children}</div>
+      <div className={cx(isVisible ? "p-5 sm:p-6" : "overflow-x-auto p-5 sm:p-6", bodyClassName)}>{children}</div>
     </section>
   );
 }

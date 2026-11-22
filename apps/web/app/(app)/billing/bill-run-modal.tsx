@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ActionForm, Submit, useActionResult } from "@/components/action-form";
 import { Button, buttonClass, cx, Notice } from "@/components/ui";
 import { formatDate, formatINR, periodLabel, periodOf, today } from "@sb/core/src/money-dates-client";
+import { compareClasses } from "@/lib/classes";
 import { runBilling } from "./actions";
 
 interface ClassItem {
@@ -243,6 +244,7 @@ export function BillRunModal({
   const initialPeriod = now >= minPeriod && now <= maxPeriod ? now : minPeriod;
 
   const [period, setPeriod] = useState(initialPeriod);
+  const sortedClasses = useMemo(() => [...classes].sort(compareClasses), [classes]);
   const [selectedClasses, setSelectedClasses] = useState<Set<number>>(new Set());
 
   useEffect(() => {
@@ -479,7 +481,7 @@ export function BillRunModal({
                     </p>
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto p-1">
-                      {classes.map((c) => {
+                      {sortedClasses.map((c) => {
                         const checked = selectedClasses.has(c.id);
                         return (
                           <label

@@ -3,6 +3,7 @@ export * from "./money";
 export * from "./dates";
 export * from "./branding";
 export * from "./printing";
+export * from "./classes";
 export * as accounts from "./accounts";
 export type { SessionUser, Permission } from "./accounts";
 export { can, ROLE_ACCESS } from "./accounts";

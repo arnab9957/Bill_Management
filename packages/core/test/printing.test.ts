@@ -79,6 +79,12 @@ describe("rows of the school's grid", () => {
     expect(total).toBe(1234);
     expect(rows.at(-1)!.label).toBe("Other");
   });
+
+  it("marks refundable fee heads on print rows", () => {
+    const cautionMoney = head(8, "Caution Money", 6, { isRefundable: true });
+    const { rows } = buildPrintRows([cautionMoney], []);
+    expect(rows[0]!.isRefundable).toBe(true);
+  });
 });
 
 describe("Rs. and P. columns", () => {

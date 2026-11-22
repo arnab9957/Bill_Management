@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { compareClasses } from "@/lib/classes";
 import {
   extractAdmissionFormData,
   getAdmissionDraft,
@@ -233,7 +234,8 @@ export function StudentInputs({
     secId ? m.sections.find((section) => section.id === secId)?.name : null;
 
   // Class and Section selection
-  const defaultClass = cls ?? (isNew && m.classes[0] ? m.classes[0].id : "");
+  const sortedClasses = useMemo(() => [...m.classes].sort(compareClasses), [m.classes]);
+  const defaultClass = cls ?? (isNew && sortedClasses[0] ? sortedClasses[0].id : "");
   const [selectedClassId, setSelectedClassId] = useState<number | "">(defaultClass);
 
   const availableSections = selectedClassId
@@ -564,7 +566,7 @@ export function StudentInputs({
             required
           >
             <option value="">Select class</option>
-            {m.classes.map((c) => (
+            {sortedClasses.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>

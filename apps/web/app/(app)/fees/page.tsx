@@ -1,24 +1,24 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
-import { fees, getSettings, toRupeeString } from "@sb/core";
+import { fees, getSettings, toRupeeString, schoolLogoDataUri } from "@sb/core";
 import { requireRole } from "@/lib/auth";
 import { getWorkingYear } from "@/lib/year";
 import { formObject, run, type ActionState } from "@/lib/action";
 import { ActionForm, FieldError, Submit } from "@/components/action-form";
 import { Card, LinkButton, Money, PageHeader } from "@/components/ui";
 import { ReceiptRowsManager } from "./receipt-rows-manager";
-import { AddFeeHeadSection } from "./add-fee-head";
+import { FeeHeadFormCard } from "./add-fee-head";
+import { FeeHeadsProvider } from "./fee-heads-context";
 
 async function addHead(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
   const u = await requireRole("fees");
-  const isCustom = fd.get("preset") === "__custom__";
-  const name = String(isCustom ? fd.get("customName") : fd.get("name") ?? "").trim();
+  const name = String(fd.get("name") || fd.get("customName") || "").trim();
   if (!name) return { ok: false, message: "Enter a fee head name", errors: { name: "Required" } };
 
-  let code = String(isCustom ? (fd.get("customCode") || name) : fd.get("code") ?? "").trim().toUpperCase();
-  code = code.replace(/[^A-Z0-9_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
-  if (!code) code = "FEE_" + Date.now().toString(36).toUpperCase();
+  // Use preset code if available; otherwise code is auto-generated on backend from name
+  const rawCode = String(fd.get("code") ?? "").trim().toUpperCase();
+  const code = rawCode ? rawCode.replace(/[^A-Z0-9_]/g, "_").slice(0, 32) : undefined;
 
   const type = String(fd.get("type") || fd.get("customType") || "recurring") as "recurring" | "one_time" | "optional";
   const isRefundable = fd.has("isRefundable");
@@ -46,6 +46,35 @@ async function addHead(_: ActionState, fd: FormData): Promise<ActionState> {
   revalidatePath("/fees");
   return r;
 }
+
+async function editHead(_: ActionState, fd: FormData): Promise<ActionState> {
+  "use server";
+  const u = await requireRole("fees");
+  const id = Number(fd.get("id"));
+  const name = String(fd.get("name") ?? "").trim();
+  if (!name) return { ok: false, message: "Enter a fee head name", errors: { name: "Required" } };
+
+  const rawCode = String(fd.get("code") ?? "").trim().toUpperCase();
+  const type = String(fd.get("type") || "recurring") as "recurring" | "one_time" | "optional";
+  const isRefundable = fd.has("isRefundable");
+
+  const r = await run(
+    () => fees.updateFeeHead(u, { id, name, code: rawCode || undefined, type, isRefundable }),
+    `Fee head "${name}" updated`
+  );
+  revalidatePath("/fees");
+  return r;
+}
+
+async function deleteHead(_: ActionState, fd: FormData): Promise<ActionState> {
+  "use server";
+  const u = await requireRole("fees");
+  const id = Number(fd.get("id"));
+  const r = await run(() => fees.deleteFeeHead(u, id), "Fee head deleted");
+  revalidatePath("/fees");
+  return r;
+}
+
 async function addConcession(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
   const u = await requireRole("fees");
@@ -53,6 +82,7 @@ async function addConcession(_: ActionState, fd: FormData): Promise<ActionState>
   revalidatePath("/fees");
   return r;
 }
+
 async function saveRows(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
   const u = await requireRole("fees");
@@ -72,6 +102,7 @@ async function saveRows(_: ActionState, fd: FormData): Promise<ActionState> {
   revalidatePath("/fees");
   return r ? { ok: r.ok, message: r.message, errors: r.errors } : r;
 }
+
 async function saveLate(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
   const u = await requireRole("fees");
@@ -79,6 +110,7 @@ async function saveLate(_: ActionState, fd: FormData): Promise<ActionState> {
   revalidatePath("/fees");
   return r;
 }
+
 async function copy(_: ActionState, fd: FormData): Promise<ActionState> {
   "use server";
   const u = await requireRole("fees");
@@ -93,87 +125,180 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const current = (await getWorkingYear()).year;
   const yearId = Number((await searchParams).year ?? current?.id);
   const year = m.years.find((y) => y.id === yearId);
-  const concessionsOn = (await getSettings()).concessionsEnabled;
-  const [structs, conc, late] = await Promise.all([fees.listStructures(yearId), fees.listConcessionTypes(), fees.getLateFeeRule(yearId)]);
-  return (
-    <div className="space-y-5">
-      <PageHeader title="Fee setup" actions={
-        <form className="toolbar"><select name="year" defaultValue={yearId}>{m.years.map((y) => <option key={y.id} value={y.id}>{y.name}{y.isCurrent ? " (current)" : ""}</option>)}</select><button className="filter-button">Go</button></form>
-      } />
-      <Card
-        title={`Fee structures ${year?.name ?? ""}`}
-        actions={<LinkButton variant="secondary" size="sm" href="/settings?open=classes-sections#classes-sections">Manage classes</LinkButton>}
-      >
-        <table className="data">
-          <thead>
-            <tr>
-              <th>Class</th>
-              <th className="text-center">Heads</th>
-              <th className="text-center">Monthly</th>
-              <th className="text-center">Yearly total</th>
-              <th className="text-center" />
-            </tr>
-          </thead>
-          <tbody>{structs.map((s) => (
-            <tr key={s.classId}>
-              <td>{s.className}</td>
-              <td className="text-center tabular-nums">{s.items}</td>
-              <td className="text-center"><Money p={s.monthly} /></td>
-              <td className="text-center"><Money p={s.annualTotal} /></td>
-              <td className="text-center">
-                <Link className="text-ink hover:underline" href={`/fees/structure/${yearId}/${s.classId}`}>
-                  {s.items ? "Edit" : "Set up"}
-                </Link>
-              </td>
-            </tr>
-          ))}</tbody>
-        </table>
-        <ActionForm action={copy} className="mt-4 flex flex-wrap items-end gap-2 border-t border-gray-100 pt-4">
-          <span className="text-sm">Copy all structures from</span>
-          <select name="from">{m.years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}</select>
-          <span className="text-sm">to</span>
-          <select name="to" defaultValue={yearId}>{m.years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}</select>
-          <label className="flex items-center gap-1 text-sm">hike %<input name="hike" type="number" step="0.1" defaultValue={0} className="w-20" /></label>
-          <Submit variant="secondary" confirm="Copy structures? Existing heads in the target year are kept.">Copy</Submit>
-        </ActionForm>
-      </Card>
+  const settings = await getSettings();
+  const concessionsOn = settings.concessionsEnabled;
+  const [structs, conc, late, logoSrc] = await Promise.all([
+    fees.listStructures(yearId),
+    fees.listConcessionTypes(),
+    fees.getLateFeeRule(yearId),
+    schoolLogoDataUri(),
+  ]);
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card title="Add Fee Heads">
-          <AddFeeHeadSection existingHeads={m.heads} action={addHead} />
+  return (
+    <FeeHeadsProvider>
+      <div className="space-y-5">
+        <PageHeader title="Fee setup" actions={
+          <form className="toolbar"><select name="year" defaultValue={yearId}>{m.years.map((y) => <option key={y.id} value={y.id}>{y.name}{y.isCurrent ? " (current)" : ""}</option>)}</select><button className="filter-button">Go</button></form>
+        } />
+        <Card
+          title={`Fee structures ${year?.name ?? ""}`}
+          actions={<LinkButton variant="secondary" size="sm" href="/settings?open=classes-sections#classes-sections">Manage classes</LinkButton>}
+        >
+          <table className="data">
+            <thead>
+              <tr>
+                <th>Class</th>
+                <th className="text-center">Heads</th>
+                <th className="text-center">Monthly</th>
+                <th className="text-center">Yearly total</th>
+                <th className="text-center" />
+              </tr>
+            </thead>
+            <tbody>{structs.map((s) => (
+              <tr key={s.classId}>
+                <td>{s.className}</td>
+                <td className="text-center tabular-nums">{s.items}</td>
+                <td className="text-center"><Money p={s.monthly} /></td>
+                <td className="text-center"><Money p={s.annualTotal} /></td>
+                <td className="text-center">
+                  <Link className="text-ink hover:underline" href={`/fees/structure/${yearId}/${s.classId}`}>
+                    {s.items ? "Edit" : "Set up"}
+                  </Link>
+                </td>
+              </tr>
+            ))}</tbody>
+          </table>
+          <ActionForm action={copy} className="mt-4 flex flex-wrap items-end gap-2 border-t border-gray-100 pt-4">
+            <span className="text-sm">Copy all structures from</span>
+            <select name="from">{m.years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}</select>
+            <span className="text-sm">to</span>
+            <select name="to" defaultValue={yearId}>{m.years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}</select>
+            <label className="flex items-center gap-1 text-sm">hike %<input name="hike" type="number" step="0.1" defaultValue={0} className="w-20" /></label>
+            <Submit variant="secondary" confirm="Copy structures? Existing heads in the target year are kept.">Copy</Submit>
+          </ActionForm>
         </Card>
+
+        {/* Full-width: Add Fee Heads */}
+        <FeeHeadFormCard
+          existingHeads={m.heads}
+          addAction={addHead}
+          editAction={editHead}
+        />
 
         {concessionsOn && (
-        <Card title="Concession types">
-          <table className="data"><thead><tr><th>Name</th><th>Value</th><th>Applies to</th></tr></thead>
-            <tbody>{conc.map(({ t, headName }) => <tr key={t.id}><td>{t.name}</td><td>{t.kind === "percent" ? `${t.value / 100}%` : <Money p={t.value} />}</td><td>{headName ?? "All heads"}</td></tr>)}</tbody></table>
-          <ActionForm action={addConcession} className="mt-3 flex flex-wrap gap-2" resetOnSuccess>
-            <input name="name" placeholder="Name (e.g. Merit)" required />
-            <select name="kind"><option value="percent">%</option><option value="flat">Flat ₹</option></select>
-            <input name="value" placeholder="Value" className="w-20" required />
-            <select name="feeHeadId"><option value="">All heads</option>{m.heads.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}</select>
-            <Submit variant="secondary">Add</Submit><FieldError name="value" />
-          </ActionForm>
-          <p className="mt-2 text-xs text-gray-500">Attach a concession to a student from their profile; it needs Accountant/Admin approval.</p>
-        </Card>
+          <Card title="Concession types">
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Value</th>
+                  <th>Applies to</th>
+                </tr>
+              </thead>
+              <tbody>
+                {conc.map(({ t, headName }) => (
+                  <tr key={t.id}>
+                    <td>{t.name}</td>
+                    <td>{t.kind === "percent" ? `${t.value / 100}%` : <Money p={t.value} />}</td>
+                    <td>{headName ?? "All heads"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <ActionForm action={addConcession} className="mt-3 flex flex-wrap gap-2" resetOnSuccess>
+              <input name="name" placeholder="Name (e.g. Merit)" required />
+              <select name="kind">
+                <option value="percent">%</option>
+                <option value="flat">Flat ₹</option>
+              </select>
+              <input name="value" placeholder="Value" className="w-20" required />
+              <select name="feeHeadId">
+                <option value="">All heads</option>
+                {m.heads.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.name}
+                  </option>
+                ))}
+              </select>
+              <Submit variant="secondary">Add</Submit>
+              <FieldError name="value" />
+            </ActionForm>
+            <p className="mt-2 text-xs text-gray-500">
+              Attach a concession to a student from their profile; it needs Accountant/Admin approval.
+            </p>
+          </Card>
         )}
 
-        <Card title={`Late fee rule ${year?.name ?? ""}`}>
-          <ActionForm action={saveLate} className="grid grid-cols-2 gap-3">
+        {/* Full-width: Setup Late Fee Rule */}
+        <Card title={`Setup late fee rule ${year?.name ? `(${year.name})` : ""}`}>
+          <ActionForm action={saveLate} className="flex flex-wrap items-end gap-3 sm:gap-4">
             <input type="hidden" name="academicYearId" value={yearId} />
-            <label className="flex flex-col gap-1">Grace days<input name="graceDays" type="number" defaultValue={late?.graceDays ?? 5} /></label>
-            <label className="flex flex-col gap-1">Kind<select name="kind" defaultValue={late?.kind ?? "per_day"}><option value="per_day">₹ per day late</option><option value="flat">Flat ₹ once</option><option value="percent">% of bill once</option></select></label>
-            <label className="flex flex-col gap-1">Amount (₹ or %)<input name="amount" defaultValue={late ? (late.kind === "percent" ? String(late.amount / 100) : toRupeeString(late.amount)) : "10"} /><FieldError name="amount" /></label>
-            <label className="flex flex-col gap-1">Maximum per bill (₹, 0 = none)<input name="maxCap" defaultValue={late ? toRupeeString(late.maxCap) : "500"} /></label>
-            <label className="flex items-center gap-2"><input type="checkbox" name="isActive" defaultChecked={late?.isActive ?? true} />Active</label>
-            <div><Submit>Save rule</Submit></div>
+            <label className="flex flex-col gap-1 min-w-[120px]">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">Grace days</span>
+              <input name="graceDays" type="number" defaultValue={late?.graceDays ?? 5} className="w-28 text-sm" />
+            </label>
+            <label className="flex flex-col gap-1 min-w-[160px]">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">Kind</span>
+              <select name="kind" defaultValue={late?.kind ?? "per_day"} className="text-sm">
+                <option value="per_day">₹ per day late</option>
+                <option value="flat">Flat ₹ once</option>
+                <option value="percent">% of bill once</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 min-w-[140px]">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">Amount (₹ or %)</span>
+              <input
+                name="amount"
+                defaultValue={
+                  late
+                    ? late.kind === "percent"
+                      ? String(late.amount / 100)
+                      : toRupeeString(late.amount)
+                    : "10"
+                }
+                className="w-32 text-sm"
+              />
+              <FieldError name="amount" />
+            </label>
+            <label className="flex flex-col gap-1 min-w-[160px]">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                Maximum per bill (₹, 0 = none)
+              </span>
+              <input
+                name="maxCap"
+                defaultValue={late ? toRupeeString(late.maxCap) : "500"}
+                className="w-36 text-sm"
+              />
+            </label>
+            <label className="flex items-center gap-2 pb-2 text-xs font-medium cursor-pointer select-none">
+              <input
+                type="checkbox"
+                name="isActive"
+                defaultChecked={late?.isActive ?? true}
+                className="h-4 w-4 rounded text-accent"
+              />
+              <span>Active</span>
+            </label>
+            <div className="pb-0.5">
+              <Submit>Save rule</Submit>
+            </div>
           </ActionForm>
         </Card>
-      </div>
 
-      <Card title="Rows printed on receipts and bills">
-        <ReceiptRowsManager initialHeads={m.heads} saveRowsAction={saveRows} />
-      </Card>
-    </div>
+        <ReceiptRowsManager
+          initialHeads={m.heads}
+          saveRowsAction={saveRows}
+          deleteHeadAction={deleteHead}
+          school={{
+            name: settings.name,
+            address: settings.address,
+            headerSubtitle: settings.headerSubtitle,
+            udiseCode: settings.udiseCode,
+            registrationNote: settings.registrationNote,
+          }}
+          logoSrc={logoSrc ?? undefined}
+        />
+      </div>
+    </FeeHeadsProvider>
   );
 }

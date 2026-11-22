@@ -53,12 +53,13 @@ function Chevron({ open }: { open: boolean }) {
   </svg>;
 }
 
-export function CollapsibleSection({ id, title, subtitle, children, actions }: {
+export function CollapsibleSection({ id, title, subtitle, children, actions, overflowVisible }: {
   id: string;
   title: string;
   subtitle?: ReactNode;
   children: ReactNode;
   actions?: ReactNode;
+  overflowVisible?: boolean;
 }) {
   const { open, toggle } = useSectionCollapse(id);
   const sectionRef = useRef<HTMLElement>(null);
@@ -74,7 +75,15 @@ export function CollapsibleSection({ id, title, subtitle, children, actions }: {
   };
 
   return (
-    <section ref={sectionRef} id={id} className={cx(panelClass, "scroll-mt-24 transition-shadow hover:shadow-[0_6px_20px_-14px_rgba(16,24,40,0.22)]")}>
+    <section
+      ref={sectionRef}
+      id={id}
+      className={cx(
+        panelClass,
+        "scroll-mt-24 transition-shadow hover:shadow-[0_6px_20px_-14px_rgba(16,24,40,0.22)]",
+        overflowVisible && "!overflow-visible"
+      )}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 bg-gray-50/70 px-5 py-4 sm:px-6">
         <button type="button" onClick={handleToggle} aria-expanded={open} aria-controls={`settings-section-${id}`} className="group flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left">
           <span className={cx("grid h-8 w-8 shrink-0 place-items-center rounded-lg border transition-colors", open ? "border-accent/20 bg-accent-soft text-accent-ink" : "border-gray-200 bg-subtle text-gray-500 group-hover:border-accent/40 group-hover:text-accent-ink")}>
@@ -87,7 +96,7 @@ export function CollapsibleSection({ id, title, subtitle, children, actions }: {
         </button>
         {actions && <div className="shrink-0">{actions}</div>}
       </div>
-      {open && <div id={`settings-section-${id}`} className="p-5 sm:p-6">{children}</div>}
+      {open && <div id={`settings-section-${id}`} className={cx("p-5 sm:p-6", overflowVisible && "overflow-visible")}>{children}</div>}
     </section>
   );
 }

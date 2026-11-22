@@ -147,7 +147,10 @@ export type ImportRow = z.infer<typeof importRowSchema>;
 // ---------------------------------------------------------------- fees
 export const frequencies = ["monthly", "quarterly", "half_yearly", "annual", "one_time"] as const;
 export const feeHeadSchema = z.object({
-  code: z.string().trim().toUpperCase().pipe(z.string().regex(/^[A-Z0-9_]+$/, "Use A-Z, 0-9, _")),
+  code: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() ? v.trim().toUpperCase() : undefined),
+    z.string().regex(/^[A-Z0-9_]+$/, "Use A-Z, 0-9, _").optional(),
+  ),
   name: z.string().trim().min(1),
   type: z.enum(["recurring", "one_time", "optional"]),
   isRefundable: checkbox,

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { compareClasses } from "@/lib/classes";
 
 interface ClassItem {
   id: number;
@@ -42,6 +43,7 @@ export function StudentFilters({
   const searchParams = useSearchParams();
 
   const [q, setQ] = useState(defaultQ ?? "");
+  const sortedClasses = useMemo(() => [...classes].sort(compareClasses), [classes]);
 
   // Typed an exact admission number: open that student straight away.
   // replace (not push) so the browser's Back button doesn't land on this search and re-open the student.
@@ -196,7 +198,7 @@ export function StudentFilters({
         aria-label="Filter by class"
       >
         <option value="">All classes</option>
-        {classes.map((c) => (
+        {sortedClasses.map((c) => (
           <option key={c.id} value={c.id}>
             {c.name}
           </option>

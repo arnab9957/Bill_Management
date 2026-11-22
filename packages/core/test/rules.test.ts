@@ -4,6 +4,7 @@ import { addDays, daysBetween, monthOffset } from "../src/dates";
 import {
   allocateOldestFirst, concessionFor, deriveStatus, isDueInPeriod, lateFeeTarget, validateManualAllocation, type ScheduleItem,
 } from "../src/billing/rules";
+import { generateFeeHeadCode } from "../src/fees";
 
 describe("money", () => {
   it("rejects fractional paise", () => {
@@ -249,5 +250,13 @@ describe("admission & roll auto-generation sequence", async () => {
     // 1 digit with section prefix: B-1, B-2
     const rollCfg3 = { digits: 1, prefixSection: true, startNumber: 1 };
     expect(computeNextRollNumber(["B-1", "B-2"], rollCfg3, "B")).toBe("B-3");
+  });
+
+  it("auto-generates clean, safe fee head codes from names", () => {
+    expect(generateFeeHeadCode("Smart Class Fee")).toBe("SMART_CLASS_FEE");
+    expect(generateFeeHeadCode("Computer & Lab Charges")).toBe("COMPUTER_LAB_CHARGES");
+    expect(generateFeeHeadCode("Sports / Games")).toBe("SPORTS_GAMES");
+    expect(generateFeeHeadCode("   Exam-Fee.2026   ")).toBe("EXAM_FEE_2026");
+    expect(generateFeeHeadCode("A".repeat(50)).length).toBeLessThanOrEqual(32);
   });
 });
