@@ -8,6 +8,7 @@ import { ActionForm, FieldError, Submit } from "@/components/action-form";
 import { LinkButton } from "@/components/ui";
 import Link from "next/link";
 import { ClassesSectionsManager } from "./classes-sections";
+import { FolderPicker } from "@/components/folder-picker";
 import { CollapsibleSection, SectionCollapseProvider } from "./section-collapse";
 import { ProfileSection } from "./profile-section";
 import { NumberingFormatFields } from "./numbering-format-fields";
@@ -312,7 +313,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <span className="flex items-baseline gap-1.5">
               Backup folder <span className="text-xs font-normal text-gray-500">(second disk recommended)</span>
             </span>
-            <input name="backupPath" defaultValue={s.backupPath ?? ""} placeholder="D:\SchoolBackups" />
+            <FolderPicker name="backupPath" defaultValue={s.backupPath ?? ""} placeholder="D:\SchoolBackups" />
           </label>
           <label className="flex items-start gap-2"><input type="checkbox" name="concessionsEnabled" defaultChecked={s.concessionsEnabled} className="mt-0.5" />
             <span>Fee concessions <span className={hint}>— sibling, staff ward or merit discounts applied to new bills.</span></span></label>
