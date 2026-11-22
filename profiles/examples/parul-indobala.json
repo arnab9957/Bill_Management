@@ -12,7 +12,7 @@
   },
   "academicYear": { "name": "2026-27", "startDate": "2026-04-01", "endDate": "2027-03-31" },
   "classes": [
-    { "name": "S-I", "sections": ["A"] }
+    { "name": "Class I", "sections": ["A"] }
   ],
   "feeHeads": [
     { "code": "TUITION", "name": "Tuition Fee", "type": "recurring", "receiptOrder": 1, "receiptLabel": "Tuition Fees" },

@@ -93,19 +93,43 @@ export const PRESET_CLASSES: PresetClass[] = [
   { name: "Nursery", keywords: ["nursery", "nurs", "pre nursery", "pre-nursery", "early"] },
   { name: "LKG", keywords: ["lkg", "lower kg", "lower kindergarten", "jr kg", "junior kg", "kg 1", "kg1", "kg i", "pp1", "pp 1"] },
   { name: "UKG", keywords: ["ukg", "upper kg", "upper kindergarten", "sr kg", "senior kg", "kg 2", "kg2", "kg ii", "pp2", "pp 2", "prep"] },
-  { name: "Class I", keywords: ["1", "1st", "first", "i", "std 1", "std i", "grade 1", "class 1"] },
-  { name: "Class II", keywords: ["2", "2nd", "second", "ii", "std 2", "std ii", "grade 2", "class 2"] },
-  { name: "Class III", keywords: ["3", "3rd", "third", "iii", "std 3", "std iii", "grade 3", "class 3"] },
-  { name: "Class IV", keywords: ["4", "4th", "fourth", "iv", "std 4", "std iv", "grade 4", "class 4"] },
-  { name: "Class V", keywords: ["5", "5th", "fifth", "v", "std 5", "std v", "grade 5", "class 5"] },
-  { name: "Class VI", keywords: ["6", "6th", "sixth", "vi", "std 6", "std vi", "grade 6", "class 6"] },
-  { name: "Class VII", keywords: ["7", "7th", "seventh", "vii", "std 7", "std vii", "grade 7", "class 7"] },
-  { name: "Class VIII", keywords: ["8", "8th", "eighth", "viii", "std 8", "std viii", "grade 8", "class 8"] },
-  { name: "Class IX", keywords: ["9", "9th", "ninth", "ix", "std 9", "std ix", "grade 9", "class 9"] },
-  { name: "Class X", keywords: ["10", "10th", "tenth", "x", "std 10", "std x", "grade 10", "class 10", "matric"] },
-  { name: "Class XI", keywords: ["11", "11th", "eleventh", "xi", "std 11", "std xi", "grade 11", "class 11", "first year", "plus one"] },
-  { name: "Class XII", keywords: ["12", "12th", "twelfth", "xii", "std 12", "std xii", "grade 12", "class 12", "second year", "plus two"] },
+  { name: "Class I", keywords: ["1", "1st", "first", "i", "std 1", "std i", "grade 1", "class 1", "s-i", "s i", "s1", "s.i", "class-i"] },
+  { name: "Class II", keywords: ["2", "2nd", "second", "ii", "std 2", "std ii", "grade 2", "class 2", "s-ii", "s ii", "s2", "s.ii", "class-ii"] },
+  { name: "Class III", keywords: ["3", "3rd", "third", "iii", "std 3", "std iii", "grade 3", "class 3", "class-iii"] },
+  { name: "Class IV", keywords: ["4", "4th", "fourth", "iv", "std 4", "std iv", "grade 4", "class 4", "class-iv"] },
+  { name: "Class V", keywords: ["5", "5th", "fifth", "v", "std 5", "std v", "grade 5", "class 5", "class-v"] },
+  { name: "Class VI", keywords: ["6", "6th", "sixth", "vi", "std 6", "std vi", "grade 6", "class 6", "class-vi"] },
+  { name: "Class VII", keywords: ["7", "7th", "seventh", "vii", "std 7", "std vii", "grade 7", "class 7", "class-vii"] },
+  { name: "Class VIII", keywords: ["8", "8th", "eighth", "viii", "std 8", "std viii", "grade 8", "class 8", "class-viii"] },
+  { name: "Class IX", keywords: ["9", "9th", "ninth", "ix", "std 9", "std ix", "grade 9", "class 9", "class-ix"] },
+  { name: "Class X", keywords: ["10", "10th", "tenth", "x", "std 10", "std x", "grade 10", "class 10", "matric", "class-x"] },
+  { name: "Class XI", keywords: ["11", "11th", "eleventh", "xi", "std 11", "std xi", "grade 11", "class 11", "first year", "plus one", "class-xi"] },
+  { name: "Class XII", keywords: ["12", "12th", "twelfth", "xii", "std 12", "std xii", "grade 12", "class 12", "second year", "plus two", "class-xii"] },
 ];
+
+/**
+ * Checks whether a given class name matches a preset class.
+ * Matches by exact name, keyword aliases (e.g. "I", "S-I", "1", "Class 1"),
+ * or equivalent canonical educational rank.
+ */
+export function isClassPresetMatch(preset: PresetClass, className: string): boolean {
+  if (!className) return false;
+  const c = className.trim().toLowerCase();
+  const p = preset.name.toLowerCase();
+  if (c === p) return true;
+  if (preset.keywords.some((k) => k === c)) return true;
+  const rankC = computeClassSortOrder(className);
+  const rankP = computeClassSortOrder(preset.name);
+  return rankC > 0 && rankC < 5000 && rankC === rankP;
+}
+
+/**
+ * Finds the preset class that matches the given class name or query.
+ */
+export function findMatchingPreset(className: string): PresetClass | undefined {
+  if (!className) return undefined;
+  return PRESET_CLASSES.find((p) => isClassPresetMatch(p, className));
+}
 
 /** Computes canonical sort order for any class name */
 export function classOrder(name: string): number {

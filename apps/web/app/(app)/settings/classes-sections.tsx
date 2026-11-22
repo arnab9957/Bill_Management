@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useFormStatus } from "react-dom";
 import { ActionForm, FieldError, Submit } from "@/components/action-form";
 import { buttonClass, cx } from "@/components/ui";
-import { PRESET_CLASSES, type PresetClass, compareClasses } from "@/lib/classes";
+import { PRESET_CLASSES, type PresetClass, compareClasses, isClassPresetMatch, findMatchingPreset } from "@/lib/classes";
 import type { ActionState } from "@/lib/action";
 import { CollapsibleSection } from "./section-collapse";
 
@@ -11,7 +11,8 @@ function matchesClassPreset(p: PresetClass, query: string): boolean {
   if (!query) return true;
   const q = query.toLowerCase().trim();
   if (p.name.toLowerCase().includes(q)) return true;
-  return p.keywords.some((k) => k === q || k.includes(q) || q.includes(k));
+  if (p.keywords.some((k) => k === q || k.includes(q) || q.includes(k))) return true;
+  return isClassPresetMatch(p, query);
 }
 
 function scoreClassPreset(p: PresetClass, query: string): number {
@@ -19,12 +20,13 @@ function scoreClassPreset(p: PresetClass, query: string): number {
   const q = query.toLowerCase().trim();
   const nameLower = p.name.toLowerCase();
   if (nameLower === q) return 100;
+  if (p.keywords.some((k) => k === q)) return 95;
+  if (isClassPresetMatch(p, query)) return 90;
   if (nameLower.startsWith(q)) return 80;
   if (nameLower.includes(q)) return 60;
-  if (p.keywords.some((k) => k === q)) return 50;
-  if (p.keywords.some((k) => k.startsWith(q))) return 30;
-  if (p.keywords.some((k) => k.includes(q))) return 20;
-  if (p.keywords.some((k) => q.includes(k))) return 15;
+  if (p.keywords.some((k) => k.startsWith(q))) return 50;
+  if (p.keywords.some((k) => k.includes(q))) return 30;
+  if (p.keywords.some((k) => q.includes(k))) return 20;
   return 0;
 }
 
@@ -129,8 +131,9 @@ export function ClassesSectionsManager({
   }, [className]);
 
   const hasExactMatch = useMemo(() => {
-    const q = className.trim().toLowerCase();
-    return PRESET_CLASSES.some((p) => p.name.toLowerCase() === q);
+    const q = className.trim();
+    if (!q) return false;
+    return Boolean(findMatchingPreset(q));
   }, [className]);
 
   const showCustomOption = Boolean(className.trim() && !hasExactMatch);
@@ -280,8 +283,9 @@ export function ClassesSectionsManager({
                     {filteredPresets.length > 0 ? (
                       filteredPresets.map((p, index) => {
                         const isHighlighted = highlightedIndex === index;
-                        const alreadyExists = existingClassNames.has(p.name.toLowerCase());
-                        const isCurrentClass = edit?.mode === "class" && p.name.toLowerCase() === className.toLowerCase();
+                        const matchingClass = classes.find((c) => isClassPresetMatch(p, c.name));
+                        const alreadyExists = Boolean(matchingClass);
+                        const isCurrentClass = edit?.mode === "class" && matchingClass?.id === edit.id;
                         return (
                           <button
                             key={p.name}

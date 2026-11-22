@@ -33,9 +33,9 @@ export const PRESET_HEADS: PresetFeeHead[] = [
   { name: "Badge", code: "BADGE", type: "optional", keywords: ["badge", "pin", "school badge", "monogram", "logo badge"] },
   { name: "Tie", code: "TIE", type: "optional", keywords: ["tie", "necktie", "school tie", "uniform tie"] },
   { name: "Belt", code: "BELT", type: "optional", keywords: ["belt", "waist belt", "school belt", "uniform belt"] },
-  { name: "Book / Diary / Khata", code: "BOOK_KHATA_DIARY", type: "optional", keywords: ["book", "diary", "khata", "notebook", "stationery", "copy", "copies", "school diary", "books"] },
-  { name: "Transfer Certificate", code: "T_CERTIFICATE", type: "optional", keywords: ["transfer", "tc", "slc", "school leaving", "leaving certificate", "migration", "t.c.", "t.c"] },
-  { name: "Admission Form", code: "FORM", type: "optional", keywords: ["form", "prospectus", "admission form", "application form", "registration form"] },
+  { name: "Book+Khata+Diary", code: "BOOK_KHATA_DIARY", type: "optional", keywords: ["book", "diary", "khata", "notebook", "stationery", "copy", "copies", "school diary", "books", "book+khata+diary", "book / diary / khata", "book khata diary"] },
+  { name: "T.Certificate", code: "T_CERTIFICATE", type: "optional", keywords: ["transfer", "tc", "slc", "school leaving", "leaving certificate", "migration", "t.c.", "t.c", "t.certificate", "t certificate", "transfer certificate"] },
+  { name: "Form", code: "FORM", type: "optional", keywords: ["form", "prospectus", "admission form", "application form", "registration form", "school form"] },
   { name: "Miscellaneous", code: "MISC", type: "optional", keywords: ["misc", "miscellaneous", "other", "extra", "general", "sundry"] },
 ];
 
@@ -238,15 +238,17 @@ function scorePreset(p: PresetFeeHead, query: string): number {
   if (!query) return 0;
   const q = query.toLowerCase().trim();
   const nameLower = p.name.toLowerCase();
+  const codeLower = p.code.toLowerCase();
   if (nameLower === q) return 100;
+  if (codeLower === q) return 95;
+  if (p.keywords.some((k) => k.toLowerCase() === q)) return 90;
   if (nameLower.startsWith(q)) return 80;
+  if (codeLower.startsWith(q)) return 70;
   if (nameLower.includes(q)) return 60;
-  if (p.code.toLowerCase() === q) return 50;
-  if (p.code.toLowerCase().includes(q)) return 40;
-  if (p.keywords.some((k) => k === q)) return 35;
-  if (p.keywords.some((k) => k.startsWith(q))) return 30;
-  if (p.keywords.some((k) => k.includes(q))) return 20;
-  if (p.keywords.some((k) => q.includes(k))) return 15;
+  if (p.keywords.some((k) => k.toLowerCase().startsWith(q))) return 50;
+  if (codeLower.includes(q)) return 40;
+  if (p.keywords.some((k) => k.toLowerCase().includes(q))) return 30;
+  if (p.keywords.some((k) => q.includes(k.toLowerCase()))) return 20;
   return 0;
 }
 
@@ -299,7 +301,11 @@ function AddFeeHeadForm({
 
   const hasExactMatch = useMemo(() => {
     const q = headName.trim().toLowerCase();
-    return availablePresets.some((p) => p.name.toLowerCase() === q);
+    return availablePresets.some((p) =>
+      p.name.toLowerCase() === q ||
+      p.code.toLowerCase() === q ||
+      p.keywords.some((k) => k.toLowerCase() === q)
+    );
   }, [availablePresets, headName]);
 
   const showCustomOption = Boolean(headName.trim() && !hasExactMatch);
@@ -379,7 +385,11 @@ function AddFeeHeadForm({
                 setHeadName(val);
                 setIsOpen(true);
                 setHighlightedIndex(-1);
-                const exact = availablePresets.find((p) => p.name.toLowerCase() === val.trim().toLowerCase());
+                const exact = availablePresets.find((p) =>
+                  p.name.toLowerCase() === val.trim().toLowerCase() ||
+                  p.code.toLowerCase() === val.trim().toLowerCase() ||
+                  p.keywords.some((k) => k.toLowerCase() === val.trim().toLowerCase())
+                );
                 if (exact) {
                   setSelectedPresetCode(exact.code);
                   setCategory(exact.type);
