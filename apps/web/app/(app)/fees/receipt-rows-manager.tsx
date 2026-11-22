@@ -31,7 +31,8 @@ interface ReceiptRowsManagerProps {
   logoSrc?: string;
 }
 
-function formatCategory(type: string) {
+function formatCategory(type: string, code?: string, name?: string) {
+  if (code === "LATE_FEE" || name?.toLowerCase() === "late fee") return "As per late";
   if (type === "one_time") return "One-time";
   if (type === "recurring") return "Recurring";
   if (type === "optional") return "Optional";
@@ -49,15 +50,21 @@ export function ReceiptRowsManager({
 }: ReceiptRowsManagerProps) {
   const { startEdit, cancelEdit, editingHead } = useFeeHeads();
 
-  // Sort items: existing receiptOrder first, then any unassigned by name; assign 1..N order
+  // Sort items: existing receiptOrder first, then any unassigned by name; Late Fee is placed at the end by default. Assign 1..N order
   const getSortedInitial = (heads: FeeHeadRow[]) => {
-    const active = heads
+    const isLateFee = (h: FeeHeadRow) => h.code === "LATE_FEE" || h.name.toLowerCase() === "late fee";
+    const nonLate = heads.filter((h) => !isLateFee(h));
+    const lateHeads = heads.filter((h) => isLateFee(h));
+
+    const activeNonLate = nonLate
       .filter((h) => h.receiptOrder != null)
       .sort((a, b) => (a.receiptOrder ?? 0) - (b.receiptOrder ?? 0));
-    const unassigned = heads
+    const unassignedNonLate = nonLate
       .filter((h) => h.receiptOrder == null)
       .sort((a, b) => a.name.localeCompare(b.name));
-    const sorted = [...active, ...unassigned];
+
+    // Place Late Fee at the very end by default
+    const sorted = [...activeNonLate, ...unassignedNonLate, ...lateHeads];
     return sorted.map((h, i) => ({ ...h, receiptOrder: i + 1 }));
   };
 
@@ -88,7 +95,7 @@ export function ReceiptRowsManager({
         fd.append("ids", String(h.id));
         fd.append(`show_${h.id}`, "on");
         fd.append(`order_${h.id}`, String(i + 1));
-        fd.append(`label_${h.id}`, h.receiptLabel ?? "");
+        fd.append(`label_${h.id}`, h.name);
       }
       const res = await saveRowsAction(null, fd);
       if (res?.ok) {
@@ -129,12 +136,6 @@ export function ReceiptRowsManager({
     const reordered = next.map((h, i) => ({ ...h, receiptOrder: i + 1 }));
     setItems(reordered);
     autoSave(reordered);
-  };
-
-  const handleReset = () => {
-    const resetItems = getSortedInitial(initialHeads);
-    setItems(resetItems);
-    autoSave(resetItems);
   };
 
   const handleDelete = async (h: FeeHeadRow) => {
@@ -185,9 +186,9 @@ export function ReceiptRowsManager({
   };
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr] lg:grid-cols-[1.1fr_0.9fr] items-start">
-      {/* Left: Rows printed on receipts and bills manager */}
-      <Card title="Rows printed on receipts and bills">
+    <div id="active-fee-heads" data-section="active-fee-heads" className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr] lg:grid-cols-[1.1fr_0.9fr] items-start scroll-mt-24">
+      {/* Left: Active fee heads, you added */}
+      <Card title="Active fee heads, you added">
         <div className="space-y-4">
           {/* Top bar with auto-save indicator and reset */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
@@ -227,14 +228,6 @@ export function ReceiptRowsManager({
                   Auto-saved
                 </span>
               )}
-
-              <button
-                type="button"
-                onClick={handleReset}
-                className="text-xs font-semibold text-gray-500 hover:text-gray-800 transition px-2 py-1 rounded border border-gray-200 hover:bg-gray-50 ml-1"
-              >
-                Reset
-              </button>
             </div>
           </div>
 
@@ -274,11 +267,10 @@ export function ReceiptRowsManager({
                     return (
                       <tr
                         key={h.id}
-                        className={`transition-colors ${
-                          isCurrentEditing
+                        className={`transition-colors ${isCurrentEditing
                             ? "bg-accent/10 hover:bg-accent/15"
                             : "bg-white hover:bg-subtle/70"
-                        }`}
+                          }`}
                       >
                         {/* Move Up / Down Buttons */}
                         <td className="text-center">
@@ -327,38 +319,52 @@ export function ReceiptRowsManager({
 
                         {/* Category */}
                         <td>
-                          <span className="inline-flex rounded-md bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700">
-                            {formatCategory(h.type)}
+                          <span className={`inline-flex rounded-md px-2.5 py-0.5 text-xs font-semibold ${
+                            h.code === "LATE_FEE" || h.name.toLowerCase() === "late fee"
+                              ? "bg-amber-100 text-amber-900 border border-amber-200"
+                              : "bg-gray-100 text-gray-700"
+                          }`}>
+                            {formatCategory(h.type, h.code, h.name)}
                           </span>
                         </td>
 
                         {/* Edit & Delete Actions */}
                         <td className="text-center">
-                          <div className="inline-flex items-center justify-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => startEdit(h)}
-                              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-gray-700 hover:border-accent hover:bg-accent-soft hover:text-accent-ink transition shadow-2xs"
-                              title={`Edit ${h.name}`}
+                          {h.code === "LATE_FEE" || h.name.toLowerCase() === "late fee" ? (
+                            <a
+                              href="#late-fee-rule"
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold text-accent-ink hover:bg-accent-soft transition"
+                              title="Jump to Late Fee rule setup below"
                             >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                              </svg>
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(h)}
-                              disabled={deletingId === h.id}
-                              className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 hover:text-red-800 transition shadow-2xs disabled:opacity-40"
-                              title={`Delete ${h.name}`}
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                              </svg>
-                              <span>{deletingId === h.id ? "…" : "Delete"}</span>
-                            </button>
-                          </div>
+                              Rule setup ↓
+                            </a>
+                          ) : (
+                            <div className="inline-flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => startEdit(h)}
+                                className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-gray-700 hover:border-accent hover:bg-accent-soft hover:text-accent-ink transition shadow-2xs"
+                                title={`Edit ${h.name}`}
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                                </svg>
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(h)}
+                                disabled={deletingId === h.id}
+                                className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 hover:text-red-800 transition shadow-2xs disabled:opacity-40"
+                                title={`Delete ${h.name}`}
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                </svg>
+                                <span>{deletingId === h.id ? "…" : "Delete"}</span>
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -402,14 +408,16 @@ export function ReceiptRowsManager({
 
                 {/* Banner */}
                 <div className="bg-black text-white text-center font-bold text-xs uppercase tracking-wide py-1 px-2 mb-1 rounded-xs">
-                  {schoolInfo.name || "School Name"}
+                  {schoolInfo.name?.trim() ? schoolInfo.name : "—"}
                 </div>
 
                 {/* School lines */}
-                <div className="text-center text-[10px] leading-tight text-gray-600 mb-2 font-sans">
-                  {schoolInfo.headerSubtitle && <div>{schoolInfo.headerSubtitle}</div>}
-                  {schoolInfo.udiseCode && <div className="font-semibold">U-Dise Code- {schoolInfo.udiseCode}</div>}
-                  {schoolInfo.address && <div>{schoolInfo.address}</div>}
+                <div className="text-center text-[10px] leading-tight text-gray-600 mb-2 font-sans space-y-0.5">
+                  <div>{schoolInfo.headerSubtitle?.trim() ? schoolInfo.headerSubtitle : "—"}</div>
+                  <div className="font-semibold">
+                    {schoolInfo.udiseCode?.trim() ? `U-Dise Code- ${schoolInfo.udiseCode}` : "U-Dise Code- —"}
+                  </div>
+                  <div>{schoolInfo.address?.trim() ? schoolInfo.address : "—"}</div>
                 </div>
 
                 {/* Student Details Grid */}
@@ -446,13 +454,12 @@ export function ReceiptRowsManager({
                         return (
                           <tr
                             key={h.id}
-                            className={`border-b ${isLast ? "border-b-black" : "border-b-gray-300"} text-[11px] transition-colors ${
-                              isCurrentEditing ? "bg-accent/10 font-bold" : ""
-                            }`}
+                            className={`border-b ${isLast ? "border-b-black" : "border-b-gray-300"} text-[11px] transition-colors ${isCurrentEditing ? "bg-accent/10 font-bold" : ""
+                              }`}
                           >
-                            <td className="px-1.5 py-1 border-r border-black truncate max-w-[150px]" title={h.receiptLabel || h.name}>
+                            <td className="px-1.5 py-1 border-r border-black truncate max-w-[150px]" title={h.name}>
                               <span className="inline-flex items-center gap-1.5">
-                                <span className="truncate">{h.receiptLabel || h.name}</span>
+                                <span className="truncate">{h.name}</span>
                                 {h.isRefundable && (
                                   <span className="shrink-0 rounded border border-black/70 px-1 py-0.5 text-[7px] leading-none font-sans font-semibold tracking-tight text-black">
                                     Refundable

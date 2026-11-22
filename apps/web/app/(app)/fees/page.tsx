@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
-import { fees, getSettings, schoolLogoDataUri } from "@sb/core";
+import { fees, getSettings, toRupeeString, schoolLogoDataUri } from "@sb/core";
 import { requireRole } from "@/lib/auth";
 import { getWorkingYear } from "@/lib/year";
 import { formObject, run, type ActionState } from "@/lib/action";
@@ -23,23 +23,33 @@ async function addHead(_: ActionState, fd: FormData): Promise<ActionState> {
   const type = String(fd.get("type") || fd.get("customType") || "recurring") as "recurring" | "one_time" | "optional";
   const isRefundable = fd.has("isRefundable");
   const printOnReceipt = fd.has("printOnReceipt") || !fd.has("preset");
-  const receiptLabel = String(fd.get("receiptLabel") ?? "").trim() || null;
 
   const r = await run(async () => {
     const h = await fees.createFeeHead(u, { code, name, type, isRefundable });
     if (printOnReceipt && h?.id) {
       const m = await fees.masters();
-      const maxOrder = Math.max(0, ...m.heads.map((x) => x.receiptOrder ?? 0));
-      const existingRows = m.heads.map((x) => ({
-        id: x.id,
-        show: x.receiptOrder != null,
-        order: x.receiptOrder,
-        label: x.receiptLabel,
-      }));
-      await fees.saveReceiptRows(u, [
-        ...existingRows,
-        { id: h.id, show: true, order: maxOrder + 1, label: receiptLabel }
-      ]);
+      // Keep Late Fee always at the end
+      const isLate = (head: { code: string; name: string }) => head.code === "LATE_FEE" || head.name.toLowerCase() === "late fee";
+      const lateHead = m.heads.find(isLate);
+      const regularActive = m.heads
+        .filter((x) => x.receiptOrder != null && !isLate(x))
+        .sort((a, b) => (a.receiptOrder ?? 0) - (b.receiptOrder ?? 0));
+
+      const newRows: { id: number; show: boolean; order: number; label: string | null }[] = [];
+      let currentOrder = 1;
+      for (const reg of regularActive) {
+        newRows.push({ id: reg.id, show: true, order: currentOrder++, label: reg.name });
+      }
+      if (!isLate(h)) {
+        newRows.push({ id: h.id, show: true, order: currentOrder++, label: name });
+      }
+      if (lateHead) {
+        newRows.push({ id: lateHead.id, show: true, order: currentOrder++, label: lateHead.name });
+      } else if (isLate(h)) {
+        newRows.push({ id: h.id, show: true, order: currentOrder++, label: name });
+      }
+
+      await fees.saveReceiptRows(u, newRows);
     }
     return h;
   }, printOnReceipt ? `Fee head "${name}" added & scheduled on receipts` : `Fee head "${name}" added`);
@@ -194,15 +204,11 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           </ActionForm>
         </Card>
 
-        {/* Full-width: Add Fee Heads & Late Fee Setup */}
+        {/* Full-width: Add Fee Heads */}
         <FeeHeadFormCard
           existingHeads={m.heads}
           addAction={addHead}
           editAction={editHead}
-          lateAction={saveLate}
-          lateRule={late}
-          yearId={yearId}
-          yearName={year?.name}
         />
 
         {concessionsOn && (
@@ -254,14 +260,68 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
           saveRowsAction={saveRows}
           deleteHeadAction={deleteHead}
           school={{
-            name: settings.name,
-            address: settings.address,
-            headerSubtitle: settings.headerSubtitle,
-            udiseCode: settings.udiseCode,
-            registrationNote: settings.registrationNote,
+            name: settings.name || "",
+            address: settings.address || "",
+            headerSubtitle: settings.headerSubtitle || "",
+            udiseCode: settings.udiseCode || "",
+            registrationNote: settings.registrationNote || "",
           }}
           logoSrc={logoSrc ?? undefined}
         />
+
+        {/* Full-width: Setup Late Fee Rule at end of page */}
+        <div id="late-fee-rule" data-section="late-fee-rule" className="scroll-mt-24">
+          <Card title={`Setup late fee rule ${year?.name ? `(${year.name})` : ""}`}>
+          <ActionForm action={saveLate} className="flex flex-wrap items-end gap-3 sm:gap-4">
+            <input type="hidden" name="academicYearId" value={yearId} />
+            <label className="flex flex-col gap-1 min-w-[120px]">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">Grace days</span>
+              <input name="graceDays" type="number" defaultValue={late?.graceDays ?? 5} className="w-28 text-sm" />
+            </label>
+            <label className="flex flex-col gap-1 min-w-[160px]">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">Kind</span>
+              <select name="kind" defaultValue={late?.kind ?? "per_day"} className="text-sm">
+                <option value="per_day">₹ per day late</option>
+                <option value="flat">Flat ₹ once</option>
+                <option value="percent">% of bill once</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 min-w-[140px]">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">Amount (₹ or %, 0 = none)</span>
+              <input
+                name="amount"
+                defaultValue={
+                  late
+                    ? late.kind === "percent"
+                      ? String(late.amount / 100)
+                      : toRupeeString(late.amount)
+                    : "0"
+                }
+                className="w-32 text-sm"
+              />
+              <FieldError name="amount" />
+            </label>
+            <label className="flex flex-col gap-1 min-w-[160px]">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                Maximum per bill (₹, 0 = none)
+              </span>
+              <input
+                name="maxCap"
+                defaultValue={late ? toRupeeString(late.maxCap) : "500"}
+                className="w-36 text-sm"
+              />
+            </label>
+            <div className="pb-0.5">
+              <Submit
+                variant="secondary"
+                className="!border-accent/40 !bg-accent-soft/80 !text-accent-ink hover:!bg-accent hover:!text-white font-semibold shadow-xs"
+              >
+                Save rule
+              </Submit>
+            </div>
+          </ActionForm>
+        </Card>
+      </div>
       </div>
     </FeeHeadsProvider>
   );

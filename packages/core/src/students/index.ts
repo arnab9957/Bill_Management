@@ -9,7 +9,7 @@ import {
 import { admissionSchema, guardianSchema, importRowSchema, studentEditSchema, fieldErrors, type ImportRow } from "@sb/validation";
 import { AppError, audit, getCurrentYear, getSettings, type Actor } from "../common";
 import { today, type ISODate } from "../dates";
-import { createOpeningBalance } from "../billing";
+import { createOpeningBalance, reformatStudentFeesForClass } from "../billing";
 import { recalcWallet } from "../payments/wallet";
 import { carryForwardDues, promoteStudent, upsertEnrollment } from "./enrollment";
 
@@ -348,6 +348,12 @@ export async function updateStudent(actor: Actor, studentId: number, input: unkn
     }).where(eq(students.id, studentId));
     const [prev] = await tx.select().from(studentEnrollments).where(and(eq(studentEnrollments.studentId, studentId), eq(studentEnrollments.academicYearId, yearId)));
     await upsertEnrollment(tx, { studentId, academicYearId: yearId, classId: d.classId, sectionId: d.sectionId, rollNo: d.rollNo, status: prev?.status ?? "studying" });
+
+    // If class was edited, reformat his unpaid fee amounts as per the edited class fee structure
+    if (prev && prev.classId !== d.classId) {
+      await reformatStudentFeesForClass(tx, actor, studentId, yearId, d.classId);
+    }
+
     const [s] = await tx.select().from(students).where(eq(students.id, studentId));
     await audit(tx, actor, "update", "student", studentId, old, { ...s, academicYearId: yearId });
     return s!;
