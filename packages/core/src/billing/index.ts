@@ -355,3 +355,133 @@ export async function listInvoices(f: { period?: string; classId?: number; statu
     .where(conds.length ? and(...conds) : undefined).orderBy(desc(invoices.id)).limit(f.limit ?? 200);
 }
 
+/**
+ * Reformat fee amounts on unpaid regular invoices for a student when their class changes.
+ * Only touches invoices that have zero payments (paid = 0) and are regular monthly invoices (YYYY-MM).
+ */
+export async function reformatStudentFeesForClass(
+  tx: Executor,
+  actor: Actor,
+  studentId: number,
+  academicYearId: number,
+  newClassId: number,
+) {
+  // 1. Get new class fee structure
+  const [structure] = await tx.select().from(feeStructures)
+    .where(and(eq(feeStructures.academicYearId, academicYearId), eq(feeStructures.classId, newClassId)));
+  if (!structure) return;
+
+  const items = await tx.select({ item: feeStructureItems, head: feeHeads })
+    .from(feeStructureItems)
+    .innerJoin(feeHeads, eq(feeHeads.id, feeStructureItems.feeHeadId))
+    .where(eq(feeStructureItems.structureId, structure.id))
+    .orderBy(asc(feeHeads.sortOrder));
+  if (!items.length) return;
+
+  // 2. Find unpaid regular invoices for this student in this academic year
+  const unpaidInvs = await tx.select().from(invoices)
+    .where(and(
+      eq(invoices.studentId, studentId),
+      eq(invoices.academicYearId, academicYearId),
+      eq(invoices.paid, 0),
+      ne(invoices.status, "cancelled"),
+      like(invoices.period, "____-__"),
+    ));
+  if (!unpaidInvs.length) return;
+
+  // 3. Get student concessions and session details
+  const [studentRow] = await tx.select().from(students).where(eq(students.id, studentId));
+  if (!studentRow) return;
+
+  const conc = await tx.select({ t: concessionTypes }).from(studentConcessions)
+    .innerJoin(concessionTypes, eq(concessionTypes.id, studentConcessions.concessionTypeId))
+    .where(and(
+      eq(studentConcessions.studentId, studentId),
+      eq(studentConcessions.isActive, true),
+      sql`${studentConcessions.approvedBy} is not null`,
+    ));
+  const concessionsOn = (await getSettings(tx)).concessionsEnabled;
+  const concRules: ConcessionRule[] = concessionsOn ? conc.map((c) => ({
+    name: c.t.name,
+    kind: c.t.kind,
+    value: c.t.value,
+    feeHeadId: c.t.feeHeadId,
+  })) : [];
+
+  const sessMap = await allSessions(tx, [academicYearId]);
+  const session = sessMap.get(`${academicYearId}:${newClassId}`);
+  const [transportHead] = await tx.select().from(feeHeads).where(eq(feeHeads.code, "TRANSPORT"));
+  const [route] = studentRow.transportRouteId
+    ? await tx.select().from(transportRoutes).where(eq(transportRoutes.id, studentRow.transportRouteId))
+    : [null];
+
+  for (const inv of unpaidInvs) {
+    const period = inv.period;
+    const periodStart = dateInPeriod(period, 1);
+    const periodEnd = dateInPeriod(period, 28);
+
+    const activeRules = concRules.filter(() => true);
+    const newLines: PlannedLine[] = [];
+    let dueDay = 28;
+
+    for (const { item, head } of items) {
+      if (session) {
+        if (!isDueInPeriod(item, period, session.startDate, { firstInvoiceOfYear: false, alreadyBilledThisYear: true })) {
+          continue;
+        }
+        if (item.frequency === "one_time" && studentRow.admissionDate < session.startDate) {
+          continue;
+        }
+      }
+      const { discount, names } = concessionFor(head.id, item.amount, activeRules);
+      newLines.push({
+        feeHeadId: head.id,
+        description: `${head.name} – ${periodLabel(period)}`,
+        amount: item.amount,
+        discount,
+        net: item.amount - discount,
+        concession: names.join(", ") || undefined,
+      });
+      dueDay = Math.min(dueDay, item.dueDay);
+    }
+
+    if (route && transportHead && route.monthlyFee > 0) {
+      const { discount, names } = concessionFor(transportHead.id, route.monthlyFee, activeRules);
+      newLines.push({
+        feeHeadId: transportHead.id,
+        description: `Transport (${route.name}) – ${periodLabel(period)}`,
+        amount: route.monthlyFee,
+        discount,
+        net: route.monthlyFee - discount,
+        concession: names.join(", ") || undefined,
+      });
+      dueDay = Math.min(dueDay, 10);
+    }
+
+    if (!newLines.length) continue;
+
+    // Remove old lines for this unpaid invoice
+    await tx.delete(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id));
+
+    // Insert new formatted fee lines
+    await tx.insert(invoiceLines).values(newLines.map((l) => ({
+      invoiceId: inv.id,
+      feeHeadId: l.feeHeadId,
+      kind: "fee" as const,
+      description: l.concession ? `${l.description} (${l.concession} concession)` : l.description,
+      amount: l.amount,
+      discount: l.discount,
+      net: l.net,
+    })));
+
+    // Recalculate invoice totals and balance
+    const updatedInv = await recalcInvoice(tx, inv.id);
+    await audit(tx, actor, "update", "invoice", inv.id, { net: inv.net, balance: inv.balance }, {
+      net: updatedInv.net,
+      balance: updatedInv.balance,
+      reformattedForClass: newClassId,
+    });
+  }
+}
+
+

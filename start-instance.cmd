@@ -39,6 +39,7 @@ call pnpm db:migrate || goto :fail
 echo.
 echo  Institute: %CODE%
 echo  Website:   http://%BIND%:%WEBPORT%
+echo  Drizzle:   https://local.drizzle.studio
 echo  Keep this window and the Database window open. Close them to stop.
 echo.
 start "" /min cmd /c "node scripts\wait-port.mjs %WEBPORT% 180 && start "" http://%BIND%:%WEBPORT%"

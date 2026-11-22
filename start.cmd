@@ -24,6 +24,8 @@ rem --- 2. Website already running? Just open it.
 node scripts\wait-port.mjs 3000 0 --check
 if not errorlevel 1 (
   echo The website is already running.
+  echo  Website:  http://127.0.0.1:3000
+  echo  Drizzle:  https://local.drizzle.studio
   start "" http://127.0.0.1:3000
   timeout /t 3 >nul
   exit /b 0
@@ -73,7 +75,7 @@ rem --- 6. Website + reminder worker (this window). Code changes appear on brows
 echo.
 echo  Starting the website and reminder worker...
 echo  Website:  http://127.0.0.1:3000
-echo  DB dashboard:  https://local.drizzle.studio
+echo  Drizzle:  https://local.drizzle.studio
 echo  Keep this window and the Database window open. Close them to stop.
 echo.
 call pnpm dev

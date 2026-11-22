@@ -419,16 +419,18 @@ export function StudentInputs({
       setSelectedSectionId(newSectionId);
     }
 
-    if (isNew || !rollCustomized) {
+    const isClassChanged = Boolean(cls && newClassId !== cls);
+    if (isNew || isClassChanged || !rollCustomized) {
       const autoRoll = computeNextRoll(
         rollsByClassSection,
         newClassId,
         newSectionId,
-        s?.rollNo,
+        isClassChanged ? undefined : s?.rollNo,
         rollFormat,
         getSectionName(newSectionId),
       );
       setRollVal(autoRoll);
+      setRollCustomized(false);
       setRollError("");
       rollRef.current?.setCustomValidity("");
     } else {
@@ -445,16 +447,18 @@ export function StudentInputs({
     const newSectionId = e.target.value ? Number(e.target.value) : "";
     setSelectedSectionId(newSectionId);
 
-    if (isNew || !rollCustomized) {
+    const isClassChanged = Boolean(cls && selectedClassId !== cls);
+    if (isNew || isClassChanged || !rollCustomized) {
       const autoRoll = computeNextRoll(
         rollsByClassSection,
         selectedClassId,
         newSectionId,
-        s?.rollNo,
+        isClassChanged ? undefined : s?.rollNo,
         rollFormat,
         getSectionName(newSectionId),
       );
       setRollVal(autoRoll);
+      setRollCustomized(false);
       setRollError("");
       rollRef.current?.setCustomValidity("");
     } else {

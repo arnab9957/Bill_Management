@@ -37,22 +37,22 @@ describe("rows of the school's grid", () => {
       { feeHeadId: 2, amount: 8000, period: "2026-09" }, { feeHeadId: 1, amount: 47000, period: "2026-09" },
       { feeHeadId: 1, amount: 47000, period: "2026-10" }, { feeHeadId: 2, amount: 8000, period: "2026-10" },
     ]);
-    expect(rows.map((r) => r.label)).toEqual(["Tuition Fees", "Computer fees", "Charges on fine", "Admission Fee", "Miscellaneous"]);
+    expect(rows.map((r) => r.label)).toEqual(["Tuition Fee", "Computer Fee", "Late Fee", "Admission Fee", "Miscellaneous"]);
     expect(rows.map((r) => r.amount)).toEqual([94000, 16000, 0, 0, 0]);
     expect(rows[0]!.period).toBe("Sept To Oct");
     expect(total).toBe(110000);
   });
 
-  it("uses the printed label when set, otherwise the head's name", () => {
+  it("always uses the exact fee head name for printed receipts", () => {
     const { rows } = buildPrintRows(heads, []);
-    expect(rows[0]!.label).toBe("Tuition Fees");
+    expect(rows[0]!.label).toBe("Tuition Fee");
     expect(rows[3]!.label).toBe("Admission Fee");
   });
 
   it("shows months only for recurring heads", () => {
     const { rows } = buildPrintRows(heads, [{ feeHeadId: 4, amount: 100000, period: "2026-04" }, { feeHeadId: 3, amount: 5000, period: "2026-04" }]);
     expect(rows.find((r) => r.label === "Admission Fee")!.period).toBe("");
-    expect(rows.find((r) => r.label === "Charges on fine")!.period).toBe("");
+    expect(rows.find((r) => r.label === "Late Fee")!.period).toBe("");
   });
 
   it("adds a row for a head that is not one of the fixed rows, so nothing is hidden", () => {

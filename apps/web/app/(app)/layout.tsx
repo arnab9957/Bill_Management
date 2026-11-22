@@ -46,6 +46,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const wy = await getWorkingYear();
   return (
     <Shell nav={nav} user={{ fullName: user.fullName, role: user.role }} school={settings.name} logo={{ hasLogo: !!settings.logoPath, version: settings.logoPath ?? "" }} logout={logout}
+      schoolInfo={{ address: settings.address, headerSubtitle: settings.headerSubtitle, udiseCode: settings.udiseCode }}
       year={{ id: wy.year.id, name: wy.year.name, isCurrent: wy.isCurrent, currentName: wy.current.name, options: wy.years.map((y) => ({ id: y.id, name: y.name, isCurrent: y.isCurrent })) }}
       switchYear={switchYear}>
       {children}

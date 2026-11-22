@@ -70,7 +70,7 @@ export function buildPrintRows(heads: readonly PrintHead[], lines: readonly Prin
     if (l.period) cur.periods.push(l.period);
     byHead.set(l.feeHeadId, cur);
   }
-  const label = (h: PrintHead) => h.receiptLabel?.trim() || h.name;
+  const label = (h: PrintHead) => h.name;
   // Months are shown for recurring heads only: a one-time admission fee has no "month".
   const periodFor = (h: PrintHead | null, periods: string[]) => (h?.type === "recurring" ? periodSpan(periods) : "");
 
