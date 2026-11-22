@@ -9,7 +9,7 @@ import { DateGuards } from "./date-guards";
 export interface NavItem { href: string; label: string; key?: string }
 export interface YearInfo { id: number; name: string; isCurrent: boolean; currentName: string; options: { id: number; name: string; isCurrent: boolean }[] }
 
-const ADMIN_HREFS = ["/settings", "/audit"];
+const ADMIN_HREFS = ["/settings", "/settings/users", "/audit"];
 
 const NAV_ICONS: Record<string, ReactNode> = {
   "/": <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>,
@@ -19,6 +19,7 @@ const NAV_ICONS: Record<string, ReactNode> = {
   "/reports": <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>,
   "/promotion": <><path d="M12 20V5M6 11l6-6 6 6" /><path d="M5 20h14" /></>,
   "/notifications":<><path d="M20 15a3 3 0 0 1-3 3H9l-5 3v-6a3 3 0 0 1-1-2.2V7a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3z" /><path d="M8 10h8M8 13h5" /></>,
+  "/settings/users": <><circle cx="9" cy="8" r="3.2" /><path d="M3 20a6 6 0 0 1 12 0" /><path d="M16 11h6M19 8v6" /></>,
   "/settings": <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3v-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3h4v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4h-.2a1.7 1.7 0 0 0-1.6 1z" /></>,
   "/audit": <><path d="M12 3 5 6v5c0 4.5 3 8.5 7 10 4-1.5 7-5.5 7-10V6z" /><path d="m9 12 2 2 4-4" /></>,
 };
@@ -203,7 +204,9 @@ export function Shell({ nav, user, school, logo, children, logout, year, switchY
             </div>
             {nav.map((n, i) => {
               const target = pendingHref ?? path;
-              const active = n.href === "/" ? target === "/" : target.startsWith(n.href);
+              // The closest match wins, so /settings/users lights up "Users" and not "School Settings" too.
+              const best = nav.filter((x) => (x.href === "/" ? target === "/" : target === x.href || target.startsWith(x.href + "/"))).sort((a, b) => b.href.length - a.href.length)[0]?.href;
+              const active = n.href === best;
               const showDivider = i > 0 && ADMIN_HREFS.includes(n.href) && !ADMIN_HREFS.includes(nav[i - 1]?.href ?? "");
               return (
                 <div key={n.href}>
