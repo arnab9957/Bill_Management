@@ -95,6 +95,11 @@ describe("late fees", () => {
     expect(lateFeeTarget({ graceDays: 0, kind: "flat", amount: 10000, maxCap: 0 }, "2026-07-10", "2026-07-20", 0)).toEqual({ total: 10000, step: 1 });
     expect(lateFeeTarget({ graceDays: 0, kind: "percent", amount: 200, maxCap: 0 }, "2026-07-10", "2026-07-11", 250000)).toEqual({ total: 5000, step: 1 });
   });
+  it("amount 0 means no late fee", () => {
+    expect(lateFeeTarget({ graceDays: 0, kind: "flat", amount: 0, maxCap: 0 }, "2026-07-10", "2026-07-20", 0)).toBeNull();
+    expect(lateFeeTarget({ graceDays: 0, kind: "per_day", amount: 0, maxCap: 0 }, "2026-07-10", "2026-07-20", 0)).toBeNull();
+    expect(lateFeeTarget({ graceDays: 0, kind: "percent", amount: 0, maxCap: 0 }, "2026-07-10", "2026-07-20", 250000)).toBeNull();
+  });
 });
 
 describe("allocation", () => {
