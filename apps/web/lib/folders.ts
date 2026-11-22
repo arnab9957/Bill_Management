@@ -35,7 +35,7 @@ export async function listFolders(dir: string): Promise<FolderList> {
 export async function makeFolder(dir: string, name: string): Promise<{ path?: string; error?: string }> {
   await requireRole("settings");
   const clean = name.trim();
-  if (!dir || !clean || /[\/:*?"<>|]/.test(clean)) return { error: "Enter a valid folder name." };
+  if (!dir || !clean || /[\\/:*?"<>|]/.test(clean)) return { error: "Enter a valid folder name." };
   const full = path.join(path.resolve(dir), clean);
   try { await mkdir(full, { recursive: true }); return { path: full }; } catch { return { error: "Couldn't create the folder here." }; }
 }
