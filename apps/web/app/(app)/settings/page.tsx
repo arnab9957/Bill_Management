@@ -5,11 +5,12 @@ import { requireRole } from "@/lib/auth";
 import { formObject, run, type ActionState } from "@/lib/action";
 import { classOrder } from "@/lib/classes";
 import { ActionForm, FieldError, Submit } from "@/components/action-form";
-import { LinkButton } from "@/components/ui";
+import { LinkButton, PageHeader, SectionHeading, cx } from "@/components/ui";
 import Link from "next/link";
 import { ClassesSectionsManager } from "./classes-sections";
+import { AcademicSessionsSection } from "./academic-sessions-section";
 import { FolderPicker } from "@/components/folder-picker";
-import { CollapsibleSection, SectionCollapseProvider } from "./section-collapse";
+import { SectionCollapseProvider, SettingsQuickNav } from "./section-collapse";
 import { ProfileSection } from "./profile-section";
 import { NumberingFormatFields } from "./numbering-format-fields";
 import { SchoolLogoField } from "./school-logo-field";
@@ -169,7 +170,17 @@ async function removeSectionAction(_: ActionState, fd: FormData): Promise<Action
 }
 
 const field = "field-stack";
-const hint = "hint";
+
+const SETTINGS_NAV_ITEMS = [
+  { id: "school-identity", label: "Identity" },
+  { id: "contact-payment", label: "Contact & Payment" },
+  { id: "bills-receipts", label: "Bills & Receipts" },
+  { id: "reminder-timing", label: "Reminders" },
+  { id: "features-backup", label: "Modules & Backup" },
+  { id: "classes-sections", label: "Classes & Sections" },
+  { id: "academic-sessions", label: "Sessions" },
+  { id: "admission-numbering", label: "Numbering" },
+];
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ sy?: string }> }) {
   const { sy: syParam } = await searchParams;
@@ -192,149 +203,183 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   // Class session dates: the year picked with the buttons (?sy=), else the current year.
   const sessYear = m.years.find((y) => y.id === Number(syParam)) ?? currentYear;
   const sessRows = sessYear ? await sessions.listSessions(sessYear.id) : [];
-  const totalStudents = classItems.reduce((n, c) => n + c.students.length, 0);
-  const totalSections = classItems.reduce((n, c) => n + c.sections.length, 0);
 
   return (
     <div className="page-stack">
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-surface shadow-[0_1px_2px_rgba(16,24,40,0.06)]">
-        <div className="border-b border-gray-200/70 bg-tint/70 px-6 py-6 sm:px-8">
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div className="min-w-0">
-              <div className="inline-flex rounded-full bg-highlight-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-ink">Administration</div>
-              <h1 className="mt-2 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-[32px]">School Settings</h1>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-600">School identity, classes, academic sessions, bills, admission numbering and payment settings.</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <span className="rounded-full border border-teal/20 bg-teal/5 px-3 py-1.5 text-xs font-medium text-teal">{currentYear ? `Current session · ${currentYear.name}` : "No current session"}</span>
-                <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700">{classItems.length} classes</span>
-                <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700">{totalSections} sections</span>
-                <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700">{totalStudents} students</span>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <LinkButton href="/settings/users">Users</LinkButton>
-              <LinkButton href="/settings/providers">SMS / WhatsApp / Email</LinkButton>
-              <LinkButton href="/settings/health">Backups & health</LinkButton>
-              <LinkButton href="/promotion">Sessions &amp; promotion</LinkButton>
-            </div>
+      <PageHeader
+        title="School settings"
+        subtitle="Manage school identity, classes, academic sessions, and billing configuration."
+        actions={
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            <LinkButton href="/settings/users" size="sm">Users</LinkButton>
+            <LinkButton href="/settings/providers" size="sm">SMS / WhatsApp / Email</LinkButton>
+            <LinkButton href="/settings/health" size="sm">Backups &amp; health</LinkButton>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       <SectionCollapseProvider>
+        {/* Quick Navigation Pills */}
+        <div className="no-print -mt-4 mb-2 border-b border-gray-200/80 pb-3">
+          <SettingsQuickNav items={SETTINGS_NAV_ITEMS} />
+        </div>
+
         <div>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex rounded-full bg-accent-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-accent-ink">
-              School & Operations
-            </span>
-          </div>
-          <h2 className="mt-1 text-base font-semibold tracking-tight text-ink">
-            General & Billing Configuration
-          </h2>
-          <p className="text-xs text-gray-500">
-            School identity, payment details, receipts, reminders and system modules.
+          <SectionHeading>School &amp; Operations</SectionHeading>
+          <p className="hint -mt-1 mb-3">
+            School identity, payment details, receipts, reminders and system modules. Click any card to expand.
           </p>
         </div>
 
-        <ProfileSection id="school-identity" title="School Identity" subtitle="Name, address, logo and registration lines printed on receipts." action={saveIdentity} saveLabel="Save school identity">
+        {/* 1. School Identity */}
+        <ProfileSection
+          id="school-identity"
+          title="School Identity"
+          subtitle="Name, managing body, address and registration details printed on bills and receipts."
+          action={saveIdentity}
+          saveLabel="Save school identity"
+        >
           <label className={field}>
             <span className="flex items-baseline gap-1.5">
               School name <span className="text-xs font-normal text-gray-500">(printed in capitals on bills and receipts)</span>
             </span>
-            <input name="name" defaultValue={s.name} required />
+            <input name="name" defaultValue={s.name} required className="w-full min-w-0" />
           </label>
           <label className={field}>
             <span className="flex items-baseline gap-1.5">
               Line under the name <span className="text-xs font-normal text-gray-500">(e.g. managing society)</span>
             </span>
-            <input name="headerSubtitle" defaultValue={s.headerSubtitle} placeholder="(Managed by … Parishad)" />
+            <input name="headerSubtitle" defaultValue={s.headerSubtitle} placeholder="(Managed by … Parishad)" className="w-full min-w-0" />
           </label>
-          <label className={field}>Address / location line<input name="address" defaultValue={s.address} placeholder="Village * Post * District" /></label>
-          <label className={field}>U-DISE code<input name="udiseCode" defaultValue={s.udiseCode} inputMode="numeric" /></label>
+          <label className={field}>Address / location line<input name="address" defaultValue={s.address} placeholder="Village · Post · District" className="w-full min-w-0" /></label>
+          <label className={field}>U-DISE code<input name="udiseCode" defaultValue={s.udiseCode} inputMode="numeric" placeholder="11-digit school code" className="w-full min-w-0" /></label>
           <label className={`${field} sm:col-span-2`}>
             <span className="flex items-baseline gap-1.5">
               Registration lines <span className="text-xs font-normal text-gray-500">(one per line)</span>
             </span>
-            <textarea name="registrationNote" defaultValue={s.registrationNote} rows={2} />
+            <textarea name="registrationNote" defaultValue={s.registrationNote} rows={2} placeholder="Govt. Recognised / Affiliation No. / Regn. No." className="w-full min-w-0" />
           </label>
           <SchoolLogoField hasLogo={!!s.logoPath} version={s.logoPath ?? ""} />
         </ProfileSection>
 
-        <ProfileSection id="contact-payment" title="Contact & Payment" subtitle="Phone, email and UPI details shown on bills." action={saveContact} saveLabel="Save contact & payment">
-          <label className={field}>Phone<input name="phone" defaultValue={s.phone} /></label>
-          <label className={field}>Email<input name="email" defaultValue={s.email} /><FieldError name="email" /></label>
-          <label className={field}>
+        {/* 2. Contact & Payment */}
+        <ProfileSection
+          id="contact-payment"
+          title="Contact &amp; Payment"
+          subtitle="Phone, official email and UPI ID used for QR payments on receipts."
+          action={saveContact}
+          saveLabel="Save contact & payment"
+        >
+          <label className={field}>Phone<input name="phone" defaultValue={s.phone} placeholder="+91 98765 43210" className="w-full min-w-0" /></label>
+          <label className={field}>Email<input name="email" defaultValue={s.email} placeholder="office@school.edu" className="w-full min-w-0" /><FieldError name="email" /></label>
+          <label className={`${field} sm:col-span-2`}>
             <span className="flex items-baseline gap-1.5">
-              UPI ID <span className="text-xs font-normal text-gray-500">(for QR on bills)</span>
+              UPI ID <span className="rounded-full bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">QR Code on receipts</span>
+              <span className="text-xs font-normal text-gray-500">(printed as scannable payment QR code on bills and receipts)</span>
             </span>
-            <input name="upiId" defaultValue={s.upiId ?? ""} placeholder="school@bank" />
+            <input name="upiId" defaultValue={s.upiId ?? ""} placeholder="schoolname@bank" className="w-full min-w-0 font-mono text-sm" />
           </label>
         </ProfileSection>
 
-        <ProfileSection id="bills-receipts" title="Bills & Receipts" subtitle="Prefixes, numbering and receipt format defaults." action={saveBilling} saveLabel="Save bills & receipts">
-          <label className={field}>Bill prefix<input name="invoicePrefix" defaultValue={s.invoicePrefix} /></label>
-          <label className={field}>Receipt prefix<input name="receiptPrefix" defaultValue={s.receiptPrefix} /><FieldError name="receiptPrefix" /></label>
+        {/* 3. Bills & Receipts */}
+        <ProfileSection
+          id="bills-receipts"
+          title="Bills &amp; Receipts"
+          subtitle="Series prefixes, numbering format, and starting receipt counter."
+          action={saveBilling}
+          saveLabel="Save bills & receipts"
+        >
+          <label className={field}>Bill prefix<input name="invoicePrefix" defaultValue={s.invoicePrefix} placeholder="INV" className="w-full min-w-0" /></label>
+          <label className={field}>Receipt prefix<input name="receiptPrefix" defaultValue={s.receiptPrefix} placeholder="REC" className="w-full min-w-0" /><FieldError name="receiptPrefix" /></label>
           <label className={field}>Receipt numbering
-            <select name="receiptNumbering" defaultValue={s.receiptIncludeYear ? "per_year" : "continuous"}>
+            <select name="receiptNumbering" defaultValue={s.receiptIncludeYear ? "per_year" : "continuous"} className="w-full min-w-0">
               <option value="continuous">One running series ({s.receiptPrefix}/6434)</option>
               <option value="per_year">Restarts every academic year ({s.receiptPrefix}/2026-27/1)</option>
             </select></label>
           <label className={field}>
             <span className="flex items-baseline gap-1.5">
-              Number digits <span className="text-xs font-normal text-gray-500">(1 = no leading zeros)</span>
+              Number digits <span className="text-xs font-normal text-gray-500">(1 = no leading zeros, 4 = 0001)</span>
             </span>
-            <input name="receiptDigits" type="number" min={1} max={10} defaultValue={s.receiptDigits} />
+            <input name="receiptDigits" type="number" min={1} max={10} defaultValue={s.receiptDigits} className="w-full min-w-0" />
             <FieldError name="receiptDigits" />
           </label>
           {num && (num.canSetStart ? (
-            <label className={field}>
+            <label className={`${field} sm:col-span-2`}>
               <span className="flex items-baseline gap-1.5">
-                First receipt number <span className="text-xs font-normal text-gray-500">(only if you used a paper book: at 6434, type 6435)</span>
+                First receipt number <span className="text-xs font-normal text-gray-500">(only if continuing a paper book: e.g. at 6434, enter 6435)</span>
               </span>
-              <input name="next" type="number" min={1} defaultValue={num.next} />
+              <input name="next" type="number" min={1} defaultValue={num.next} className="w-full min-w-0" />
               <input type="hidden" name="nextWas" value={num.next} />
               <FieldError name="next" />
             </label>
           ) : (
-            <p className="text-sm text-gray-600 self-end">Next receipt: <b className="font-mono">{num.text}</b> <span className="text-gray-500">({num.issued} issued)</span></p>
+            <div className="sm:col-span-2 rounded-lg border border-accent/30 bg-accent-soft/60 px-4 py-2.5 text-xs text-accent-ink flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+              <span>Next receipt counter: <b className="font-mono text-sm font-bold bg-white px-2 py-0.5 rounded border border-accent/25 text-accent-ink shadow-2xs">{num.text}</b></span>
+              <span className="text-gray-500 font-medium">({num.issued} issued so far)</span>
+            </div>
           ))}
         </ProfileSection>
 
-
-        <ProfileSection id="reminder-timing" title="Reminder timing" subtitle="Quiet hours and the overdue reminder schedule." action={saveReminders} saveLabel="Save reminder timing">
-          <label className={field}>Send messages from<input name="quietStart" defaultValue={s.quietStart} /><FieldError name="quietStart" /></label>
-          <label className={field}>…until<input name="quietEnd" defaultValue={s.quietEnd} /><FieldError name="quietEnd" /></label>
-          <label className={field}>Reminder days before due<input name="reminderDaysBefore" type="number" defaultValue={s.reminderDaysBefore} /></label>
-          <label className={field}>Overdue reminders after (days)<input name="overdueSteps" defaultValue={s.overdueSteps.join(", ")} /></label>
+        {/* 4. Reminder Timing */}
+        <ProfileSection
+          id="reminder-timing"
+          title="Reminder Timing &amp; Quiet Hours"
+          subtitle="Quiet hours and automated overdue message schedule."
+          action={saveReminders}
+          saveLabel="Save reminder timing"
+        >
+          <label className={field}>Send messages from<input name="quietStart" defaultValue={s.quietStart} className="w-full min-w-0" /><FieldError name="quietStart" /></label>
+          <label className={field}>…until<input name="quietEnd" defaultValue={s.quietEnd} className="w-full min-w-0" /><FieldError name="quietEnd" /></label>
+          <label className={field}>Reminder days before due<input name="reminderDaysBefore" type="number" defaultValue={s.reminderDaysBefore} className="w-full min-w-0" /></label>
+          <label className={field}>Overdue reminders after (days)<input name="overdueSteps" defaultValue={s.overdueSteps.join(", ")} className="w-full min-w-0" /></label>
         </ProfileSection>
 
-        <ProfileSection id="features-backup" title="Features & backup" subtitle="Optional modules and the backup location." action={saveFeatures} saveLabel="Save features & backup">
+        {/* 5. Features & Backup */}
+        <ProfileSection
+          id="features-backup"
+          title="Modules &amp; Backup"
+          subtitle="Automated backup directory and optional platform modules."
+          action={saveFeatures}
+          saveLabel="Save module settings"
+        >
           <label className={`${field} sm:col-span-2`}>
             <span className="flex items-baseline gap-1.5">
-              Backup folder <span className="text-xs font-normal text-gray-500">(second disk recommended)</span>
+              Backup folder <span className="text-xs font-normal text-gray-500">(external disk or secondary partition recommended)</span>
             </span>
             <FolderPicker name="backupPath" defaultValue={s.backupPath ?? ""} placeholder="D:\SchoolBackups" />
           </label>
-          <label className="flex items-start gap-2"><input type="checkbox" name="concessionsEnabled" defaultChecked={s.concessionsEnabled} className="mt-0.5" />
-            <span>Fee concessions <span className={hint}>— sibling, staff ward or merit discounts applied to new bills.</span></span></label>
-          <label className="flex items-start gap-2"><input type="checkbox" name="dayCloseEnabled" defaultChecked={s.dayCloseEnabled} className="mt-0.5" />
-            <span>Cash counter closing <span className={hint}>— cashiers count the drawer and lock the day. Most schools leave this off.</span></span></label>
+          <div className="sm:col-span-2 grid gap-3 sm:grid-cols-2">
+            <label className="flex items-start gap-3 rounded-xl border border-gray-200/90 bg-subtle/50 p-3.5 hover:border-accent/40 transition-all cursor-pointer has-[:checked]:border-accent has-[:checked]:bg-accent-soft/20 has-[:checked]:ring-1 has-[:checked]:ring-accent/30">
+              <input type="checkbox" name="concessionsEnabled" defaultChecked={s.concessionsEnabled} className="mt-0.5" />
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-semibold text-ink">Fee Concessions</span>
+                  <span className="rounded bg-brand-50 border border-brand-200/70 px-1.5 py-0.2 text-[9px] font-semibold text-brand-800">Optional</span>
+                </div>
+                <p className="mt-0.5 text-xs text-gray-500 leading-relaxed">Sibling, staff ward, or merit discounts applied when generating bills.</p>
+              </div>
+            </label>
+            <label className="flex items-start gap-3 rounded-xl border border-gray-200/90 bg-subtle/50 p-3.5 hover:border-accent/40 transition-all cursor-pointer has-[:checked]:border-accent has-[:checked]:bg-accent-soft/20 has-[:checked]:ring-1 has-[:checked]:ring-accent/30">
+              <input type="checkbox" name="dayCloseEnabled" defaultChecked={s.dayCloseEnabled} className="mt-0.5" />
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-semibold text-ink">Cash Counter Closing</span>
+                  <span className="rounded bg-brand-50 border border-brand-200/70 px-1.5 py-0.2 text-[9px] font-semibold text-brand-800">Optional</span>
+                </div>
+                <p className="mt-0.5 text-xs text-gray-500 leading-relaxed">Cashiers count physical drawer and lock the day. Most schools leave this off.</p>
+              </div>
+            </label>
+          </div>
         </ProfileSection>
 
-        <div className="pt-6 border-t border-gray-200">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex rounded-full bg-accent-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-accent-ink">
-              Academics & Structure
-            </span>
-          </div>
-          <h2 className="mt-1 text-base font-semibold tracking-tight text-ink">
-            Classes, Sessions & Numbering
-          </h2>
-          <p className="text-xs text-gray-500">
-            Create classes, rename sections, manage academic sessions, and configure admission & roll numbering sequences.
+        <div className="pt-4 border-t border-gray-200/80">
+          <SectionHeading>Academics &amp; Structure</SectionHeading>
+          <p className="hint -mt-1 mb-3">
+            Create classes, rename sections, manage academic sessions, and configure admission &amp; roll numbering sequences.
           </p>
         </div>
 
+        {/* 6. Classes & Sections */}
         <ClassesSectionsManager
           classes={classItems}
           add={addClassSection}
@@ -342,67 +387,24 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           removeSection={removeSectionAction}
         />
 
-        <CollapsibleSection id="academic-sessions" title="Academic sessions" subtitle="Create sessions and choose the active one.">
-          <ul className="space-y-1 text-sm">{m.years.map((y) => (
-            <li key={y.id} className="flex justify-between items-center py-1">
-              <span><b>{y.name}</b> <span className="text-gray-500">({y.startDate} → {y.endDate})</span></span>
-              {y.isCurrent ? <b className="text-ink">current</b> : <form action={makeCurrent.bind(null, y.id)}><button className="text-xs text-ink hover:underline">Make current</button></form>}
-            </li>
-          ))}</ul>
-          <ActionForm action={addYear} className="mt-4 border-t border-gray-100 pt-3" resetOnSuccess>
-            <div className="overflow-x-auto">
-              <div className="grid grid-cols-[1.1fr_1.2fr_1.2fr_auto] items-center gap-x-2.5 gap-y-1.5 min-w-[380px]">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600">Academic session</span>
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600">Start date</span>
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600">End date</span>
-                <span></span>
+        {/* 7. Academic Sessions */}
+        <AcademicSessionsSection
+          years={m.years}
+          makeCurrent={makeCurrent}
+          addYear={addYear}
+          saveSession={saveSession}
+          sessYear={sessYear}
+          sessRows={sessRows}
+        />
 
-                <input name="name" placeholder="2027-28" required className="min-w-0" />
-                <input type="date" name="startDate" aria-label="Year start" required className="min-w-0" />
-                <input type="date" name="endDate" data-after="startDate" data-months="12" required className="min-w-0" />
-                <Submit variant="secondary">Add</Submit>
-              </div>
-            </div>
-            <FieldError name="name" />
-            <FieldError name="endDate" />
-          </ActionForm>
-
-          {sessYear && (
-          <div className="mt-6 border-t border-gray-100 pt-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-ink">Class session dates</h3>
-              <div className="flex flex-wrap gap-1 text-sm" role="group" aria-label="Academic year">
-                {m.years.map((y) => (
-                  <Link key={y.id} href={`/settings?sy=${y.id}#academic-sessions`} scroll={false}
-                    className={`rounded-md px-2.5 py-1 ${y.id === sessYear.id ? "bg-ink text-white" : "border border-gray-200 text-ink hover:bg-gray-50"}`}>
-                    {y.name}{y.isCurrent ? " (current)" : ""}
-                  </Link>
-                ))}
-              </div>
-            </div>
-            <p className="mt-2 text-xs text-gray-600">
-              Classes use the year&apos;s dates (<b>{formatDate(sessYear.startDate)} – {formatDate(sessYear.endDate)}</b>) unless you give them their own,
-              e.g. Nursery–UKG January–December. At most 12 months; one class&apos;s sessions can&apos;t overlap; dates can&apos;t move past bills already made.
-              Students move up automatically the day after their class&apos;s session ends.
-            </p>
-            <div className="mt-3 space-y-2">{sessRows.map((r) => (
-              <ActionForm key={r.classId} action={saveSession} className="flex flex-wrap items-center gap-2 border-b border-gray-100 pb-2">
-                <input type="hidden" name="yearId" value={sessYear.id} /><input type="hidden" name="classId" value={r.classId} />
-                <span className="w-20 text-sm font-medium">{r.className}</span>
-                <input type="date" name="startDate" defaultValue={r.startDate} aria-label={`${r.className} session start`} required className="w-40" />
-                <span className="text-gray-400">to</span>
-                <input type="date" name="endDate" defaultValue={r.endDate} aria-label={`${r.className} session end`} data-after="startDate" data-months="12" required className="w-40" />
-                <Submit variant="secondary">Save</Submit>
-                {r.custom
-                  ? <><span className="text-xs font-medium text-blue-700">own dates</span><Submit variant="secondary" name="reset" value="1">Use year&apos;s dates</Submit></>
-                  : <span className="text-xs text-gray-400">year&apos;s dates</span>}
-              </ActionForm>
-            ))}</div>
-          </div>
-          )}
-        </CollapsibleSection>
-
-        <ProfileSection id="admission-numbering" title="Admission & Roll Numbering" subtitle="How admission numbers and roll numbers are generated." action={saveNumbering} saveLabel="Save numbering formats">
+        {/* 8. Admission & Roll Numbering */}
+        <ProfileSection
+          id="admission-numbering"
+          title="Admission &amp; Roll Numbering"
+          subtitle="Configure automated admission numbering pattern and student roll sequences."
+          action={saveNumbering}
+          saveLabel="Save numbering formats"
+        >
           <NumberingFormatFields s={s} currentYear={currentYear} />
         </ProfileSection>
       </SectionCollapseProvider>

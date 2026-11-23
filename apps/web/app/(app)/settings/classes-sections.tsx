@@ -5,7 +5,7 @@ import { ActionForm, FieldError, Submit } from "@/components/action-form";
 import { buttonClass, cx } from "@/components/ui";
 import { PRESET_CLASSES, type PresetClass, compareClasses, isClassPresetMatch, findMatchingPreset } from "@/lib/classes";
 import type { ActionState } from "@/lib/action";
-import { CollapsibleSection } from "./section-collapse";
+import { CollapsibleSection, useSectionCollapse } from "./section-collapse";
 
 function matchesClassPreset(p: PresetClass, query: string): boolean {
   if (!query) return true;
@@ -30,10 +30,10 @@ function scoreClassPreset(p: PresetClass, query: string): number {
   return 0;
 }
 
-const actionLink = "cursor-pointer text-xs font-semibold transition-colors";
-const renameLink = cx(actionLink, "text-accent-ink hover:text-accent");
-const createLink = cx(actionLink, "text-brand-700 hover:text-brand-800");
-const deleteLink = cx(actionLink, "text-red-600 hover:text-red-700");
+const actionButtonBase = "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold transition-all cursor-pointer shadow-2xs";
+const renameLink = cx(actionButtonBase, "border border-gray-200 bg-white text-accent-ink hover:border-accent/40 hover:bg-accent-soft");
+const createLink = cx(actionButtonBase, "border border-brand-200/80 bg-brand-50/80 text-brand-800 hover:bg-brand-100");
+const deleteLink = cx(actionButtonBase, "border border-red-200/80 bg-red-50/70 text-red-700 hover:bg-red-100");
 
 function TextSubmit({ children, confirm }: { children: ReactNode; confirm?: string }) {
   const { pending } = useFormStatus();
@@ -54,6 +54,8 @@ export function ClassesSectionsManager({
   removeClass: Action;
   removeSection: Action;
 }) {
+  const { open } = useSectionCollapse("classes-sections");
+  const [editing, setEditing] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
   const [className, setClassName] = useState("");
   const [section, setSection] = useState("");
@@ -88,7 +90,15 @@ export function ClassesSectionsManager({
     setHighlightedIndex(-1);
   }, []);
 
+  useEffect(() => {
+    if (!open) {
+      setEditing(false);
+      reset();
+    }
+  }, [open, reset]);
+
   const startRenameClass = (c: ClassItem) => {
+    setEditing(true);
     setEdit({ mode: "class", id: c.id });
     setTargetClassId(null);
     setClassName(c.name);
@@ -98,6 +108,7 @@ export function ClassesSectionsManager({
     focusForm();
   };
   const startRenameSection = (c: ClassItem, sec: SectionItem) => {
+    setEditing(true);
     setEdit({ mode: "section", id: sec.id });
     setTargetClassId(null);
     setClassName(c.name);
@@ -107,6 +118,7 @@ export function ClassesSectionsManager({
     focusForm();
   };
   const startCreateSection = (c: ClassItem) => {
+    setEditing(true);
     setEdit(null);
     setTargetClassId(c.id);
     setClassName(c.name);
@@ -225,22 +237,85 @@ export function ClassesSectionsManager({
       title="Classes & Sections"
       subtitle="Create classes, rename sections and place students in them."
       overflowVisible={true}
+      actions={
+        open ? (
+          !editing ? (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-ink shadow-2xs hover:bg-accent hover:text-white transition-all cursor-pointer"
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3.5 w-3.5" aria-hidden="true">
+                <path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L4.5 13.5l-3 1 1-3 9-9z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Edit
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(false);
+                reset();
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-gray-700 shadow-2xs hover:border-gray-300 hover:bg-gray-50 transition-all cursor-pointer"
+            >
+              Done
+            </button>
+          )
+        ) : undefined
+      }
     >
-      <div ref={formRef} className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 relative z-30">
-        <div className="eyebrow mb-3">Add or edit</div>
+      <div
+        ref={formRef}
+        className={cx(
+          "rounded-xl border p-4 relative z-30 transition-all",
+          edit || targetClassId != null
+            ? "border-accent/60 bg-accent-soft/20 shadow-sm"
+            : "border-gray-200/90 bg-subtle/70",
+          !editing && "opacity-75"
+        )}
+      >
+        <div className="eyebrow mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span>Add or edit</span>
+            {edit?.mode === "class" ? (
+              <span className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                Renaming class
+              </span>
+            ) : edit?.mode === "section" ? (
+              <span className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                Renaming section
+              </span>
+            ) : targetClassId != null ? (
+              <span className="rounded-full bg-brand-100 border border-brand-300 px-2 py-0.5 text-[10px] font-bold text-brand-800">
+                Adding section to {targetClass?.name}
+              </span>
+            ) : editing ? (
+              <span className="rounded-full bg-brand-50 border border-brand-200 px-2 py-0.5 text-[10px] font-semibold text-brand-800">
+                Create new
+              </span>
+            ) : null}
+          </div>
+          {!editing && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-normal normal-case text-gray-500">
+              🔒 Click &ldquo;Edit&rdquo; above to create or modify classes
+            </span>
+          )}
+        </div>
+        <fieldset disabled={!editing}>
         <ActionForm action={add} className="space-y-2" onSuccess={reset}>
           <input type="hidden" name="mode" value={targetClassId != null ? "createSection" : edit?.mode ?? "create"} />
           <input type="hidden" name="id" value={edit?.id ?? ""} />
           {targetClassId != null && <input type="hidden" name="classId" value={targetClassId} />}
           {classNameLocked && <input type="hidden" name="className" value={className} />}
-          <div className="flex flex-wrap items-end gap-2.5">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-2.5">
             {classNameLocked ? (
-              <label className="field-stack min-w-[200px] flex-1">
+              <label className="field-stack w-full sm:min-w-[200px] sm:flex-1">
                 <span>Class</span>
-                <input value={className} disabled className="opacity-60 bg-gray-100" />
+                <input value={className} disabled className="opacity-60 bg-gray-100 w-full" />
               </label>
             ) : (
-              <div ref={comboboxRef} className="relative field-stack min-w-[220px] flex-1">
+              <div ref={comboboxRef} className="relative field-stack w-full sm:min-w-[220px] sm:flex-1">
                 <span>
                   Class <span className="font-semibold text-red-600">*</span>
                   {edit?.mode === "class" && (
@@ -347,7 +422,7 @@ export function ClassesSectionsManager({
               </div>
             )}
 
-            <label className="field-stack w-44">
+            <label className="field-stack w-full sm:w-44">
               <span>
                 Section{" "}
                 {isSectionDisabled ? null : isSectionRequired ? (
@@ -364,17 +439,20 @@ export function ClassesSectionsManager({
                 maxLength={16}
                 disabled={isSectionDisabled}
                 required={isSectionRequired}
+                className="w-full"
               />
             </label>
 
-            <Submit className="cursor-pointer">
-              {targetClassId != null ? "Create section" : edit ? "Save changes" : "Create class"}
-            </Submit>
-            {(edit || targetClassId != null || className) && (
-              <button type="button" onClick={reset} className={cx(buttonClass("secondary"), "cursor-pointer")}>
-                Cancel
-              </button>
-            )}
+            <div className="flex items-center gap-2 pt-1 sm:pt-0 w-full sm:w-auto">
+              <Submit className="flex-1 sm:flex-none cursor-pointer">
+                {targetClassId != null ? "Create section" : edit ? "Save changes" : "Create class"}
+              </Submit>
+              {(edit || targetClassId != null || className) && (
+                <button type="button" onClick={reset} className={cx(buttonClass("secondary"), "flex-1 sm:flex-none cursor-pointer")}>
+                  Cancel
+                </button>
+              )}
+            </div>
           </div>
           {movingStudents && submittedStudents.map((s) => <input key={s.id} type="hidden" name="studentIds" value={s.id} />)}
           {showChecklist && <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
@@ -404,6 +482,7 @@ export function ClassesSectionsManager({
           <FieldError name="className" />
           <FieldError name="section" />
         </ActionForm>
+        </fieldset>
       </div>
       <p className="hint">{edit
         ? `Editing ${edit.mode === "class" ? "class name" : "section name"} — change the value above and save.`
@@ -414,46 +493,118 @@ export function ClassesSectionsManager({
             : "Choose a preset or create a new class. Section is optional."}</p>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {sortedClasses.map((c) => (
-          <article key={c.id} className="overflow-hidden rounded-xl border border-gray-200 bg-surface shadow-[0_1px_2px_rgba(16,24,40,0.06)] transition-colors hover:border-gray-300">
-            <div className="p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="truncate text-[15px] font-semibold tracking-tight text-ink">{c.name}</h3>
-                  <p className="mt-1 text-xs text-gray-500">{c.students.length} students · {c.sections.length} {c.sections.length === 1 ? "section" : "sections"}</p>
-                </div>
-                <span className={cx("shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide", c.used ? "bg-brand-50 text-brand-700" : "bg-gray-100 text-gray-500")}>
-                  {c.used ? "In use" : "Empty"}
-                </span>
-              </div>
+        {sortedClasses.map((c) => {
+          const isTargetClass = targetClassId === c.id;
+          const isRenamingClass = edit?.mode === "class" && edit.id === c.id;
+          const isEditingSection = edit?.mode === "section" && c.sections.some((s) => s.id === edit.id);
+          const isHighlighted = isTargetClass || isRenamingClass || isEditingSection;
 
-              <div className="mt-4 space-y-1.5">
-                {c.sections.length ? c.sections.map((sec) => (
-                  <div key={sec.id} className="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50/70 px-3 py-2">
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-700">{sec.name}</span>
-                    <span className="rounded-full bg-surface px-2 py-0.5 text-[10px] font-semibold tabular-nums text-gray-500 ring-1 ring-gray-200">{c.students.filter((s) => s.section === sec.name).length}</span>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <button type="button" onClick={() => startRenameSection(c, sec)} className={renameLink} aria-label={`Rename section ${sec.name}`}>Rename</button>
-                      {!sec.used && <ActionForm action={removeSection} className="inline-flex">
-                        <input type="hidden" name="id" value={sec.id} />
-                        <TextSubmit confirm={`Remove section ${sec.name} from ${c.name}?`}>Delete</TextSubmit>
-                      </ActionForm>}
+          return (
+            <article
+              key={c.id}
+              className={cx(
+                "overflow-hidden rounded-xl border bg-surface transition-all",
+                isHighlighted
+                  ? "border-accent ring-2 ring-accent/30 shadow-md bg-accent-soft/10"
+                  : "border-gray-200/90 shadow-2xs hover:border-accent/40"
+              )}
+            >
+              <div className="p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="truncate text-sm font-bold tracking-tight text-ink">{c.name}</h3>
+                      {isRenamingClass && (
+                        <span className="rounded bg-amber-100 border border-amber-300 px-1.5 py-0.2 text-[9px] font-bold text-amber-800 animate-pulse">
+                          Editing
+                        </span>
+                      )}
+                      {isTargetClass && (
+                        <span className="rounded bg-brand-100 border border-brand-300 px-1.5 py-0.2 text-[9px] font-bold text-brand-800 animate-pulse">
+                          Adding Section
+                        </span>
+                      )}
                     </div>
+                    <p className="mt-1 text-xs text-gray-500 font-medium">
+                      {c.students.length} {c.students.length === 1 ? "student" : "students"} · {c.sections.length} {c.sections.length === 1 ? "section" : "sections"}
+                    </p>
                   </div>
-                )) : <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50/50 px-3 py-3 text-center text-xs text-gray-400">No sections yet — create the first one to place all students.</div>}
-              </div>
+                  <span
+                    className={cx(
+                      "shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide border",
+                      c.used
+                        ? "bg-emerald-50 text-emerald-800 border-emerald-200/80"
+                        : "bg-gray-100 text-gray-500 border-gray-200"
+                    )}
+                  >
+                    {c.used && <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />}
+                    {c.used ? "In use" : "Empty"}
+                  </span>
+                </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-gray-100 pt-3">
-                <button type="button" onClick={() => startRenameClass(c)} className={renameLink}>Rename class</button>
-                <button type="button" onClick={() => startCreateSection(c)} className={createLink}>Create section</button>
-                {!c.used && <ActionForm action={removeClass} className="inline-flex">
-                  <input type="hidden" name="id" value={c.id} />
-                  <TextSubmit confirm={`Remove class ${c.name}? Its empty sections and fee structure will also be removed.`}>Delete class</TextSubmit>
-                </ActionForm>}
+                <div className="mt-4 space-y-1.5">
+                  {c.sections.length ? c.sections.map((sec) => {
+                    const count = c.students.filter((s) => s.section === sec.name).length;
+                    const isCurrentSecEdit = edit?.mode === "section" && edit.id === sec.id;
+
+                    return (
+                      <div
+                        key={sec.id}
+                        className={cx(
+                          "flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors",
+                          isCurrentSecEdit
+                            ? "border-amber-300 bg-amber-50/70 ring-1 ring-amber-200"
+                            : "border-gray-200/70 bg-white"
+                        )}
+                      >
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-800">{sec.name}</span>
+                        <span
+                          className={cx(
+                            "rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums border",
+                            count > 0
+                              ? "bg-accent-soft text-accent-ink border-accent/25 font-bold"
+                              : "bg-gray-100 text-gray-400 border-gray-200"
+                          )}
+                          title={`${count} students in ${c.name} ${sec.name}`}
+                        >
+                          {count}
+                        </span>
+                        {editing && (
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            <button type="button" onClick={() => startRenameSection(c, sec)} className={renameLink} aria-label={`Rename section ${sec.name}`}>Rename</button>
+                            {!sec.used && (
+                              <ActionForm action={removeSection} className="inline-flex">
+                                <input type="hidden" name="id" value={sec.id} />
+                                <TextSubmit confirm={`Remove section ${sec.name} from ${c.name}?`}>Delete</TextSubmit>
+                              </ActionForm>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }) : (
+                    <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50/50 px-3 py-3 text-center text-xs text-gray-400">
+                      No sections yet — create the first one to place all students.
+                    </div>
+                  )}
+                </div>
+
+                {editing && (
+                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
+                    <button type="button" onClick={() => startRenameClass(c)} className={renameLink}>Rename</button>
+                    <button type="button" onClick={() => startCreateSection(c)} className={createLink}>+ Section</button>
+                    {!c.used && (
+                      <ActionForm action={removeClass} className="inline-flex">
+                        <input type="hidden" name="id" value={c.id} />
+                        <TextSubmit confirm={`Remove class ${c.name}? Its empty sections and fee structure will also be removed.`}>Delete</TextSubmit>
+                      </ActionForm>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          </article>
-        ))}
+            </article>
+          );
+        })}
       </div>
       <p className="hint mt-3">Creating the first section of a class automatically moves all its students into it. Renaming keeps students assigned to the same class/section; lists and reports show the new name. Only classes and sections with no students can be deleted.</p>
     </CollapsibleSection>
