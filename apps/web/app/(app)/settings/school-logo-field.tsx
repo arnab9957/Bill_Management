@@ -21,21 +21,21 @@ export function SchoolLogoField({
   }, [previewUrl]);
 
   return (
-    <div className="sm:col-span-2 flex flex-col gap-2 rounded-xl border border-gray-200/90 bg-gray-50/60 p-4 transition-colors">
+    <div className="sm:col-span-2 flex flex-col gap-2 rounded-xl border border-gray-200/90 bg-subtle/70 p-4 transition-colors">
       <div className="flex items-baseline justify-between gap-2">
         <span className="flex items-baseline gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-700">
           School logo <span className="text-xs font-normal text-gray-500 lowercase">(optional — printed on bills & receipts)</span>
         </span>
         {hasLogo && !markedForRemoval && !previewUrl && (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active logo
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-200/80 bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-900">
+            <span className="h-1.5 w-1.5 rounded-full bg-brand-600" /> Active logo
           </span>
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-4 pt-1">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 pt-1">
         {/* Preview box */}
-        <div className="relative flex h-16 w-44 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white p-1.5 shadow-2xs overflow-hidden">
+        <div className="relative flex h-16 w-full sm:w-44 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white p-1.5 shadow-2xs overflow-hidden">
           {previewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={previewUrl} alt="New logo preview" className="h-full w-full object-contain" />
@@ -58,7 +58,7 @@ export function SchoolLogoField({
         </div>
 
         {/* Input & controls */}
-        <div className="flex min-w-[220px] flex-1 flex-col gap-2">
+        <div className="flex w-full min-w-0 flex-1 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <input
               key={inputKey}
@@ -77,7 +77,7 @@ export function SchoolLogoField({
                   setPreviewUrl(null);
                 }
               }}
-              className="text-xs text-gray-700 file:mr-2.5 file:cursor-pointer file:rounded-md file:border-0 file:bg-gray-200/90 file:px-2.5 file:py-1.5 file:text-xs file:font-semibold file:text-gray-800 hover:file:bg-gray-300 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full sm:w-auto text-xs text-gray-700 file:mr-2.5 file:cursor-pointer file:rounded-md file:border-0 file:bg-gray-200/90 file:px-2.5 file:py-1.5 file:text-xs file:font-semibold file:text-gray-800 hover:file:bg-gray-300 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
 
             {previewUrl && (

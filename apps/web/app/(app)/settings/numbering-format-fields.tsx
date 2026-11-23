@@ -53,7 +53,7 @@ export function NumberingFormatFields({
     <div className="space-y-6 sm:col-span-2">
       <div>
         <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-700">Admission number format</h4>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           <label className={field}>
             <span className="font-medium text-gray-900">Prefix</span>
             <input
@@ -116,9 +116,9 @@ export function NumberingFormatFields({
           </label>
 
           <div className="flex flex-col justify-end">
-            <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs">
-              <span className="font-semibold text-sky-900">Generated sample:</span>
-              <div className="mt-0.5 font-mono text-sm font-bold text-sky-950">{sampleAdmNo}</div>
+            <div className="rounded-lg border border-accent/20 bg-accent-soft px-3 py-2 text-xs">
+              <span className="font-semibold text-accent-ink">Generated sample:</span>
+              <div className="mt-0.5 font-mono text-sm font-bold text-accent-ink">{sampleAdmNo}</div>
             </div>
           </div>
         </div>
@@ -126,7 +126,7 @@ export function NumberingFormatFields({
 
       <div className="border-t border-gray-100 pt-5">
         <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-700">Roll number format</h4>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           <label className={field}>
             <span className="font-medium text-gray-900">Number padding digits</span>
             <select
@@ -152,9 +152,9 @@ export function NumberingFormatFields({
           </label>
 
           <div className="flex flex-col justify-end">
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs">
-              <span className="font-semibold text-emerald-900">Generated sample:</span>
-              <div className="mt-0.5 font-mono text-sm font-bold text-emerald-950">{sampleRollNo}</div>
+            <div className="rounded-lg border border-brand-200/80 bg-brand-50 px-3 py-2 text-xs">
+              <span className="font-semibold text-brand-900">Generated sample:</span>
+              <div className="mt-0.5 font-mono text-sm font-bold text-brand-900">{sampleRollNo}</div>
             </div>
           </div>
 
